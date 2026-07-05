@@ -26,7 +26,7 @@ This skill drives the `bundesrat` command. **Before anything else, validate it i
 
 ```bash
 bundesrat session     # current sitting: { title, header, tops: [ {toptitle, topdrucksache, topheader, topdetail} ] }
-bundesrat next        # upcoming plenary sitting dates
+bundesrat next        # upcoming plenary sittings (dates are inside the HTML detail)
 bundesrat compact     # BundesratKOMPAKT — selected TOPs with editorial summaries (nested)
 ```
 

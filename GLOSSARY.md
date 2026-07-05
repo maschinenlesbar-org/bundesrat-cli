@@ -31,7 +31,8 @@ governments line up). The feed centres on the official composition graphic.
 
 **Plenarsitzung / session (`session`, `next`).** A plenary sitting of the
 Bundesrat. It meets roughly every 3–4 weeks (~10 times a year). `session` is the
-current/next sitting with its agenda; `next` lists upcoming sitting dates.
+current/next sitting with its agenda; `next` is the *Anstehende Plenarsitzungen*
+page — the upcoming dates are inside the HTML `detail` field, not separate columns.
 
 **Tagesordnung / agenda.** The list of items a sitting will decide. `session`
 returns it as `tops`.

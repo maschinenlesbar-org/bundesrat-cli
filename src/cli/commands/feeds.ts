@@ -25,7 +25,13 @@ export function registerCommands(program: Command, deps: CliDeps): void {
   feedCommand(program, deps, "session", "Current plenary sitting: agenda items (TOPs) with their Drucksachen", (c) =>
     c.session(),
   );
-  feedCommand(program, deps, "next", "Upcoming plenary sitting dates", (c) => c.nextSessions());
+  feedCommand(
+    program,
+    deps,
+    "next",
+    "Upcoming plenary sittings (the 'Anstehende Plenarsitzungen' page — the dates are inside the HTML `detail`)",
+    (c) => c.nextSessions(),
+  );
   feedCommand(program, deps, "compact", "BundesratKOMPAKT — selected agenda items with summaries", (c) =>
     c.compact(),
   );

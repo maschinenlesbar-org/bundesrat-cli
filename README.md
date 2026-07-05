@@ -47,8 +47,8 @@ bundesrat members --state Bayern | jq -r '.[] | "\(.firstname) \(.name) — \(.p
 # All Green members across the Länder
 bundesrat members --party grüne | jq length
 
-# Upcoming sitting dates
-bundesrat next
+# Upcoming sittings (dates are in the HTML detail)
+bundesrat next | jq -r '.[].detail'
 ```
 
 ## Commands
@@ -56,7 +56,7 @@ bundesrat next
 | Command | What it shows |
 | --- | --- |
 | `session` | Current plenary sitting: title, date and agenda items (TOPs) with their Drucksachen |
-| `next` | Upcoming plenary sitting dates |
+| `next` | Upcoming plenary sittings — the *Anstehende Plenarsitzungen* page (the dates are inside the HTML `detail`) |
 | `compact` | BundesratKOMPAKT — selected agenda items with summaries |
 | `members` | Members of the Bundesrat (`--state <Land>`, `--party <text>`) |
 | `composition` | Seat/vote distribution of the Bundesrat (Stimmverteilung) |

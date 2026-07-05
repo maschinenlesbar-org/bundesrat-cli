@@ -81,7 +81,7 @@ Filtering is client-side, so an unmatched filter returns `[]` (not the full list
 ## The other feeds
 
 ```bash
-bundesrat next          # upcoming plenary sitting dates
+bundesrat next          # upcoming plenary sittings (dates are inside the HTML `detail`)
 bundesrat compact        # BundesratKOMPAKT — selected TOPs with summaries (nested)
 bundesrat composition    # seat/vote distribution (Stimmverteilung)
 bundesrat presidium      # the Präsidium
