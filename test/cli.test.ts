@@ -96,6 +96,28 @@ test("--output writes to a file and keeps stdout clean", async () => {
   assert.match(cli.err.join("\n"), /Wrote \d+ bytes/);
 });
 
+test("a --output write failure reports a clean error (exit 1), not 'Unexpected error'", async () => {
+  const out: string[] = [];
+  const err: string[] = [];
+  const mt = makeMockTransport(() => xmlResponse(fx.membersXml));
+  const deps: CliDeps = {
+    io: {
+      out: (s) => out.push(s),
+      err: (s) => err.push(s),
+      writeFile: () => {
+        const e = new Error("EISDIR: illegal operation on a directory, open '/tmp'");
+        throw e;
+      },
+    },
+    createClient: (opts) => new BundesratClient({ ...opts, transport: mt.transport }),
+  };
+  const code = await run(["--output", "/tmp", "members"], deps);
+  assert.equal(code, 1);
+  assert.match(err.join("\n"), /Could not write to \/tmp: EISDIR/);
+  assert.doesNotMatch(err.join("\n"), /Unexpected error/);
+  assert.equal(out.length, 0); // nothing leaked to stdout
+});
+
 test("a control character in --user-agent is rejected (exit 2), no request", async () => {
   const cli = makeCli(() => xmlResponse(fx.membersXml));
   const code = await run(["members", "--user-agent", "bad\r\nX-Injected: 1"], cli.deps);

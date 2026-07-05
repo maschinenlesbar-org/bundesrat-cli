@@ -5,6 +5,7 @@ import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { CliDeps } from "./io.js";
 import type { BundesratClientOptions } from "../client/client.js";
+import { BundesratError } from "../client/errors.js";
 
 /**
  * commander value-parser: a plain base-10 non-negative integer.
@@ -109,7 +110,16 @@ export function renderJson(deps: CliDeps, global: GlobalOptions, value: unknown)
   const text = global.compact ? JSON.stringify(value) : JSON.stringify(value, null, 2);
   if (global.output) {
     const data = Buffer.from(text + "\n", "utf8");
-    deps.io.writeFile(global.output, data);
+    try {
+      deps.io.writeFile(global.output, data);
+    } catch (err) {
+      // A bad --output path (missing directory, a directory, no permission) is a
+      // user error, not an internal fault — surface it as a clean BundesratError
+      // instead of letting the raw fs exception hit the "Unexpected error" path.
+      // Drop the `, open '<path>'` tail since we already name the path ourselves.
+      const reason = err instanceof Error ? err.message.replace(/,\s*open\s+'.*'$/, "") : String(err);
+      throw new BundesratError(`Could not write to ${global.output}: ${reason}`);
+    }
     deps.io.err(`Wrote ${data.length} bytes to ${global.output}`);
   } else {
     deps.io.out(text);
