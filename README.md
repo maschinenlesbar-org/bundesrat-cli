@@ -7,7 +7,7 @@
 Follow Germany's **Bundesrat** — the chamber of the sixteen Länder — from your
 terminal. `bundesrat` is a command-line tool over the Bundesrat's public data
 feeds (the data behind the official Bundesrat app): the current plenary sitting's
-agenda and its Drucksachen, the members, the seat/vote distribution and more — as
+agenda and its Drucksachen, the members, the chamber's composition and more — as
 clean JSON you can pipe straight into [`jq`](https://jqlang.github.io/jq/).
 
 - **The current sitting's agenda** — every Tagesordnungspunkt (TOP) with its
@@ -59,7 +59,7 @@ bundesrat next | jq -r '.[].detail'
 | `next` | Upcoming plenary sittings — the *Anstehende Plenarsitzungen* page (the dates are inside the HTML `detail`) |
 | `compact` | BundesratKOMPAKT — selected agenda items with summaries |
 | `members` | Members of the Bundesrat (`--state <Land>`, `--party <text>`) |
-| `composition` | Seat/vote distribution of the Bundesrat (Stimmverteilung) |
+| `composition` | The Bundesrat composition page (Stimmverteilung) — a reference to the composition graphic, not a structured vote table |
 | `presidium` | The Präsidium |
 | `news` | Current news / press items (Aktuelles) |
 | `appointments` | Committee appointments and dates (Termine) |

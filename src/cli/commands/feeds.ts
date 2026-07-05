@@ -35,8 +35,12 @@ export function registerCommands(program: Command, deps: CliDeps): void {
   feedCommand(program, deps, "compact", "BundesratKOMPAKT — selected agenda items with summaries", (c) =>
     c.compact(),
   );
-  feedCommand(program, deps, "composition", "Seat/vote distribution of the Bundesrat (Stimmverteilung)", (c) =>
-    c.composition(),
+  feedCommand(
+    program,
+    deps,
+    "composition",
+    "The Bundesrat composition page (Stimmverteilung) — a reference to the composition graphic, not a structured per-Land vote table",
+    (c) => c.composition(),
   );
   feedCommand(program, deps, "presidium", "The Präsidium of the Bundesrat", (c) => c.presidium());
   feedCommand(program, deps, "news", "Current news / press items (Aktuelles)", (c) => c.news());
