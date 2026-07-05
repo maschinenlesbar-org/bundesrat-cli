@@ -1,0 +1,36 @@
+{
+  "name": "bundesrat-skills",
+  "owner": {
+    "name": "Sebastian Schürmann",
+    "email": "sebs@2xs.org"
+  },
+  "metadata": {
+    "description": "Bundesrat (German Federal Council) skills powered by the bundesrat-cli — plenary agenda, members and news"
+  },
+  "plugins": [
+    {
+      "name": "bundesrat",
+      "source": "./",
+      "description": "Follow the Bundesrat: the current plenary sitting's agenda and Drucksachen, the members (by Land or party), the seat/vote distribution, and the latest news — via the bundesrat-cli.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Sebastian Schürmann",
+        "email": "sebs@2xs.org"
+      },
+      "license": "AGPL-3.0-or-later",
+      "repository": "https://github.com/maschinenlesbar-org/bundesrat-cli",
+      "homepage": "https://github.com/maschinenlesbar-org/bundesrat-cli#readme",
+      "category": "government",
+      "keywords": [
+        "bundesrat",
+        "plenum",
+        "tagesordnung",
+        "drucksache",
+        "laender",
+        "parlament",
+        "germany",
+        "bund.dev"
+      ]
+    }
+  ]
+}

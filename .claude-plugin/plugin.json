@@ -1,0 +1,22 @@
+{
+  "name": "bundesrat",
+  "version": "0.1.0",
+  "description": "Bundesrat (German Federal Council) skills powered by the bundesrat-cli — plenary agenda, members and news.",
+  "author": {
+    "name": "Sebastian Schürmann",
+    "email": "sebs@2xs.org"
+  },
+  "license": "AGPL-3.0-or-later",
+  "repository": "https://github.com/maschinenlesbar-org/bundesrat-cli",
+  "homepage": "https://github.com/maschinenlesbar-org/bundesrat-cli#readme",
+  "keywords": [
+    "bundesrat",
+    "plenum",
+    "tagesordnung",
+    "drucksache",
+    "laender",
+    "parlament",
+    "germany",
+    "bund.dev"
+  ]
+}
