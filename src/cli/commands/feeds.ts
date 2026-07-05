@@ -51,7 +51,11 @@ export function registerCommands(program: Command, deps: CliDeps): void {
   program
     .command("members")
     .description("Members of the Bundesrat (Länder ministers and plenipotentiaries)")
-    .option("--state <land>", "only members of this federal state (Land), case-insensitive", parseNonEmpty)
+    .option(
+      "--state <land>",
+      "only members of this federal state (Land) — exact match, case-insensitive (contrast --party)",
+      parseNonEmpty,
+    )
     .option("--party <name>", "only members whose party contains this text, case-insensitive", parseNonEmpty)
     .action(
       action(deps, async ({ client, global, opts }) => {
