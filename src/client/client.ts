@@ -73,7 +73,10 @@ export class BundesratClient {
     };
   }
 
-  /** Upcoming plenary sitting dates. */
+  /**
+   * Upcoming plenary sittings — the "Anstehende Plenarsitzungen" item. The actual
+   * dates are inside its HTML `detail` fragment, not in structured fields.
+   */
   async nextSessions(): Promise<FeedItem[]> {
     const list = await this.list(FEEDS.nextSessions);
     return asArray<FeedItem>(list["item"]);
