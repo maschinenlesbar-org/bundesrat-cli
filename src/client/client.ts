@@ -6,7 +6,7 @@
 //   const c = new BundesratClient();
 //   await c.session();      // the current plenary sitting's agenda (TOPs + Drucksachen)
 //   await c.members();      // the members of the Bundesrat
-//   await c.composition();  // seat/vote distribution
+//   await c.composition();  // the Stimmverteilung composition-graphic page
 
 import { RequestEngine, type EngineOptions } from "./engine.js";
 import type { XmlObject, XmlValue } from "./xml.js";
@@ -87,7 +87,10 @@ export class BundesratClient {
     return this.list(FEEDS.compact);
   }
 
-  /** The seat/vote distribution of the Bundesrat (Stimmverteilung). */
+  /**
+   * The Bundesrat composition page (Stimmverteilung) — a reference to the
+   * composition graphic, not a structured per-Land vote table.
+   */
   async composition(): Promise<FeedItem[]> {
     const list = await this.list(FEEDS.composition);
     return asArray<FeedItem>(list["item"]);

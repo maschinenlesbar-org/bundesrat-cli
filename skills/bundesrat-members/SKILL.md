@@ -26,7 +26,7 @@ This skill drives the `bundesrat` command. **Before anything else, validate it i
 
 ```bash
 bundesrat members [--state <Land>] [--party <text>]   # member records
-bundesrat composition                                 # seat/vote distribution (Stimmverteilung)
+bundesrat composition                                 # Stimmverteilung composition graphic (not a structured vote table)
 bundesrat presidium                                   # the Präsidium (President + Vice-Presidents)
 ```
 
