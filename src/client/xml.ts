@@ -22,7 +22,11 @@ export interface XmlObject {
 
 /** Decode the five predefined XML entities plus numeric (`&#NN;` / `&#xNN;`) refs. */
 export function decodeEntities(text: string): string {
-  return text.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (whole, body: string) => {
+  // Hex (`#x…`) and decimal (`#…`) forms use separate character classes so a
+  // malformed decimal ref that contains hex letters (`&#1F;`) does NOT match the
+  // decimal branch and is left untouched, rather than being truncated at the first
+  // non-digit by `parseInt(…, 10)`.
+  return text.replace(/&(#[xX][0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);/g, (whole, body: string) => {
     switch (body) {
       case "amp":
         return "&";
@@ -36,11 +40,12 @@ export function decodeEntities(text: string): string {
         return "'";
     }
     if (body[0] === "#") {
-      const code =
-        body[1] === "x" || body[1] === "X"
-          ? parseInt(body.slice(2), 16)
-          : parseInt(body.slice(1), 10);
-      if (Number.isFinite(code) && code >= 0 && code <= 0x10ffff) {
+      const hex = body[1] === "x" || body[1] === "X";
+      const code = hex ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+      // Reject out-of-range and UTF-16 surrogate-range (0xD800–0xDFFF) code points:
+      // decoding a lone surrogate would yield an ill-formed string. Leave the
+      // original reference untouched instead.
+      if (Number.isFinite(code) && code >= 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff)) {
         try {
           return String.fromCodePoint(code);
         } catch {

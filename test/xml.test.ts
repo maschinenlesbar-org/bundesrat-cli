@@ -14,6 +14,15 @@ test("decodeEntities leaves an unknown named entity untouched", () => {
   assert.equal(decodeEntities("a &nbsp; b"), "a &nbsp; b");
 });
 
+test("decodeEntities accepts upper-case hex and rejects malformed/surrogate refs", () => {
+  assert.equal(decodeEntities("caf&#XE9;"), "café"); // upper-case X hex form
+  // A decimal ref that (illegally) contains hex letters must be left untouched,
+  // not truncated to code point 1.
+  assert.equal(decodeEntities("x&#1F;y"), "x&#1F;y");
+  // A UTF-16 surrogate-range code point must not decode to a lone surrogate.
+  assert.equal(decodeEntities("x&#xD800;y"), "x&#xD800;y");
+});
+
 test("parses a simple nested document to an object with leaf text", () => {
   const v = parseXml("<iOS><list><a>x</a><b>y</b></list></iOS>") as XmlObject;
   assert.deepEqual(v, { list: { a: "x", b: "y" } });
