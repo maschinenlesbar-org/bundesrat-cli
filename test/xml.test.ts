@@ -63,8 +63,8 @@ test("whitespace between elements is ignored (no stray #text)", () => {
   assert.deepEqual(v, { a: "x", b: "y" });
 });
 
-test("nested repeated structure (compact tops/subtops) parses correctly", () => {
-  const v = parseXml(fx.compactXml) as XmlObject;
+test("nested repeated structure (tops/subtops) parses correctly", () => {
+  const v = parseXml(fx.nestedXml) as XmlObject;
   const list = v["list"] as XmlObject;
   const tops = list["tops"] as XmlObject;
   const top = tops["top"] as XmlObject;

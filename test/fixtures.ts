@@ -1,5 +1,10 @@
 // Canned Bundesrat feed responses (XML), trimmed to what the tests assert but
 // structurally faithful to the live feeds (see the DEVELOPING.md verify notes).
+//
+// The members/session/appointments fixtures deliberately include the feeds'
+// copyright-protected editorial/image fields (detail1, topdetail, imagePath,
+// abstract, detail) so the client tests can assert those are projected OUT of the
+// surfaced output, leaving only openly-licensed factual fields (DATA_LICENSE.md).
 
 export const membersXml = `<?xml version="1.0"?>
 <iOS version="1.0">
@@ -13,6 +18,8 @@ export const membersXml = `<?xml version="1.0"?>
       <brmitglied>true</brmitglied>
       <mitglied>true</mitglied>
       <detail1><![CDATA[ <p><strong>Ministerpräsident</strong></p> ]]></detail1>
+      <imagePath>/iOS/Bilder/oezdemir.jpg</imagePath>
+      <imageDate>2025-01-01</imageDate>
       <url>https://www.bundesrat.de/x/oezdemir.html</url>
     </employee>
     <employee>
@@ -36,6 +43,7 @@ export const sessionXml = `<?xml version="1.0"?>
       <topheader>Ernennung von Bundesanw&#228;ltinnen</topheader>
       <linkedtop></linkedtop>
       <topdetail><![CDATA[<div class="tabinfo">A &amp; B</div>]]></topdetail>
+      <detailImgDates>2026-07-01</detailImgDates>
     </top>
     <top>
       <toptitle>TOP 1</toptitle>
@@ -45,28 +53,29 @@ export const sessionXml = `<?xml version="1.0"?>
   </list>
 </iOS>`;
 
-export const newsXml = `<?xml version="1.0"?>
+export const appointmentsXml = `<?xml version="1.0"?>
 <iOS version="1.0">
   <list>
     <item>
-      <type>Basepage</type>
-      <id>/BR/SharedDocs/texte/26/x</id>
-      <url>https://www.bundesrat.de/x.html</url>
-      <title>Ein starkes Europa</title>
-      <abstract>Bundesratspr&#228;sident Bovenschulte &#8230;</abstract>
+      <type>Event</type>
+      <id>/BR/termine/26/x</id>
+      <url>https://www.bundesrat.de/termin.html</url>
+      <title>Sitzung des Vermittlungsausschusses</title>
+      <startdate>2026-07-15 14:00</startdate>
+      <stopdate>2026-07-15 16:00</stopdate>
       <date>03.07.2026 13:41</date>
+      <abstract>Der Vermittlungsausschuss ber&#228;t &#8230;</abstract>
+      <detail><![CDATA[<p>Editorial <strong>HTML</strong> body</p>]]></detail>
+      <imagePath>/iOS/Bilder/termin.jpg</imagePath>
+      <imageCaption>Foto: Bundesrat</imageCaption>
     </item>
   </list>
 </iOS>`;
 
-export const compactXml = `<?xml version="1.0"?>
+/** Generic nested/repeated structure — exercises the XML parser (not a feed). */
+export const nestedXml = `<?xml version="1.0"?>
 <iOS version="1.0">
   <list>
-    <header>
-      <url>https://www.bundesrat.de/1067-pk.html</url>
-      <titel1>Ausgew&#228;hlte Tagesordnungspunkte</titel1>
-      <titel2>1067. Sitzung des Bundesrates</titel2>
-    </header>
     <tops>
       <top>
         <nr>1</nr>
@@ -75,16 +84,6 @@ export const compactXml = `<?xml version="1.0"?>
         <subtop><type>b</type><name>N2</name></subtop>
       </top>
     </tops>
-  </list>
-</iOS>`;
-
-export const singleItemXml = `<?xml version="1.0"?>
-<iOS version="1.0">
-  <list>
-    <item>
-      <type>Basepage</type>
-      <title>Zusammensetzung des Bundesrates</title>
-    </item>
   </list>
 </iOS>`;
 

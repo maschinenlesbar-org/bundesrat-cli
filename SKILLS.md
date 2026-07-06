@@ -5,19 +5,23 @@ the **Bundesrat** (Germany's chamber of the sixteen Länder), all powered by the
 **[bundesrat](README.md)** CLI over the Bundesrat's public data feeds.
 
 Each skill teaches Claude how to drive the `bundesrat` CLI to answer a specific,
-real-world question — "what's on the Bundesrat's agenda?", "who represents Bavaria?",
-"latest Bundesrat news?" — and to report the answer with citations rather than
-guesswork. They encode the parts that are easy to get wrong (the `.tops[]` agenda
-shape, HTML-in-`detail` fields, exact-vs-substring member filters, and the
-copyright-vs-*amtliches-Werk* line) so Claude doesn't rediscover them each time.
+real-world question — "what's on the Bundesrat's agenda?", "who represents Bavaria?"
+— and to report the answer with citations rather than guesswork. They encode the
+parts that are easy to get wrong (the `.tops[]` agenda shape, exact-vs-substring
+member filters, and the copyright-vs-*amtliches-Werk* line) so Claude doesn't
+rediscover them each time.
+
+The CLI exposes **only openly-licensed data** — the Bundesrat feeds' copyright
+editorial text and images (news, BundesratKOMPAKT summaries, the Stimmverteilung
+graphic, the Präsidium/next-sitting HTML pages) are not available as commands, so
+neither are they skills.
 
 ## Skills
 
 | Skill | What it does | Ask it… |
 |---|---|---|
-| **bundesrat-agenda** | The current plenary sitting's agenda (TOPs + Drucksachen), and upcoming sitting dates. | "what's on the Bundesrat's agenda?", "which Drucksachen is it voting on?", "when does the Bundesrat next meet?" |
-| **bundesrat-members** | Bundesrat members filtered by Land or party, plus the composition and Präsidium. | "who represents Bavaria?", "list the Green members", "who's the Bundesrat president?" |
-| **bundesrat-news** | Current news / press items and the committee-appointments feed. | "latest Bundesrat news", "recent press releases", "upcoming committee dates" |
+| **bundesrat-agenda** | The current plenary sitting's agenda (TOPs + Drucksachen) and committee dates (Termine). | "what's on the Bundesrat's agenda?", "which Drucksachen is it voting on?", "upcoming committee dates?" |
+| **bundesrat-members** | Bundesrat members filtered by Land or party. | "who represents Bavaria?", "list the Green members", "how many members per party?" |
 
 ## Requirements
 
@@ -42,7 +46,7 @@ Claude Code:
 ```
 
 The first command registers the marketplace; the second installs the `bundesrat`
-plugin, which bundles all three skills. Update later with `/plugin marketplace update`.
+plugin, which bundles both skills. Update later with `/plugin marketplace update`.
 
 ### Manual (copy the skill folders)
 
@@ -70,7 +74,7 @@ request. Just ask in natural language:
 
 > Who are the Bundesrat members from North Rhine-Westphalia, and their parties?
 
-> Give me the latest three Bundesrat press headlines.
+> What committee dates are coming up in the Bundesrat?
 
 You can also invoke a skill explicitly with its slash command, e.g. `/bundesrat-agenda`.
 
@@ -82,16 +86,15 @@ non-obvious parts of these feeds, for example:
 
 - **the agenda lives under `.tops[]`** — each item has `toptitle`, `topdrucksache`
   (often empty for procedural TOPs — guard it) and `topheader`;
-- **`detail`/`abstract`/`topdetail`/`detail1`–`3` are HTML fragments** kept verbatim
-  from the feed — strip or render them, and don't reproduce them as freely-licensed
-  prose (they are copyright-protected editorial content);
+- **only open fields are returned** — the CLI already strips the feeds' copyright
+  editorial content (HTML `detail`/`topdetail`, member biographies, images), so what
+  you get is safe factual data; there is no HTML to scrape or reproduce;
 - **member filters differ** — `--state` is an exact Land match, `--party` is a
   case-insensitive substring; both run client-side, so an unmatched filter returns `[]`;
 - **status flags are strings** `"true"`/`"false"`, and **dates are German-format**
   strings, not ISO;
 - **copyright vs. amtliches Werk** — the Drucksachen/Plenarprotokolle are public-domain
-  official works (reuse unaltered, with a source citation); the rest of the content is
-  copyright-protected — always cite "Quelle: Bundesrat".
+  official works (reuse unaltered, with a source citation); still cite "Quelle: Bundesrat".
 
 ## Contributing
 

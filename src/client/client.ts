@@ -3,28 +3,59 @@
 // document served by www.bundesrat.de; each `.xml` path must carry the
 // `?view=renderXml` render parameter, which this client always adds.
 //
+// LICENSING: this client exposes **only the openly-licensed data** in the feeds —
+// factual/structured fields and official-document (Drucksache) references. The
+// feeds' copyright-protected editorial content (HTML detail/biography fragments,
+// teaser abstracts, images) and the wholly-editorial feeds (news, BundesratKOMPAKT,
+// the Stimmverteilung graphic, the Präsidium/next-sitting HTML pages) are not
+// surfaced. Each result is projected down to a whitelist of open fields. See
+// DATA_LICENSE.md.
+//
 //   const c = new BundesratClient();
-//   await c.session();      // the current plenary sitting's agenda (TOPs + Drucksachen)
-//   await c.members();      // the members of the Bundesrat
-//   await c.composition();  // the Stimmverteilung composition-graphic page
+//   await c.session();       // the current plenary sitting's agenda (TOPs + Drucksachen)
+//   await c.members();       // the members of the Bundesrat (names, party, Land)
+//   await c.appointments();  // committee appointments / dates (Termine)
 
 import { RequestEngine, type EngineOptions } from "./engine.js";
 import type { XmlObject, XmlValue } from "./xml.js";
-import type { AgendaItem, FeedItem, FeedList, Member, Session } from "./types.js";
+import type { AgendaItem, Appointment, Member, Session } from "./types.js";
 
 /** The feed paths (relative to the base URL). All are GET + `?view=renderXml`. */
 export const FEEDS = {
-  news: "/iOS/v3/01_Aktuelles/aktuelles_table.xml",
-  appointments: "/iOS/v3/02_Termine/termine_table.xml",
-  compact: "/iOS/v3/03_Plenum/plenum_kompakt_table.xml",
   session: "/iOS/SharedDocs/3_Plenum/plenum_aktuelleSitzung_table.xml",
-  nextSessions: "/iOS/SharedDocs/3_Plenum/plenum_naechsteSitzungen.xml",
   members: "/iOS/SharedDocs/2_Mitglieder/mitglieder_table.xml",
-  composition: "/iOS/v3/06_Stimmen/stimmverteilung.xml",
-  presidium: "/iOS/v3/05_Bundesrat/Praesidium/bundesrat_praesidium.xml",
+  appointments: "/iOS/v3/02_Termine/termine_table.xml",
 } as const;
 
 const RENDER_QUERY = { view: "renderXml" } as const;
+
+// Whitelists of the openly-licensed fields surfaced per feed. Anything not listed
+// here — HTML `detail`/biography fragments, teaser `abstract`s, image paths — is a
+// copyright-protected editorial field and is intentionally dropped (DATA_LICENSE.md).
+const MEMBER_FIELDS = [
+  "honorificTitle",
+  "firstname",
+  "name",
+  "party",
+  "state",
+  "brmitglied",
+  "mitglied",
+  "bv",
+  "designiert",
+  "url",
+] as const;
+const TOP_FIELDS = ["toptitle", "topdrucksache", "topheader", "linkedtop"] as const;
+const APPOINTMENT_FIELDS = [
+  "type",
+  "id",
+  "url",
+  "title",
+  "date",
+  "dateOfIssue",
+  "startdate",
+  "stopdate",
+  "highlighted",
+] as const;
 
 /**
  * Coerce a possibly-single / possibly-missing XML child into an array. A repeated
@@ -34,6 +65,21 @@ const RENDER_QUERY = { view: "renderXml" } as const;
 export function asArray<T>(value: XmlValue | undefined): T[] {
   if (value === undefined) return [];
   return (Array.isArray(value) ? value : [value]) as unknown as T[];
+}
+
+/**
+ * Project a parsed element down to a whitelist of open, factual keys — dropping
+ * every copyright-protected editorial/image field. Only defined keys are copied,
+ * so absent fields simply don't appear.
+ */
+function pick<T>(obj: XmlValue, keys: readonly string[]): T {
+  const src = (typeof obj === "object" && obj !== null && !Array.isArray(obj) ? obj : {}) as XmlObject;
+  const out: Record<string, XmlValue> = {};
+  for (const key of keys) {
+    const value = src[key];
+    if (value !== undefined) out[key] = value;
+  }
+  return out as unknown as T;
 }
 
 /** Options for the client (engine options only — the feeds need no auth). */
@@ -50,67 +96,38 @@ export class BundesratClient {
    * Fetch a feed and return its `<list>` payload as an object. The document root
    * is `<iOS><list>…</list></iOS>`; a feed with no `<list>` yields `{}`.
    */
-  private async list(path: string): Promise<FeedList> {
+  private async list(path: string): Promise<XmlObject> {
     const doc = await this.engine.getXml(path, RENDER_QUERY);
     const root = (typeof doc === "object" && !Array.isArray(doc) ? doc : {}) as XmlObject;
     const list = root["list"];
-    return (typeof list === "object" && !Array.isArray(list) ? list : {}) as FeedList;
+    return (typeof list === "object" && !Array.isArray(list) ? list : {}) as XmlObject;
   }
 
-  /** The members of the Bundesrat (Länder ministers and plenipotentiaries). */
+  /**
+   * The members of the Bundesrat (Länder ministers and plenipotentiaries),
+   * projected to their factual fields (name, party, Land, membership flags).
+   */
   async members(): Promise<Member[]> {
     const list = await this.list(FEEDS.members);
-    return asArray<Member>(list["employee"]);
+    return asArray<XmlValue>(list["employee"]).map((e) => pick<Member>(e, MEMBER_FIELDS));
   }
 
-  /** The current plenary session with its agenda items (TOPs and their Drucksachen). */
+  /**
+   * The current plenary session with its agenda items (TOP numbers and their
+   * Drucksachen — the latter *amtliche Werke* under § 5 UrhG).
+   */
   async session(): Promise<Session> {
     const list = await this.list(FEEDS.session);
     return {
       ...(typeof list["title"] === "string" ? { title: list["title"] } : {}),
       ...(typeof list["header"] === "string" ? { header: list["header"] } : {}),
-      tops: asArray<AgendaItem>(list["top"]),
+      tops: asArray<XmlValue>(list["top"]).map((t) => pick<AgendaItem>(t, TOP_FIELDS)),
     };
   }
 
-  /**
-   * Upcoming plenary sittings — the "Anstehende Plenarsitzungen" item. The actual
-   * dates are inside its HTML `detail` fragment, not in structured fields.
-   */
-  async nextSessions(): Promise<FeedItem[]> {
-    const list = await this.list(FEEDS.nextSessions);
-    return asArray<FeedItem>(list["item"]);
-  }
-
-  /** "BundesratKOMPAKT" — selected agenda items with summaries (nested structure). */
-  async compact(): Promise<FeedList> {
-    return this.list(FEEDS.compact);
-  }
-
-  /**
-   * The Bundesrat composition page (Stimmverteilung) — a reference to the
-   * composition graphic, not a structured per-Land vote table.
-   */
-  async composition(): Promise<FeedItem[]> {
-    const list = await this.list(FEEDS.composition);
-    return asArray<FeedItem>(list["item"]);
-  }
-
-  /** The Präsidium of the Bundesrat. */
-  async presidium(): Promise<FeedItem[]> {
-    const list = await this.list(FEEDS.presidium);
-    return asArray<FeedItem>(list["item"]);
-  }
-
-  /** Current news / press items (Aktuelles). */
-  async news(): Promise<FeedItem[]> {
-    const list = await this.list(FEEDS.news);
-    return asArray<FeedItem>(list["item"]);
-  }
-
-  /** Committee appointments and dates (Termine). */
-  async appointments(): Promise<FeedItem[]> {
+  /** Committee appointments and dates (Termine), projected to their factual fields. */
+  async appointments(): Promise<Appointment[]> {
     const list = await this.list(FEEDS.appointments);
-    return asArray<FeedItem>(list["item"]);
+    return asArray<XmlValue>(list["item"]).map((i) => pick<Appointment>(i, APPOINTMENT_FIELDS));
   }
 }

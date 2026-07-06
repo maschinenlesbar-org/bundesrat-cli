@@ -62,11 +62,20 @@ test("members --state with no match returns an empty array (not everyone)", asyn
   assert.deepEqual(JSON.parse(cli.out.join("\n")), []);
 });
 
-test("news / composition / next / compact / presidium / appointments all work", async () => {
-  for (const cmd of ["news", "composition", "next", "compact", "presidium", "appointments"]) {
-    const fixture = cmd === "compact" ? fx.compactXml : fx.singleItemXml;
-    const cli = makeCli(() => xmlResponse(fixture));
-    assert.equal(await run([cmd], cli.deps), 0, `${cmd} should exit 0`);
+test("appointments works and returns projected calendar items (no editorial body)", async () => {
+  const cli = makeCli(() => xmlResponse(fx.appointmentsXml));
+  const code = await run(["appointments"], cli.deps);
+  assert.equal(code, 0);
+  const rows = JSON.parse(cli.out.join("\n")) as Array<Record<string, unknown>>;
+  assert.equal(rows[0]!["title"], "Sitzung des Vermittlungsausschusses");
+  assert.equal(rows[0]!["detail"], undefined);
+});
+
+test("the removed editorial commands are no longer registered (exit 2, no request)", async () => {
+  for (const cmd of ["news", "composition", "next", "compact", "presidium"]) {
+    const cli = makeCli(() => xmlResponse(fx.membersXml));
+    assert.equal(await run([cmd], cli.deps), 2, `${cmd} should be an unknown command`);
+    assert.equal(cli.mt.calls.length, 0, `${cmd} should make no request`);
   }
 });
 

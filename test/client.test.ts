@@ -25,54 +25,56 @@ test("members() hits the members feed with view=renderXml and returns Member[]",
   assert.equal(members[1]!.party, "CSU");
 });
 
-test("session() returns title, header and the agenda items", async () => {
+test("members() surfaces only open factual fields — biography HTML and images are stripped", () => {
+  return (async () => {
+    const mt = makeMockTransport(() => xmlResponse(fx.membersXml));
+    const c = new BundesratClient({ transport: mt.transport });
+    const m = (await c.members())[0]! as Record<string, unknown>;
+    // Open facts are kept…
+    assert.equal(m["name"], "Özdemir");
+    assert.equal(m["party"], "BÜNDNIS 90/DIE GRÜNEN");
+    assert.equal(m["state"], "Baden-Württemberg");
+    assert.equal(m["url"], "https://www.bundesrat.de/x/oezdemir.html");
+    // …copyright editorial/image fields are projected out.
+    assert.equal(m["detail1"], undefined);
+    assert.equal(m["imagePath"], undefined);
+    assert.equal(m["imageDate"], undefined);
+  })();
+});
+
+test("session() returns title, header and agenda items (facts + Drucksachen only)", async () => {
   const mt = makeMockTransport(() => xmlResponse(fx.sessionXml));
   const c = new BundesratClient({ transport: mt.transport });
   const s = await c.session();
   assert.equal(pathOf(mt.last().url), FEEDS.session);
   assert.match(s.title!, /^1067\./);
   assert.equal(s.tops.length, 2);
-  assert.equal(s.tops[0]!.topdrucksache, "Drucksache 371/26");
+  const top = s.tops[0]! as Record<string, unknown>;
+  assert.equal(top["topdrucksache"], "Drucksache 371/26");
+  assert.equal(top["topheader"], "Ernennung von Bundesanwältinnen");
+  // The HTML detail description and image dates are stripped.
+  assert.equal(top["topdetail"], undefined);
+  assert.equal(top["detailImgDates"], undefined);
 });
 
-test("news() returns the content items", async () => {
-  const mt = makeMockTransport(() => xmlResponse(fx.newsXml));
+test("appointments() hits its feed and surfaces only factual calendar fields", async () => {
+  const mt = makeMockTransport(() => xmlResponse(fx.appointmentsXml));
   const c = new BundesratClient({ transport: mt.transport });
-  const items = await c.news();
-  assert.equal(pathOf(mt.last().url), FEEDS.news);
+  const items = await c.appointments();
+  assert.equal(pathOf(mt.last().url), FEEDS.appointments);
+  assert.equal(queryOf(mt.last()).get("view"), "renderXml");
   assert.equal(items.length, 1);
-  assert.equal(items[0]!.title, "Ein starkes Europa");
+  const it = items[0]! as Record<string, unknown>;
+  assert.equal(it["title"], "Sitzung des Vermittlungsausschusses");
+  assert.equal(it["startdate"], "2026-07-15 14:00");
+  assert.equal(it["stopdate"], "2026-07-15 16:00");
+  // Editorial body + image are stripped.
+  assert.equal(it["abstract"], undefined);
+  assert.equal(it["detail"], undefined);
+  assert.equal(it["imagePath"], undefined);
+  assert.equal(it["imageCaption"], undefined);
 });
 
-test("a single <item> feed still yields an array of one", async () => {
-  const mt = makeMockTransport(() => xmlResponse(fx.singleItemXml));
-  const c = new BundesratClient({ transport: mt.transport });
-  const comp = await c.composition();
-  assert.equal(pathOf(mt.last().url), FEEDS.composition);
-  assert.equal(comp.length, 1);
-  assert.equal(comp[0]!.title, "Zusammensetzung des Bundesrates");
-});
-
-test("compact() returns the nested list payload (header + tops)", async () => {
-  const mt = makeMockTransport(() => xmlResponse(fx.compactXml));
-  const c = new BundesratClient({ transport: mt.transport });
-  const list = await c.compact();
-  assert.equal(pathOf(mt.last().url), FEEDS.compact);
-  const header = list["header"] as Record<string, string>;
-  assert.equal(header["titel2"], "1067. Sitzung des Bundesrates");
-});
-
-test("presidium(), appointments(), nextSessions() target their feeds", async () => {
-  for (const [method, path] of [
-    ["presidium", FEEDS.presidium],
-    ["appointments", FEEDS.appointments],
-    ["nextSessions", FEEDS.nextSessions],
-  ] as const) {
-    const mt = makeMockTransport(() => xmlResponse(fx.singleItemXml));
-    const c = new BundesratClient({ transport: mt.transport });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (c as any)[method]();
-    assert.equal(pathOf(mt.last().url), path);
-    assert.equal(queryOf(mt.last()).get("view"), "renderXml");
-  }
+test("only the three open-data feeds are exposed", () => {
+  assert.deepEqual(Object.keys(FEEDS).sort(), ["appointments", "members", "session"]);
 });

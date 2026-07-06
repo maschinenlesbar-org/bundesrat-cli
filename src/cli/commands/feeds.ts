@@ -1,6 +1,12 @@
-// The Bundesrat command group: one command per public feed. Each command fetches
-// its feed and prints the parsed JSON. `members` additionally filters client-side
-// by --state / --party (the feed itself returns the full list).
+// The Bundesrat command group. Each command fetches one public feed and prints
+// its parsed JSON, projected to the openly-licensed factual fields (see
+// DATA_LICENSE.md). `members` additionally filters client-side by --state /
+// --party (the feed itself returns the full list).
+//
+// Only the feeds that return open data are exposed: `session` (agenda TOPs +
+// Drucksachen), `members` (names, party, Land), and `appointments` (Termine dates).
+// The wholly-editorial feeds — news, BundesratKOMPAKT, the Stimmverteilung graphic,
+// and the Präsidium / next-sitting HTML pages — are intentionally not commands.
 
 import type { Command } from "commander";
 import type { CliDeps } from "../io.js";
@@ -25,25 +31,6 @@ export function registerCommands(program: Command, deps: CliDeps): void {
   feedCommand(program, deps, "session", "Current plenary sitting: agenda items (TOPs) with their Drucksachen", (c) =>
     c.session(),
   );
-  feedCommand(
-    program,
-    deps,
-    "next",
-    "Upcoming plenary sittings (the 'Anstehende Plenarsitzungen' page — the dates are inside the HTML `detail`)",
-    (c) => c.nextSessions(),
-  );
-  feedCommand(program, deps, "compact", "BundesratKOMPAKT — selected agenda items with summaries", (c) =>
-    c.compact(),
-  );
-  feedCommand(
-    program,
-    deps,
-    "composition",
-    "The Bundesrat composition page (Stimmverteilung) — a reference to the composition graphic, not a structured per-Land vote table",
-    (c) => c.composition(),
-  );
-  feedCommand(program, deps, "presidium", "The Präsidium of the Bundesrat", (c) => c.presidium());
-  feedCommand(program, deps, "news", "Current news / press items (Aktuelles)", (c) => c.news());
   feedCommand(program, deps, "appointments", "Committee appointments and dates (Termine)", (c) =>
     c.appointments(),
   );

@@ -7,13 +7,16 @@
 Follow Germany's **Bundesrat** — the chamber of the sixteen Länder — from your
 terminal. `bundesrat` is a command-line tool over the Bundesrat's public data
 feeds (the data behind the official Bundesrat app): the current plenary sitting's
-agenda and its Drucksachen, the members, the chamber's composition and more — as
-clean JSON you can pipe straight into [`jq`](https://jqlang.github.io/jq/).
+agenda and its Drucksachen, the members, and committee dates — as clean JSON you
+can pipe straight into [`jq`](https://jqlang.github.io/jq/).
 
 - **The current sitting's agenda** — every Tagesordnungspunkt (TOP) with its
   **Drucksache** number, in one command.
 - **The members** — all Bundesrat members with party and Land, filterable by
   `--state` / `--party`.
+- **Open data only** — the CLI surfaces just the openly-licensed facts (names,
+  parties, Länder, TOP/Drucksache numbers, dates). The feeds' copyright editorial
+  text and images are deliberately not exposed — see [DATA_LICENSE.md](DATA_LICENSE.md).
 - **No API key** — the feeds are public.
 - **Clean JSON output** — pretty by default, `--compact` for scripting, `-o <file>`
   to write to disk.
@@ -47,8 +50,8 @@ bundesrat members --state Bayern | jq -r '.[] | "\(.firstname) \(.name) — \(.p
 # All Green members across the Länder
 bundesrat members --party grüne | jq length
 
-# Upcoming sittings (dates are in the HTML detail)
-bundesrat next | jq -r '.[].detail'
+# Committee appointments with their dates
+bundesrat appointments | jq -r '.[] | "\(.startdate // "")\t\(.title)"'
 ```
 
 ## Commands
@@ -56,16 +59,18 @@ bundesrat next | jq -r '.[].detail'
 | Command | What it shows |
 | --- | --- |
 | `session` | Current plenary sitting: title, date and agenda items (TOPs) with their Drucksachen |
-| `next` | Upcoming plenary sittings — the *Anstehende Plenarsitzungen* page (the dates are inside the HTML `detail`) |
-| `compact` | BundesratKOMPAKT — selected agenda items with summaries |
 | `members` | Members of the Bundesrat (`--state <Land>`, `--party <text>`) |
-| `composition` | The Bundesrat composition page (Stimmverteilung) — a reference to the composition graphic, not a structured vote table |
-| `presidium` | The Präsidium |
-| `news` | Current news / press items (Aktuelles) |
 | `appointments` | Committee appointments and dates (Termine) |
 
-New to terms like *TOP*, *Drucksache*, *Stimmverteilung* or *Präsidium*? The
-**[Glossary](GLOSSARY.md)** decodes every one.
+New to terms like *TOP*, *Drucksache* or *Land*? The **[Glossary](GLOSSARY.md)**
+decodes every one.
+
+> **Why only three commands?** The Bundesrat feeds also carry news/press items, the
+> BundesratKOMPAKT editorial summaries, the Stimmverteilung graphic, and the
+> Präsidium / next-sitting HTML pages. Those return **copyright-protected editorial
+> text and images**, not open data, so this CLI doesn't expose them (and strips the
+> editorial fields — HTML `detail`, biographies, images — from the three it keeps).
+> See [DATA_LICENSE.md](DATA_LICENSE.md).
 
 ### `members` filters
 
@@ -115,9 +120,10 @@ Use `--compact` for single-line JSON and `-o <file>` to write to a file — both
   shell instead of XML (it may have moved). The CLI already adds the required
   `?view=renderXml` render parameter; if this persists, the upstream feed changed.
 - **Empty `tops` between sittings** — outside an active sitting the agenda feed can
-  be sparse; check `bundesrat next` for the upcoming dates.
-- **A field holds HTML** — `detail`/`abstract`/`topdetail` carry HTML fragments
-  verbatim (the feed embeds them); strip or render them as you see fit.
+  be sparse.
+- **A field you expected is missing** — the CLI surfaces only openly-licensed
+  factual fields; the feeds' HTML `detail`/`abstract` bodies, biographies and images
+  are stripped on purpose (see [DATA_LICENSE.md](DATA_LICENSE.md)).
 
 ## Global options
 

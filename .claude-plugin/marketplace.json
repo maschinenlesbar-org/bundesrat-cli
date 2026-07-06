@@ -5,14 +5,14 @@
     "email": "sebs@2xs.org"
   },
   "metadata": {
-    "description": "Bundesrat (German Federal Council) skills powered by the bundesrat-cli — plenary agenda, members and news"
+    "description": "Bundesrat (German Federal Council) skills powered by the bundesrat-cli — plenary agenda, members and committee dates (open data only)"
   },
   "plugins": [
     {
       "name": "bundesrat",
       "source": "./",
-      "description": "Follow the Bundesrat: the current plenary sitting's agenda and Drucksachen, the members (by Land or party), the seat/vote distribution, and the latest news — via the bundesrat-cli.",
-      "version": "0.1.0",
+      "description": "Follow the Bundesrat: the current plenary sitting's agenda and Drucksachen, the members (by Land or party), and committee dates — via the bundesrat-cli. Surfaces only openly-licensed data.",
+      "version": "0.2.0",
       "author": {
         "name": "Sebastian Schürmann",
         "email": "sebs@2xs.org"

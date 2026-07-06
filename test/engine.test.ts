@@ -14,14 +14,14 @@ test("buildUrl normalises the path and appends the query", () => {
 });
 
 test("getXml parses an XML body into a JS value", async () => {
-  const mt = makeMockTransport(() => xmlResponse(fx.newsXml));
+  const mt = makeMockTransport(() => xmlResponse(fx.appointmentsXml));
   const e = new RequestEngine({ transport: mt.transport });
   const v = (await e.getXml("/x", { view: "renderXml" })) as { list: { item: { title: string } } };
-  assert.equal(v.list.item.title, "Ein starkes Europa");
+  assert.equal(v.list.item.title, "Sitzung des Vermittlungsausschusses");
 });
 
 test("getXml sends the Accept: application/xml header and the query", async () => {
-  const mt = makeMockTransport(() => xmlResponse(fx.newsXml));
+  const mt = makeMockTransport(() => xmlResponse(fx.appointmentsXml));
   const e = new RequestEngine({ transport: mt.transport });
   await e.getXml("/x", { view: "renderXml" });
   assert.equal(mt.last().headers?.["Accept"], "application/xml");

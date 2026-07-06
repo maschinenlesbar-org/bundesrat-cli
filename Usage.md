@@ -35,7 +35,7 @@ bundesrat session
   "title": "1067. Sitzung des Bundesrates | Tagesordnung Entwurf",
   "header": "am Freitag, dem 10. Juli 2026, 9:30 Uhr",
   "tops": [
-    { "toptitle": "TOP 67", "topdrucksache": "Drucksache 371/26", "topheader": "…", "topdetail": "<div>…</div>" }
+    { "toptitle": "TOP 67", "topdrucksache": "Drucksache 371/26", "topheader": "…", "linkedtop": "" }
   ]
 }
 ```
@@ -51,8 +51,9 @@ bundesrat session | jq '.tops | length'
 bundesrat session | jq -r '.tops[].topdrucksache | select(.)'
 ```
 
-> `topdetail` (and other `detail` fields elsewhere) contain **HTML fragments** kept
-> verbatim from the feed. Use `jq -r` plus a stripper, or render them, as needed.
+> The agenda item's HTML description (`topdetail`) is copyright-protected editorial
+> content and is **not** surfaced — only the factual TOP number, Drucksache and
+> short header. See [DATA_LICENSE.md](DATA_LICENSE.md).
 
 ## `members` — the members of the Bundesrat
 
@@ -63,9 +64,11 @@ bundesrat members --party grüne        # party substring, case-insensitive
 bundesrat members --state Hessen --party CDU
 ```
 
-Each member carries `firstname`, `name`, `party`, `state`, the boolean-ish flags
-`brmitglied` / `mitglied` / `bv` / `designiert` (as `"true"`/`"false"` strings),
-and HTML `detail1`–`detail3` (role / biography / address).
+Each member carries `honorificTitle`, `firstname`, `name`, `party`, `state`, a `url`,
+and the boolean-ish flags `brmitglied` / `mitglied` / `bv` / `designiert` (as
+`"true"`/`"false"` strings). The feed's HTML biography (`detail1`–`detail3`) and
+portrait image are copyright-protected and are **not** surfaced (see
+[DATA_LICENSE.md](DATA_LICENSE.md)).
 
 ```bash
 # Names + parties for a Land
@@ -78,28 +81,25 @@ bundesrat members | jq -r 'group_by(.party)[] | "\(.[0].party): \(length)"'
 
 Filtering is client-side, so an unmatched filter returns `[]` (not the full list).
 
-## The other feeds
+## `appointments` — committee dates (Termine)
 
 ```bash
-bundesrat next          # upcoming plenary sittings (dates are inside the HTML `detail`)
-bundesrat compact        # BundesratKOMPAKT — selected TOPs with summaries (nested)
-bundesrat composition    # the composition page (Stimmverteilung graphic — not a structured vote table)
-bundesrat presidium      # the Präsidium
-bundesrat news           # current news / press items (Aktuelles)
-bundesrat appointments   # committee appointments and dates (Termine)
+bundesrat appointments
 ```
 
-Most of these return an **array of content items** (`type`, `id`, `url`, `title`,
-`abstract`, `date`, and an HTML `detail`). `compact` returns a nested structure
-(`header` + `tops` each with `subtop`s).
+Returns an **array of calendar items** with their factual fields: `type`, `id`,
+`url`, `title`, `date`, `startdate` / `stopdate`. (The item's HTML `detail`/`abstract`
+body and any image are copyright-protected and are not surfaced.)
 
 ```bash
-# Latest three headlines
-bundesrat news | jq -r '.[:3][] | "\(.date)\t\(.title)"'
-
 # Committee dates with start/stop
 bundesrat appointments | jq -r '.[] | "\(.startdate // "")\t\(.title)"'
 ```
+
+> **Only open data is exposed.** The Bundesrat feeds also carry news/press items,
+> the BundesratKOMPAKT editorial summaries, the Stimmverteilung graphic, and the
+> Präsidium / next-sitting HTML pages — all copyright-protected editorial content,
+> so this CLI does not provide commands for them. See [DATA_LICENSE.md](DATA_LICENSE.md).
 
 ## Scripting recipes
 

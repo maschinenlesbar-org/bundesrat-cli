@@ -14,8 +14,13 @@ official Bundesrat iOS app, served by `www.bundesrat.de`.
   (no axios, no fetch polyfill) and a **hand-rolled, dependency-free XML parser**
   (no `fast-xml-parser`, no `xmldom`).
 - **One small dependency** for the CLI: [`commander`](https://github.com/tj/commander.js).
-- **Strongly typed** — typed `Member` / `AgendaItem` / `Session` / `FeedItem`
-  shapes over the parsed XML; unknown leaf fields survive via an index signature.
+- **Strongly typed** — typed `Member` / `AgendaItem` / `Session` / `Appointment`
+  shapes over the parsed XML, projected to their openly-licensed factual fields.
+- **Open data only** — each result is projected down to a whitelist of factual
+  fields; the feeds' copyright-protected editorial content (HTML `detail`/biography
+  fragments, teaser `abstract`s, images) and the wholly-editorial feeds (news,
+  BundesratKOMPAKT, the Stimmverteilung graphic, the Präsidium/next-sitting pages)
+  are **not** exposed. See [DATA_LICENSE.md](DATA_LICENSE.md).
 - **Well tested** — unit tests on Node's built-in test runner (`node --test`),
   every HTTP response mocked. The XML parser has its own edge-case suite.
 
@@ -62,11 +67,11 @@ const session = await client.session();     // { title, header, tops: [...] }
 console.log(session.title, session.tops.length);
 for (const top of session.tops) console.log(top.toptitle, top.topdrucksache);
 
-const members = await client.members();      // Member[]
+const members = await client.members();      // Member[] (name, party, Land, flags)
 const bavaria = members.filter((m) => m.state === "Bayern");
 
 try {
-  await client.news();
+  await client.appointments();               // Appointment[] (title, dates)
 } catch (err) {
   if (err instanceof BundesratParseError) console.error(err.message);
 }
@@ -85,18 +90,21 @@ new BundesratClient({
 });
 ```
 
-### Methods (one per feed)
+### Methods (one per open-data feed)
+
+Only the three feeds that return open data are exposed. Each result is projected to
+a whitelist of factual fields (`MEMBER_FIELDS` / `TOP_FIELDS` / `APPOINTMENT_FIELDS`
+in `client.ts`); copyright editorial/image fields are dropped.
 
 | Method | Feed | Returns |
 |---|---|---|
 | `session()` | current plenary sitting | `{ title?, header?, tops: AgendaItem[] }` |
-| `nextSessions()` | upcoming sittings | `FeedItem[]` |
-| `compact()` | BundesratKOMPAKT | the parsed `<list>` (nested `tops`/`subtop`) |
-| `members()` | members | `Member[]` |
-| `composition()` | Stimmverteilung | `FeedItem[]` |
-| `presidium()` | Präsidium | `FeedItem[]` |
-| `news()` | Aktuelles | `FeedItem[]` |
-| `appointments()` | Termine | `FeedItem[]` |
+| `members()` | members | `Member[]` (name, party, Land, status flags, url) |
+| `appointments()` | Termine | `Appointment[]` (title, dates, url) |
+
+The wholly-editorial feeds (news, BundesratKOMPAKT, Stimmverteilung, Präsidium,
+next-sittings) are intentionally **not** methods — their payload is
+copyright-protected editorial text or images, not open data (DATA_LICENSE.md).
 
 ## The XML parser
 
@@ -121,12 +129,12 @@ hard in [`test/xml.test.ts`](test/xml.test.ts).
 src/
   client/
     xml.ts       # dependency-free XML parser + entity decoder
-    types.ts     # Member / AgendaItem / Session / FeedItem (index-signature'd)
+    types.ts     # Member / AgendaItem / Session / Appointment (open fields only)
     query.ts     # dependency-free query-string builder
     http.ts      # the Transport interface + default node:http/https transport
     engine.ts    # URL building, retry/backoff, XML decode + HTML-shell guard, errors
     errors.ts    # BundesratError / …ApiError / …NetworkError / …ValidationError / …ParseError
-    client.ts    # BundesratClient — one method per feed (+ FEEDS map, asArray)
+    client.ts    # BundesratClient — session/members/appointments + open-field projection
   cli/
     io.ts        # injectable I/O seam (stdout/stderr/file)
     shared.ts    # option parsers, global-option resolver, JSON renderer

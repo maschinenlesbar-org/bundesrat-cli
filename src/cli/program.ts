@@ -43,10 +43,11 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
     .name("bundesrat")
     .description(
       "CLI for the Bundesrat's public data feeds (the data behind the official " +
-        "Bundesrat iOS app). No API key needed. `session` shows the current plenary " +
-        "sitting's agenda (TOPs + Drucksachen); `members` lists the Bundesrat members " +
-        "(filter by --state/--party); `composition`, `next`, `compact`, `presidium`, " +
-        "`news` and `appointments` expose the other feeds.",
+        "Bundesrat iOS app). No API key needed. Surfaces only openly-licensed data: " +
+        "`session` shows the current plenary sitting's agenda (TOPs + Drucksachen); " +
+        "`members` lists the Bundesrat members (filter by --state/--party); " +
+        "`appointments` lists committee dates (Termine). The feeds' copyright " +
+        "editorial content (news, summaries, images) is not exposed — see DATA_LICENSE.md.",
     )
     .version(VERSION)
     .option("--base-url <url>", "API base URL", parseBaseUrl, DEFAULT_BASE_URL)

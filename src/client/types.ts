@@ -1,13 +1,22 @@
 // Response interfaces for the Bundesrat feeds. The feeds are XML (see xml.ts);
-// each leaf element is text (or an HTML fragment in a CDATA section, kept as a
-// string). The named fields below are the ones the feeds reliably carry — all are
-// best-effort strings, and an index signature preserves anything else present.
+// each leaf element is text (or an HTML fragment in a CDATA section).
+//
+// This client deliberately surfaces **only openly-licensed data** — factual /
+// structured fields (names, parties, Länder, session titles/dates, TOP numbers,
+// Drucksache numbers, appointment dates) and references to official documents.
+// The feeds' copyright-protected editorial content — HTML `detail`/biography
+// fragments, teaser `abstract`s, and images — is projected out in the client and
+// is intentionally absent from these types. See DATA_LICENSE.md for why.
 
-import type { XmlValue, XmlObject } from "./xml.js";
+import type { XmlObject } from "./xml.js";
 
 export type { XmlValue, XmlObject } from "./xml.js";
 
-/** A member of the Bundesrat (from the `<employee>` elements of the members feed). */
+/**
+ * A member of the Bundesrat (from the `<employee>` elements of the members feed).
+ * Factual fields only; the feed's HTML biography (`detail1..3`) and portrait image
+ * are copyright-protected editorial content and are not surfaced.
+ */
 export interface Member {
   /** e.g. "Dr." (often empty). */
   honorificTitle?: string;
@@ -25,30 +34,24 @@ export interface Member {
   bv?: string;
   /** "true"/"false": whether the membership is designated (not yet in office). */
   designiert?: string;
-  /** HTML fragments: role / biography / address. */
-  detail1?: string;
-  detail2?: string;
-  detail3?: string;
+  /** Link to the member's page on bundesrat.de (a reference, not content). */
   url?: string;
-  imagePath?: string;
-  imageDate?: string;
-  [key: string]: XmlValue | undefined;
 }
 
-/** One agenda item (Tagesordnungspunkt) of a plenary session (`<top>`). */
+/**
+ * One agenda item (Tagesordnungspunkt) of a plenary session (`<top>`). Factual
+ * fields only; the feed's HTML `topdetail` description is editorial content and is
+ * not surfaced.
+ */
 export interface AgendaItem {
   /** e.g. "TOP 67". */
   toptitle?: string;
-  /** The associated Drucksache, e.g. "Drucksache 371/26". */
+  /** The associated Drucksache, e.g. "Drucksache 371/26" (an *amtliches Werk*). */
   topdrucksache?: string;
-  /** Short description of the item. */
+  /** Short factual label of the item. */
   topheader?: string;
   /** A cross-referenced TOP, when the item is linked to another. */
   linkedtop?: string;
-  /** HTML fragment with the detailed description. */
-  topdetail?: string;
-  detailImgDates?: string;
-  [key: string]: XmlValue | undefined;
 }
 
 /** A plenary session with its agenda (from the current-session feed). */
@@ -61,29 +64,25 @@ export interface Session {
   tops: AgendaItem[];
 }
 
-/** A generic content item shared by the news / appointments / info feeds (`<item>`). */
-export interface FeedItem {
-  /** Content type, e.g. "Basepage" or "Event". */
+/**
+ * A committee appointment / date from the appointments (Termine) feed (`<item>`).
+ * Factual calendar fields only; the item's HTML `detail`/`abstract` body and any
+ * image are editorial content and are not surfaced.
+ */
+export interface Appointment {
+  /** Content type, e.g. "Event". */
   type?: string;
   id?: string;
+  /** Link to the item on bundesrat.de (a reference, not content). */
   url?: string;
   title?: string;
-  /** Teaser text. */
-  abstract?: string;
-  /** HTML fragment with the full content. */
-  detail?: string;
   /** Publication/update timestamp, e.g. "03.07.2026 13:41" (German format). */
   date?: string;
   dateOfIssue?: string;
-  /** For appointments (Termine): start/stop of the event. */
+  /** Start/stop of the event. */
   startdate?: string;
   stopdate?: string;
-  description?: string;
   highlighted?: string;
-  imagePath?: string;
-  imageCaption?: string;
-  imageSource?: string;
-  [key: string]: XmlValue | undefined;
 }
 
 /** The parsed `<list>` payload of a feed, before per-feed normalisation. */
