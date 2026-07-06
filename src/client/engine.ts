@@ -122,6 +122,12 @@ export class RequestEngine {
    * GET a feed path and parse the XML reply. The Bundesrat feeds require the
    * `view=renderXml` render parameter; without it the server returns its HTML
    * shell, which we detect and reject with a helpful BundesratParseError.
+   *
+   * NOTE: the response Content-Type is intentionally *ignored*. The Government Site
+   * Builder CMS is inconsistent about it (feeds have been seen as `text/plain`,
+   * `application/xml`, `text/html`), so we sniff the body — an `<!doctype html>` /
+   * `<html>` prefix is the HTML-shell guard — rather than trust the header. Don't
+   * "harden" this by validating Content-Type; it would reject valid feeds.
    */
   async getXml(path: string, query?: QueryParams): Promise<XmlValue> {
     const res = await this.request(path, query);
