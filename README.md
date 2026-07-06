@@ -120,7 +120,8 @@ Use `--compact` for single-line JSON and `-o <file>` to write to a file — both
   shell instead of XML (it may have moved). The CLI already adds the required
   `?view=renderXml` render parameter; if this persists, the upstream feed changed.
 - **Empty `tops` between sittings** — outside an active sitting the agenda feed can
-  be sparse.
+  be sparse: `tops` may be `[]` and `session`'s `title`/`header` may be absent
+  (both are optional), so guard for them in scripts.
 - **A field you expected is missing** — the CLI surfaces only openly-licensed
   factual fields; the feeds' HTML `detail`/`abstract` bodies, biographies and images
   are stripped on purpose (see [DATA_LICENSE.md](DATA_LICENSE.md)).

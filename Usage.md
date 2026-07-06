@@ -55,6 +55,10 @@ bundesrat session | jq -r '.tops[].topdrucksache | select(.)'
 > content and is **not** surfaced — only the factual TOP number, Drucksache and
 > short header. See [DATA_LICENSE.md](DATA_LICENSE.md).
 
+> Between sittings the agenda feed can be sparse: `title` and `header` are optional
+> and may be **absent**, and `tops` may be `[]`. Guard for them in scripts
+> (`.title // "—"`).
+
 ## `members` — the members of the Bundesrat
 
 ```bash
