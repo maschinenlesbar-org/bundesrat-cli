@@ -32,6 +32,12 @@ const RENDER_QUERY = { view: "renderXml" } as const;
 // Whitelists of the openly-licensed fields surfaced per feed. Anything not listed
 // here — HTML `detail`/biography fragments, teaser `abstract`s, image paths — is a
 // copyright-protected editorial field and is intentionally dropped (DATA_LICENSE.md).
+//
+// MAINTENANCE: this is a fixed allowlist, so a *new* field the upstream feed starts
+// serving is dropped silently — including a genuinely factual one (a member's office,
+// an event location, …). When the feeds change, revisit these lists rather than
+// assuming new fields flow through. (Confirmed against the live feeds 2026-07-06: no
+// factual field is currently lost; everything dropped is editorial/HTML/image.)
 const MEMBER_FIELDS = [
   "honorificTitle",
   "firstname",

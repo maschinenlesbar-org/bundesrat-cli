@@ -96,6 +96,10 @@ Only the three feeds that return open data are exposed. Each result is projected
 a whitelist of factual fields (`MEMBER_FIELDS` / `TOP_FIELDS` / `APPOINTMENT_FIELDS`
 in `client.ts`); copyright editorial/image fields are dropped.
 
+> **Maintenance:** the whitelists are fixed, so a *new* field the feed later serves is
+> dropped silently — including a factual one. Revisit the lists in `client.ts` when the
+> upstream feeds change; don't assume new fields flow through.
+
 | Method | Feed | Returns |
 |---|---|---|
 | `session()` | current plenary sitting | `{ title?, header?, tops: AgendaItem[] }` |
