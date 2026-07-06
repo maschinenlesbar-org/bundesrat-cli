@@ -64,6 +64,6 @@ bundesrat members | jq '[.[] | select(.brmitglied == "true")] | length'
 - **Status flags are strings** `"true"`/`"false"`, not booleans — compare as
   strings in `jq` (`select(.brmitglied == "true")`).
 - **Only facts are returned.** Names, party and Land are facts; the feed's HTML
-  biography (`detail1`–`detail3`) and photo are copyright-protected and are stripped
+  biography (`detail`) and photo (`imagePath`) are copyright-protected and are stripped
   by the CLI, so there's nothing to scrape or republish.
 - The plenary agenda and committee dates → the **bundesrat-agenda** skill.

@@ -36,7 +36,7 @@ test("members() surfaces only open factual fields — biography HTML and images 
     assert.equal(m["state"], "Baden-Württemberg");
     assert.equal(m["url"], "https://www.bundesrat.de/x/oezdemir.html");
     // …copyright editorial/image fields are projected out.
-    assert.equal(m["detail1"], undefined);
+    assert.equal(m["detail"], undefined);
     assert.equal(m["imagePath"], undefined);
     assert.equal(m["imageDate"], undefined);
   })();

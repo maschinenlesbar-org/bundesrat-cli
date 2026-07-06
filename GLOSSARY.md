@@ -74,7 +74,7 @@ feed** rather than the website's **HTML page**. The CLI adds it automatically; a
 [DEVELOPING.md](DEVELOPING.md)).
 
 **Editorial fields (not surfaced).** The raw feeds embed HTML fragments in CDATA —
-`detail`, `abstract`, `topdetail`, member `detail1`–`detail3` (role / biography /
+`detail`, `abstract`, `topdetail`, the member biography `detail` (role / biography /
 address) — plus image paths. These are copyright-protected editorial content, so the
 CLI **strips them**; only factual fields reach the output.
 

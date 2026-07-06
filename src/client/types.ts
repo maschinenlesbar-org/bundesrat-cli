@@ -14,8 +14,8 @@ export type { XmlValue, XmlObject } from "./xml.js";
 
 /**
  * A member of the Bundesrat (from the `<employee>` elements of the members feed).
- * Factual fields only; the feed's HTML biography (`detail1..3`) and portrait image
- * are copyright-protected editorial content and are not surfaced.
+ * Factual fields only; the feed's HTML biography (`detail`) and portrait image
+ * (`imagePath`) are copyright-protected editorial content and are not surfaced.
  */
 export interface Member {
   /** e.g. "Dr." (often empty). */

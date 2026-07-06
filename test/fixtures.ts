@@ -2,8 +2,8 @@
 // structurally faithful to the live feeds (see the DEVELOPING.md verify notes).
 //
 // The members/session/appointments fixtures deliberately include the feeds'
-// copyright-protected editorial/image fields (detail1, topdetail, imagePath,
-// abstract, detail) so the client tests can assert those are projected OUT of the
+// copyright-protected editorial/image fields (detail, topdetail, imagePath,
+// abstract) so the client tests can assert those are projected OUT of the
 // surfaced output, leaving only openly-licensed factual fields (DATA_LICENSE.md).
 
 export const membersXml = `<?xml version="1.0"?>
@@ -17,7 +17,7 @@ export const membersXml = `<?xml version="1.0"?>
       <state>Baden-Württemberg</state>
       <brmitglied>true</brmitglied>
       <mitglied>true</mitglied>
-      <detail1><![CDATA[ <p><strong>Ministerpräsident</strong></p> ]]></detail1>
+      <detail><![CDATA[ <p><strong>Ministerpräsident</strong></p> ]]></detail>
       <imagePath>/iOS/Bilder/oezdemir.jpg</imagePath>
       <imageDate>2025-01-01</imageDate>
       <url>https://www.bundesrat.de/x/oezdemir.html</url>

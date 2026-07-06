@@ -66,8 +66,8 @@ bundesrat members --state Hessen --party CDU
 
 Each member carries `honorificTitle`, `firstname`, `name`, `party`, `state`, a `url`,
 and the boolean-ish flags `brmitglied` / `mitglied` / `bv` / `designiert` (as
-`"true"`/`"false"` strings). The feed's HTML biography (`detail1`–`detail3`) and
-portrait image are copyright-protected and are **not** surfaced (see
+`"true"`/`"false"` strings). The feed's HTML biography (`detail`) and portrait image
+(`imagePath`) are copyright-protected and are **not** surfaced (see
 [DATA_LICENSE.md](DATA_LICENSE.md)).
 
 ```bash

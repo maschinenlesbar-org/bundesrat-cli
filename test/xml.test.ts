@@ -81,7 +81,7 @@ test("parses the members feed: two <employee> entries with decoded/CDATA fields"
   assert.equal(employees.length, 2);
   assert.equal(employees[0]!["name"], "Özdemir");
   assert.equal(employees[0]!["state"], "Baden-Württemberg");
-  assert.equal(employees[0]!["detail1"], "<p><strong>Ministerpräsident</strong></p>");
+  assert.equal(employees[0]!["detail"], "<p><strong>Ministerpräsident</strong></p>");
   assert.equal(employees[1]!["party"], "CSU");
 });
 
