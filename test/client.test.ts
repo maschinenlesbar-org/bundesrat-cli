@@ -75,6 +75,16 @@ test("appointments() hits its feed and surfaces only factual calendar fields", a
   assert.equal(it["imageCaption"], undefined);
 });
 
+test("empty leaf fields are omitted, consistent with absent ones", async () => {
+  const mt = makeMockTransport(() => xmlResponse(fx.sessionXml));
+  const c = new BundesratClient({ transport: mt.transport });
+  const s = await c.session();
+  // top[0] carries <linkedtop></linkedtop> (empty); top[1] has no <linkedtop> at
+  // all — both omit the key, rather than one being "" and the other absent.
+  assert.equal((s.tops[0] as Record<string, unknown>)["linkedtop"], undefined);
+  assert.equal((s.tops[1] as Record<string, unknown>)["linkedtop"], undefined);
+});
+
 test("only the three open-data feeds are exposed", () => {
   assert.deepEqual(Object.keys(FEEDS).sort(), ["appointments", "members", "session"]);
 });

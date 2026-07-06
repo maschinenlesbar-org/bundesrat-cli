@@ -75,15 +75,16 @@ export function asArray<T>(value: XmlValue | undefined): T[] {
 
 /**
  * Project a parsed element down to a whitelist of open, factual keys — dropping
- * every copyright-protected editorial/image field. Only defined keys are copied,
- * so absent fields simply don't appear.
+ * every copyright-protected editorial/image field. Only defined, **non-empty** keys
+ * are copied, so an absent field and an empty one (`<linkedtop/>`) both simply don't
+ * appear — a consistent "a present key always has a value" shape for consumers.
  */
 function pick<T>(obj: XmlValue, keys: readonly string[]): T {
   const src = (typeof obj === "object" && obj !== null && !Array.isArray(obj) ? obj : {}) as XmlObject;
   const out: Record<string, XmlValue> = {};
   for (const key of keys) {
     const value = src[key];
-    if (value !== undefined) out[key] = value;
+    if (value !== undefined && value !== "") out[key] = value;
   }
   return out as unknown as T;
 }
