@@ -91,6 +91,13 @@ test("a 404 exits 4", async () => {
   assert.equal(await run(["members"], cli.deps), 4);
 });
 
+test("a server 3xx exits 1 (runtime) with a base-url hint, not usage (2)", async () => {
+  const cli = makeCli(() => rawResponse("", "text/html", 302));
+  const code = await run(["members"], cli.deps);
+  assert.equal(code, 1);
+  assert.match(cli.err.join("\n"), /redirected \(3xx\)|--base-url/);
+});
+
 test("--compact prints single-line JSON", async () => {
   const cli = makeCli(() => xmlResponse(fx.membersXml));
   await run(["members", "--compact"], cli.deps);

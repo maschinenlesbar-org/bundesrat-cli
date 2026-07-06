@@ -69,9 +69,18 @@ export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<
     if (err instanceof BundesratApiError) {
       deps.io.err(`Error: ${err.message}`);
       if (err.status === 404) return EXIT.NOT_FOUND;
-      // A 3xx means the base URL redirected (the canonical host answers directly),
-      // so it is a base-URL misconfiguration — a usage error.
-      if (err.status >= 300 && err.status < 400) return EXIT.USAGE;
+      // A 3xx means the server redirected. The feeds are served directly by the
+      // canonical host, so this usually means --base-url points at a redirecting
+      // host — but it is a server/runtime condition, not CLI misuse, so it exits
+      // OTHER (1) with a pointed hint rather than USAGE (2), which scripts reserve
+      // for bad flags / arguments.
+      if (err.status >= 300 && err.status < 400) {
+        deps.io.err(
+          "Hint: the server redirected (3xx) — check --base-url points at the canonical " +
+            "host (https://www.bundesrat.de).",
+        );
+        return EXIT.OTHER;
+      }
       return EXIT.OTHER;
     }
     if (err instanceof BundesratNetworkError) {
