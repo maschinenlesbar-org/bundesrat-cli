@@ -37,6 +37,15 @@ test("getXml rejects the HTML shell with a helpful BundesratParseError", async (
   );
 });
 
+test("getXml on an empty body reports 'Empty response', not a parse failure", async () => {
+  const mt = makeMockTransport(() => rawResponse("   ", "application/xml"));
+  const e = new RequestEngine({ transport: mt.transport });
+  await assert.rejects(
+    () => e.getXml("/x", { view: "renderXml" }),
+    (err) => err instanceof BundesratParseError && /Empty response/.test(err.message),
+  );
+});
+
 test("a 503 is retried up to maxRetries then surfaces as BundesratApiError", async () => {
   let calls = 0;
   const mt = makeMockTransport(() => {

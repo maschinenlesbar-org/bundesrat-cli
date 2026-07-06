@@ -133,6 +133,13 @@ export class RequestEngine {
           "or the request lost its ?view=renderXml parameter.",
       );
     }
+    // An empty body is not malformed XML — surface it as "empty" rather than the
+    // generic parse-failure message so the cause is obvious.
+    if (text.trim().length === 0) {
+      throw new BundesratParseError(
+        `Empty response from ${path} — the feed returned no content (expected XML).`,
+      );
+    }
     try {
       return parseXml(text);
     } catch (cause) {
