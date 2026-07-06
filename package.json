@@ -1,6 +1,6 @@
 {
   "name": "@maschinenlesbar.org/bundesrat-cli",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "TypeScript API client and CLI for the Bundesrat's public data feeds — plenary sessions, agenda items, members and vote distribution",
   "type": "module",
   "bin": {
