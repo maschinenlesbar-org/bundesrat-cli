@@ -68,3 +68,16 @@ test("a 404 surfaces as a BundesratApiError with status 404", async () => {
     (err) => err instanceof BundesratApiError && err.status === 404 && err.isNotFound,
   );
 });
+
+test("a pathologically deep body surfaces as BundesratParseError, not a raw error (BR-01)", async () => {
+  // A hostile/MITM'd feed returns a very deeply nested document. Before the depth
+  // cap this parsed fine but the downstream JSON.stringify threw an untyped
+  // RangeError ("Unexpected error"); now it fails cleanly as a parse error.
+  const deep = "<x>".repeat(5000) + "leaf" + "</x>".repeat(5000);
+  const mt = makeMockTransport(() => rawResponse(`<iOS>${deep}</iOS>`, "application/xml"));
+  const e = new RequestEngine({ transport: mt.transport });
+  await assert.rejects(
+    () => e.getXml("/x", { view: "renderXml" }),
+    (err) => err instanceof BundesratParseError && /Failed to parse XML/.test(err.message),
+  );
+});

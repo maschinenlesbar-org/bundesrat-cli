@@ -20,6 +20,17 @@ export interface XmlObject {
   [key: string]: XmlValue;
 }
 
+/**
+ * Maximum element-nesting depth accepted by {@link parseXml}. The real Bundesrat
+ * feeds are shallow (`<iOS><list>…</list></iOS>` plus a couple of levels), so a far
+ * lower bound would do; this leaves generous headroom while still rejecting a
+ * pathological body long before the tree gets deep enough to blow up a *downstream*
+ * `JSON.stringify` (which recurses natively and throws a RangeError). Exceeding it
+ * throws — surfaced by the engine as a typed BundesratParseError, not a raw
+ * "Unexpected error". (BR-01.)
+ */
+const MAX_DEPTH = 512;
+
 /** Decode the five predefined XML entities plus numeric (`&#NN;` / `&#xNN;`) refs. */
 export function decodeEntities(text: string): string {
   // Hex (`#x…`) and decimal (`#…`) forms use separate character classes so a
@@ -170,6 +181,9 @@ export function parseXml(xml: string): XmlValue {
       if (m[5] === "/") {
         attach(name, frameValue({ attrs, children: [], text: "", hasElements: false }));
       } else {
+        if (stack.length >= MAX_DEPTH) {
+          throw new Error(`XML nesting too deep (exceeded ${MAX_DEPTH} levels)`);
+        }
         stack.push({ attrs, children: [], text: "", hasElements: false });
         names.push(name);
       }

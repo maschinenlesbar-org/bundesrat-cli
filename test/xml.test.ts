@@ -110,6 +110,22 @@ test("throws on a document with no root element", () => {
   assert.throws(() => parseXml("   \n  "), /No root element/);
 });
 
+// --- Security: deep-nesting depth cap (BR-01) ---
+
+test("a pathologically deep document is rejected with a typed parse error", () => {
+  // Well past the 512-level cap. The parser itself is iterative and would not
+  // overflow, but the resulting tree blows up a downstream JSON.stringify; the cap
+  // turns that into a clean, typed failure instead of a raw RangeError.
+  const deep = "<x>".repeat(5000) + "leaf" + "</x>".repeat(5000);
+  assert.throws(() => parseXml(`<r>${deep}</r>`), /nesting too deep/);
+});
+
+test("a document at a normal depth still parses", () => {
+  const nested = "<a><b><c><d>leaf</d></c></b></a>";
+  const v = parseXml(`<r>${nested}</r>`) as XmlObject;
+  assert.equal((((v["a"] as XmlObject)["b"] as XmlObject)["c"] as XmlObject)["d"], "leaf");
+});
+
 // --- Security: prototype-pollution defence-in-depth (BR-02) ---
 
 test("a <__proto__> / <constructor> tag does not pollute Object.prototype", () => {
