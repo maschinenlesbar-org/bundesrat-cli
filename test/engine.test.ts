@@ -69,6 +69,35 @@ test("a 404 surfaces as a BundesratApiError with status 404", async () => {
   );
 });
 
+test("error detail is stripped of terminal control characters", async () => {
+  // Build the hostile snippet from char codes so no raw control byte appears in
+  // this source file. ESC + CSI (a C1 control) + BEL interleaved with printable text.
+  const ESC = String.fromCharCode(0x1b);
+  const BEL = String.fromCharCode(0x07);
+  const CSI = String.fromCharCode(0x9b);
+  const evil = `boom${ESC}[31mred${BEL}${CSI}2J`;
+  // Plain (non-`<`) body so a `detail` snippet is produced.
+  const mt = makeMockTransport(() => rawResponse(evil, "text/plain", 500));
+  const e = new RequestEngine({ transport: mt.transport, maxRetries: 0 });
+  await assert.rejects(
+    () => e.getXml("/x"),
+    (err) => {
+      assert.ok(err instanceof BundesratApiError);
+      const hasControl = (s: string): boolean =>
+        [...s].some((c) => {
+          const n = c.charCodeAt(0);
+          return n <= 8 || (n >= 0x0b && n <= 0x1f) || (n >= 0x7f && n <= 0x9f);
+        });
+      // Control bytes are gone from both the structured detail and the message
+      // that run.ts prints to stderr, while printable characters are preserved.
+      assert.ok(!hasControl(err.detail ?? ""));
+      assert.ok(!hasControl(err.message));
+      assert.equal(err.detail, "boom[31mred2J");
+      return true;
+    },
+  );
+});
+
 test("a pathologically deep body surfaces as BundesratParseError, not a raw error (BR-01)", async () => {
   // A hostile/MITM'd feed returns a very deeply nested document. Before the depth
   // cap this parsed fine but the downstream JSON.stringify threw an untyped

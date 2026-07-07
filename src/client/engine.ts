@@ -45,6 +45,27 @@ export interface EngineOptions {
 
 const DEFAULT_MAX_RESPONSE_BYTES = 100 * 1024 * 1024;
 
+/**
+ * Strip control characters (all C0/C1 except tab and newline, plus DEL) out of a
+ * string that originates in an attacker-controlled response body — the error
+ * `detail` snippet that ends up in a BundesratApiError.message printed raw to
+ * stderr by run.ts. Without this, a hostile / MITM'd / spoofed-`--base-url`
+ * endpoint could drive ANSI/OSC escape sequences (display spoofing, terminal
+ * title changes) into the user's terminal via a non-2xx reply. The success path
+ * is already safe (JSON.stringify escapes these), so this only covers error text.
+ *
+ * Written as a char-code filter so no raw control byte ever appears in this source.
+ */
+function sanitizeServerText(text: string): string {
+  let out = "";
+  for (const ch of text) {
+    const n = ch.codePointAt(0) ?? 0;
+    if (n <= 8 || (n >= 0x0b && n <= 0x1f) || (n >= 0x7f && n <= 0x9f)) continue;
+    out += ch;
+  }
+  return out;
+}
+
 const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -158,12 +179,16 @@ export class RequestEngine {
     // The Bundesrat serves HTML error pages, not a structured envelope; surface a
     // short, whitespace-collapsed snippet only when it is plain (non-HTML) text.
     const snippet = text.trim().replace(/\s+/g, " ");
-    const detail =
+    let detail =
       snippet.length > 0 && !snippet.startsWith("<")
         ? snippet.length > 200
           ? `${snippet.slice(0, 200)}…`
           : snippet
         : undefined;
+    // `detail` came from the response body and lands in an Error.message printed
+    // raw to stderr; strip control chars so a hostile endpoint cannot inject
+    // terminal escape sequences. (`\s+` collapse above already drops tab/newline.)
+    if (detail !== undefined) detail = sanitizeServerText(detail);
     return new BundesratApiError({ status, url, method: "GET", body: text, detail });
   }
 }
