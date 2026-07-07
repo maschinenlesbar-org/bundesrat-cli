@@ -67,13 +67,21 @@ interface Frame {
   hasElements: boolean;
 }
 
+// Tag/attribute names that would reparent or shadow a built-in if used as an object
+// key. We key parsed nodes by attacker-controlled names, so we skip these outright
+// (belt-and-braces alongside the `Object.create(null)` node objects below).
+const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 function parseAttrs(raw: string): Record<string, string> {
-  const attrs: Record<string, string> = {};
+  // Null-proto so an attribute named `__proto__` becomes an own property rather
+  // than invoking the Object.prototype setter and reparenting the object.
+  const attrs: Record<string, string> = Object.create(null);
   const re = /([A-Za-z_:][\w.:-]*)\s*=\s*"([^"]*)"|([A-Za-z_:][\w.:-]*)\s*=\s*'([^']*)'/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(raw)) !== null) {
-    if (m[1] !== undefined) attrs[m[1]] = decodeEntities(m[2] ?? "");
-    else if (m[3] !== undefined) attrs[m[3]] = decodeEntities(m[4] ?? "");
+    const name = m[1] !== undefined ? m[1] : m[3];
+    if (name === undefined || DANGEROUS_KEYS.has(name)) continue;
+    attrs[name] = decodeEntities((m[1] !== undefined ? m[2] : m[4]) ?? "");
   }
   return attrs;
 }
@@ -84,16 +92,21 @@ function frameValue(frame: Frame): XmlValue {
   if (!frame.hasElements) {
     const text = frame.text.trim();
     if (attrEntries.length === 0) return text;
-    // Leaf with attributes: keep both under an object.
-    const obj: XmlObject = {};
+    // Leaf with attributes: keep both under an object. Null-proto so an attacker
+    // tag/attr name can never reparent it or shadow a built-in method.
+    const obj: XmlObject = Object.create(null);
     for (const [k, v] of attrEntries) obj[`@${k}`] = v;
     if (text.length > 0) obj["#text"] = text;
     return obj;
   }
 
-  const obj: XmlObject = {};
+  // Null-proto result object: keying by an attacker-controlled tag name such as
+  // `__proto__` then creates an own property instead of walking the prototype
+  // chain, so the node is never reparented and no built-in method is shadowed.
+  const obj: XmlObject = Object.create(null);
   for (const [k, v] of attrEntries) obj[`@${k}`] = v;
   for (const [name, value] of frame.children) {
+    if (DANGEROUS_KEYS.has(name)) continue; // belt-and-braces (attrs are `@`-prefixed and safe)
     if (name in obj) {
       const existing = obj[name];
       if (Array.isArray(existing)) existing.push(value as string | XmlObject);

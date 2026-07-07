@@ -3,6 +3,17 @@ import assert from "node:assert/strict";
 import { parseXml, decodeEntities, type XmlObject } from "../src/client/xml.js";
 import * as fx from "./fixtures.js";
 
+/**
+ * Round-trip a parsed value through JSON so structural `deepEqual` assertions
+ * compare data only. Parsed nodes are intentionally null-proto (BR-02 hardening),
+ * which `assert.deepStrictEqual` treats as unequal to a plain-object literal;
+ * JSON.parse re-materialises them with the default prototype without changing
+ * their shape.
+ */
+function plain(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value));
+}
+
 test("decodeEntities handles named, decimal and hex references", () => {
   assert.equal(decodeEntities("A &amp; B &lt;x&gt; &quot;q&quot; &apos;a&apos;"), `A & B <x> "q" 'a'`);
   assert.equal(decodeEntities("Bundesratspr&#228;sident"), "Bundesratspräsident");
@@ -25,7 +36,7 @@ test("decodeEntities accepts upper-case hex and rejects malformed/surrogate refs
 
 test("parses a simple nested document to an object with leaf text", () => {
   const v = parseXml("<iOS><list><a>x</a><b>y</b></list></iOS>") as XmlObject;
-  assert.deepEqual(v, { list: { a: "x", b: "y" } });
+  assert.deepEqual(plain(v), { list: { a: "x", b: "y" } });
 });
 
 test("captures attributes as @-prefixed keys", () => {
@@ -60,7 +71,7 @@ test("empty and self-closing elements become empty strings", () => {
 
 test("whitespace between elements is ignored (no stray #text)", () => {
   const v = parseXml("<r>\n  <a>x</a>\n  <b>y</b>\n</r>") as XmlObject;
-  assert.deepEqual(v, { a: "x", b: "y" });
+  assert.deepEqual(plain(v), { a: "x", b: "y" });
 });
 
 test("nested repeated structure (tops/subtops) parses correctly", () => {
@@ -69,7 +80,7 @@ test("nested repeated structure (tops/subtops) parses correctly", () => {
   const tops = list["tops"] as XmlObject;
   const top = tops["top"] as XmlObject;
   assert.equal(top["nr"], "1");
-  assert.deepEqual(top["subtop"], [
+  assert.deepEqual(plain(top["subtop"]), [
     { type: "a", name: "N1" },
     { type: "b", name: "N2" },
   ]);
@@ -97,4 +108,29 @@ test("parses the session feed: title, header and two <top> items with Drucksache
 
 test("throws on a document with no root element", () => {
   assert.throws(() => parseXml("   \n  "), /No root element/);
+});
+
+// --- Security: prototype-pollution defence-in-depth (BR-02) ---
+
+test("a <__proto__> / <constructor> tag does not pollute Object.prototype", () => {
+  parseXml("<r><__proto__><polluted>yes</polluted></__proto__></r>");
+  parseXml("<r><constructor><polluted>yes</polluted></constructor></r>");
+  parseXml('<r __proto__="evil"><a>x</a></r>');
+  // A brand-new, unrelated object must be unaffected.
+  const probe = {} as Record<string, unknown>;
+  assert.equal(probe["polluted"], undefined);
+  assert.equal(({} as Record<string, unknown>)["__proto__"], Object.prototype);
+});
+
+test("parsed nodes are null-proto: no reparenting, safe to string-coerce and stringify", () => {
+  // A <__proto__> child previously reparented the node; a <toString> child shadowed
+  // its method so String(node) threw. With null-proto nodes both are just own keys.
+  const v = parseXml("<r><__proto__>x</__proto__><toString>y</toString><a>z</a></r>") as XmlObject;
+  assert.equal(Object.getPrototypeOf(v), null);
+  // The dangerous key is dropped; the real child survives.
+  assert.equal(v["a"], "z");
+  assert.equal(v["__proto__"], undefined);
+  // String-coercion and JSON.stringify (used by renderJson) must not throw.
+  assert.doesNotThrow(() => JSON.stringify(v));
+  assert.doesNotThrow(() => `${JSON.stringify(v)}`);
 });
