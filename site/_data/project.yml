@@ -1,0 +1,16 @@
+# The only repo-specific texts of the website. Everything else comes from the
+# repository: the English intro from README.md, the commands from the built CLI.
+
+# How the API is accessed: open | key (env: VAR) | account (token, user, password: VARs)
+access:
+  type: open
+
+de:
+  # German version of the README's intro paragraph. Keep it in step with README.md.
+  intro: >-
+    Den **Bundesrat** – die Länderkammer der sechzehn Bundesländer – direkt im Terminal
+    verfolgen. `bundesrat` ist ein Kommandozeilen-Tool für die öffentlichen Daten-Feeds des
+    Bundesrates (die Daten hinter der offiziellen Bundesrat-App): die Tagesordnung der
+    aktuellen Plenarsitzung mit ihren Drucksachen, die Mitglieder und die Ausschusstermine –
+    als sauberes JSON, das Sie direkt an [`jq`](https://jqlang.github.io/jq/) weitergeben
+    können.

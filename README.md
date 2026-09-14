@@ -4,6 +4,8 @@
 [![Release](https://github.com/maschinenlesbar-org/bundesrat-cli/actions/workflows/release.yml/badge.svg)](https://github.com/maschinenlesbar-org/bundesrat-cli/actions/workflows/release.yml)
 [![npm](https://img.shields.io/npm/v/@maschinenlesbar.org/bundesrat-cli)](https://www.npmjs.com/package/@maschinenlesbar.org/bundesrat-cli)
 
+**Website:** [English](https://maschinenlesbar-org.github.io/bundesrat-cli/) · [Deutsch](https://maschinenlesbar-org.github.io/bundesrat-cli/de/) — command reference, guides and API docs
+
 Follow Germany's **Bundesrat** — the chamber of the sixteen Länder — from your
 terminal. `bundesrat` is a command-line tool over the Bundesrat's public data
 feeds (the data behind the official Bundesrat app): the current plenary sitting's
