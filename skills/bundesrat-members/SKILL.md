@@ -83,4 +83,7 @@ bundesrat members | jq '[.[] | select(.mitglied == "true")] | length'
 - **Only facts are returned.** Names, party and Land are facts; the feed's HTML
   biography (`detail`) and photo (`imagePath`) are copyright-protected and are stripped
   by the CLI, so there's nothing to scrape or republish.
+- **A connection reset isn't retried.** The server occasionally drops a connection
+  (`Error: read ECONNRESET`, exit `6`). `--max-retries` covers only HTTP 429/503, so
+  run the command once more before reporting the feed as unavailable.
 - The plenary agenda and committee dates → the **bundesrat-agenda** skill.

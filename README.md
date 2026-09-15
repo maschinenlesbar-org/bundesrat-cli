@@ -121,6 +121,9 @@ Use `--compact` for single-line JSON and `-o <file>` to write to a file — both
 - **Exit `1` / "received an HTML page"** — the feed returned the website's HTML
   shell instead of XML (it may have moved). The CLI already adds the required
   `?view=renderXml` render parameter; if this persists, the upstream feed changed.
+- **Exit `6` / `read ECONNRESET`** — the server dropped the connection. This
+  happens now and then; `--max-retries` retries only `429`/`503` responses, not
+  network errors, so run the command again.
 - **Empty `tops` between sittings** — outside an active sitting the agenda feed can
   be sparse: `tops` may be `[]` and `session`'s `title`/`header` may be absent
   (both are optional), so guard for them in scripts.
