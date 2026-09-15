@@ -17,9 +17,12 @@ Einwohnerzahl (je 3–6).
 
 **Mitglied (`members`).** Ein Mitglied einer Landesregierung, das dem Bundesrat angehört.
 Jeder Datensatz enthält `honorificTitle`, `firstname`, `name`, `party`, `state` (das
-Land), eine `url` und Statusflags: `brmitglied` (stimmberechtigtes Bundesratsmitglied),
-`mitglied`, `bv` (*Bevollmächtigter*), `designiert` (benannt, noch nicht im Amt) – alle
-als Strings `"true"`/`"false"`.
+Land), eine `url` und Statusflags: `mitglied` (eines der 69 Mitglieder, je Land so viele,
+wie es Stimmen hat), `brmitglied` (ein Mitglied **oder** ein *stellvertretendes Mitglied*;
+181 von 193 Datensätzen am 15.09.2026), `bv` (*Bevollmächtigter*), `designiert` (benannt,
+noch nicht im Amt) – alle als Strings `"true"`/`"false"`. Der Feed führt Mitglieder,
+stellvertretende Mitglieder und Bevollmächtigte; filtern Sie auf `mitglied == "true"`, um
+die 69 Mitglieder zu erhalten.
 
 ## Plenarsitzungen & Tagesordnung
 

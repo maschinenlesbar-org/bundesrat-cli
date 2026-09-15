@@ -94,6 +94,9 @@ non-obvious parts of these feeds, for example:
   you get is safe factual data; there is no HTML to scrape or reproduce;
 - **member filters differ** — `--state` is an exact Land match, `--party` is a
   case-insensitive substring; both run client-side, so an unmatched filter returns `[]`;
+- **the member list includes deputies and plenipotentiaries** — `mitglied == "true"`
+  marks the 69 members; `brmitglied` is also `"true"` for the deputies, so it is not
+  the voting-member flag;
 - **status flags are strings** `"true"`/`"false"`, and **dates are German-format**
   strings, not ISO;
 - **copyright vs. amtliches Werk** — the Drucksachen/Plenarprotokolle are public-domain

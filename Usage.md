@@ -74,13 +74,17 @@ and the boolean-ish flags `brmitglied` / `mitglied` / `bv` / `designiert` (as
 (`imagePath`) are copyright-protected and are **not** surfaced (see
 [DATA_LICENSE.md](DATA_LICENSE.md)).
 
-```bash
-# Names + parties for a Land
-bundesrat members --state "Nordrhein-Westfalen" \
-  | jq -r '.[] | "\(.firstname) \(.name) — \(.party)"'
+The list holds more than the 69 members: `mitglied == "true"` marks a member,
+`brmitglied == "true"` with `mitglied == "false"` a deputy (*stellvertretendes
+Mitglied*), and `bv == "true"` alone a plenipotentiary, who may have no `party`.
 
-# Party head-count across the whole Bundesrat
-bundesrat members | jq -r 'group_by(.party)[] | "\(.[0].party): \(length)"'
+```bash
+# Names + parties of a Land's members
+bundesrat members --state "Nordrhein-Westfalen" \
+  | jq -r '.[] | select(.mitglied == "true") | "\(.firstname) \(.name) — \(.party)"'
+
+# Party head-count of the 69 members
+bundesrat members | jq -r '[.[] | select(.mitglied == "true")] | group_by(.party)[] | "\(.[0].party // "no party given"): \(length)"'
 ```
 
 Filtering is client-side, so an unmatched filter returns `[]` (not the full list).

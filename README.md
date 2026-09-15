@@ -96,8 +96,8 @@ bundesrat session | jq '.tops | length'
 # Drucksachen on the agenda
 bundesrat session | jq -r '.tops[].topdrucksache | select(.)'
 
-# Members grouped by party
-bundesrat members | jq -r 'group_by(.party)[] | "\(.[0].party): \(length)"'
+# Members grouped by party (mitglied marks the 69 members; the rest are deputies and plenipotentiaries)
+bundesrat members | jq -r '[.[] | select(.mitglied == "true")] | group_by(.party)[] | "\(.[0].party // "no party given"): \(length)"'
 ```
 
 Use `--compact` for single-line JSON and `-o <file>` to write to a file — both are

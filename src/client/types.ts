@@ -26,9 +26,9 @@ export interface Member {
   party?: string;
   /** Federal state (Land), e.g. "Baden-Württemberg". */
   state?: string;
-  /** "true"/"false": whether the person is a voting Bundesrat member. */
+  /** "true"/"false": whether the person is a member *or* a deputy (stellvertretendes Mitglied). */
   brmitglied?: string;
-  /** "true"/"false": whether the person is a (regular) member. */
+  /** "true"/"false": whether the person is one of the 69 (full) members. */
   mitglied?: string;
   /** "true"/"false": whether the person is a plenipotentiary (Bevollmächtigter). */
   bv?: string;

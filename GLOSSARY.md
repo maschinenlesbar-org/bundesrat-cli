@@ -16,9 +16,12 @@ to the Bundesrat and holds a bloc of **votes** weighted by population (3–6 eac
 
 **Member (`members`).** A member of a Land government who sits in the Bundesrat.
 Each record carries `honorificTitle`, `firstname`, `name`, `party`, `state` (the
-Land), a `url`, and status flags: `brmitglied` (a voting Bundesrat member),
-`mitglied`, `bv` (*Bevollmächtigter* — plenipotentiary), `designiert` (designated,
-not yet in office) — all as `"true"`/`"false"` strings.
+Land), a `url`, and status flags: `mitglied` (one of the 69 members, as many per
+Land as it has votes), `brmitglied` (a member **or** a deputy — *stellvertretendes
+Mitglied*; 181 of 193 records on 2026-09-15), `bv` (*Bevollmächtigter* —
+plenipotentiary), `designiert` (designated, not yet in office) — all as
+`"true"`/`"false"` strings. The feed lists members, deputies and plenipotentiaries,
+so filter on `mitglied == "true"` to get the 69 members.
 
 ## Plenary sittings & agenda
 
