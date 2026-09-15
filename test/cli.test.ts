@@ -178,6 +178,17 @@ test("--max-retries above the sane maximum is rejected (exit 2)", async () => {
   assert.equal(await run(["--max-retries", "1000", "members"], cli.deps), 2);
 });
 
+test("--timeout accepts up to the largest timer Node supports", async () => {
+  const cli = makeCli(() => xmlResponse(fx.membersXml));
+  assert.equal(await run(["--timeout", "2147483647", "members"], cli.deps), 0);
+  assert.equal(cli.mt.last().timeoutMs, 2_147_483_647);
+
+  const over = makeCli(() => xmlResponse(fx.membersXml));
+  assert.equal(await run(["--timeout", "2147483648", "members"], over.deps), 2);
+  assert.equal(over.mt.calls.length, 0);
+  assert.match(over.err.join("\n"), /Must be <= 2147483647/);
+});
+
 test("a bare invocation prints help and exits 0", async () => {
   const cli = makeCli(() => xmlResponse(fx.membersXml));
   const code = await run([], cli.deps);
