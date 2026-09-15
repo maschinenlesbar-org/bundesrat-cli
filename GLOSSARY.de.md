@@ -36,8 +36,9 @@ liefert sie als `tops`.
 **TOP (Tagesordnungspunkt) – `top` / `tops`.** Ein einzelner Punkt der Tagesordnung. Jeder
 enthält `toptitle` (z. B. „TOP 67“), `topheader` (eine kurze sachliche Bezeichnung),
 `topdrucksache` (die zugehörige Drucksachennummer) und `linkedtop` (einen Querverweis).
-Die HTML-Beschreibung des Feeds (`topdetail`) ist redaktioneller Inhalt und wird nicht
-ausgegeben.
+Leere Felder entfallen, `linkedtop` erscheint also nur, wenn es gesetzt ist. Der Feed führt
+die TOPs nicht in numerischer Reihenfolge. Die HTML-Beschreibung des Feeds (`topdetail`)
+ist redaktioneller Inhalt und wird nicht ausgegeben.
 
 **Drucksache (`topdrucksache`).** Ein nummeriertes Dokument, z. B. „Drucksache 371/26“ –
 das Dokument, um das es in einem TOP geht (ein Gesetz, eine Verordnung, ein Antrag …).
@@ -46,7 +47,9 @@ können Sie das vollständige Dokument auf bundesrat.de oder im DIP nachschlagen
 
 **Termine (`appointments`).** Ausschusstermine und andere geplante Ereignisse (z. B.
 *Umfragen* – schriftliche Verfahren der Ausschüsse nach § 43 GO BR). Ausgegeben als
-sachliche Kalendereinträge (`title`, `date`, `startdate`/`stopdate`).
+sachliche Kalendereinträge (`title`, `startdate` sowie `date`/`stopdate`, wenn der Feed sie
+setzt). `startdate` hat deutsches Format, z. B. „25.09.2026 09:30“; eine abgesagte Sitzung
+bleibt mit „entfällt“ im Titel in der Liste.
 
 ## Inhalte der Feeds, die diese CLI nicht ausgibt
 

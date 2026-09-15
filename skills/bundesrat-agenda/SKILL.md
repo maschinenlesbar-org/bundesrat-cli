@@ -25,15 +25,18 @@ This skill drives the `bundesrat` command. **Before anything else, validate it i
 ## Commands
 
 ```bash
-bundesrat session       # current sitting: { title, header, tops: [ {toptitle, topdrucksache, topheader, linkedtop} ] }
-bundesrat appointments  # committee dates (Termine): [ {type, id, url, title, date, startdate, stopdate} ]
+bundesrat session       # current sitting: { title, header, tops: [ {toptitle, topdrucksache, topheader, linkedtop?} ] }
+bundesrat appointments  # committee dates (Termine): [ {type, id, url, title, startdate} ]
 ```
+
+The CLI drops empty fields, so a field with no value is **missing**, never `""`.
 
 ## Recipes
 
 ```bash
-# The full agenda, one line per item
-bundesrat session | jq -r '.tops[] | "\(.toptitle)\t\(.topdrucksache // "—")\t\(.topheader)"'
+# The full agenda, one line per item, in TOP order (the feed lists them out of order)
+bundesrat session \
+  | jq -r '.tops | sort_by(.toptitle // "" | capture("(?<n>\\d+)(?<s>[a-z]*)") | [(.n | tonumber), .s])[] | "\(.toptitle)\t\(.topdrucksache // "—")\t\(.topheader)"'
 
 # When and what: title, date, and number of items
 bundesrat session | jq '{title, header, items: (.tops | length)}'
@@ -41,16 +44,30 @@ bundesrat session | jq '{title, header, items: (.tops | length)}'
 # Every Drucksache the sitting will deal with
 bundesrat session | jq -r '.tops[].topdrucksache | select(.)'
 
-# Upcoming committee dates
-bundesrat appointments | jq -r '.[] | "\(.startdate // "")\t\(.title)"'
+# Upcoming committee dates, sorted, start as YYYY-MM-DD HH:MM
+bundesrat appointments \
+  | jq -r 'map(. + {start: ((.startdate // "" | capture("(?<d>\\d{2})\\.(?<m>\\d{2})\\.(?<y>\\d{4}) ?(?<t>[0-9:]*)") | "\(.y)-\(.m)-\(.d) \(.t)") // "")}) | sort_by(.start)[] | "\(.start)\t\(.title)"'
 ```
 
 ## Traps
 
-- **The agenda is under `.tops[]`**, each with `toptitle` ("TOP 67"),
-  `topdrucksache` ("Drucksache 371/26"), `topheader` (short factual label) and
-  `linkedtop`. `topdrucksache` can be empty for procedural items — guard with
-  `select(.)`.
+- **The agenda is under `.tops[]`**, each with `toptitle` ("TOP 67", "TOP 2b"),
+  `topdrucksache` ("Drucksache 371/26") and `topheader` (short factual label).
+  `linkedtop` (a cross-reference) appears only when set — on 2026-09-15 none of the
+  95 TOPs had one. `topdrucksache` may be **missing** on a procedural item — use
+  `// "—"` or `select(.)`.
+- **TOPs come out of order.** The feed lists them as e.g. TOP 31, TOP 24, TOP 81,
+  TOP 40. Sort by the number and letter suffix (recipe above) before presenting the
+  agenda; a plain string sort puts "TOP 10" before "TOP 2".
+- **Appointment dates are German-format strings** — `startdate` is
+  `"25.09.2026 09:30"` (DD.MM.YYYY HH:MM), which doesn't sort as text; convert as in
+  the recipe. On 2026-09-15 every appointment had only `type`, `id`, `url`, `title`
+  and `startdate`; don't count on `date` or `stopdate`, which the CLI passes through
+  only when the feed sets them.
+- **Cancelled dates stay in the list.** The title says so: „Sitzung des
+  Finanzausschusses entfällt / Umfrageverfahren". Mark titles containing „entfällt"
+  as cancelled (a committee that decides by written poll instead holds no meeting)
+  rather than listing them as meetings.
 - **Only open fields are returned.** The agenda item's HTML description (`topdetail`)
   and the appointment's editorial `detail`/`abstract`/image are stripped by the CLI —
   there is no HTML to scrape, and nothing copyright-protected reaches the output.

@@ -79,7 +79,7 @@ export interface Appointment {
   /** Publication/update timestamp, e.g. "03.07.2026 13:41" (German format). */
   date?: string;
   dateOfIssue?: string;
-  /** Start/stop of the event. */
+  /** Start/stop of the event, German format, e.g. "25.09.2026 09:30". `stopdate` is often absent. */
   startdate?: string;
   stopdate?: string;
   highlighted?: string;

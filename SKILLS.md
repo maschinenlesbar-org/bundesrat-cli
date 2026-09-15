@@ -88,7 +88,8 @@ Every skill is a single `SKILL.md` — a short, model-facing playbook describing
 non-obvious parts of these feeds, for example:
 
 - **the agenda lives under `.tops[]`** — each item has `toptitle`, `topdrucksache`
-  (often empty for procedural TOPs — guard it) and `topheader`;
+  (missing on a procedural TOP — guard it) and `topheader`; the feed lists TOPs out
+  of order, so sort by number before presenting them;
 - **only open fields are returned** — the CLI already strips the feeds' copyright
   editorial content (HTML `detail`/`topdetail`, member biographies, images), so what
   you get is safe factual data; there is no HTML to scrape or reproduce;
@@ -98,7 +99,8 @@ non-obvious parts of these feeds, for example:
   marks the 69 members; `brmitglied` is also `"true"` for the deputies, so it is not
   the voting-member flag;
 - **status flags are strings** `"true"`/`"false"`, and **dates are German-format**
-  strings, not ISO;
+  strings (`"25.09.2026 09:30"`), not ISO — convert before sorting; cancelled
+  committee dates stay listed with „entfällt" in the title;
 - **copyright vs. amtliches Werk** — the Drucksachen/Plenarprotokolle are public-domain
   official works (reuse unaltered, with a source citation); still cite "Quelle: Bundesrat".
 

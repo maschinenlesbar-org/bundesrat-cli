@@ -35,14 +35,20 @@ bundesrat session
   "title": "1067. Sitzung des Bundesrates | Tagesordnung Entwurf",
   "header": "am Freitag, dem 10. Juli 2026, 9:30 Uhr",
   "tops": [
-    { "toptitle": "TOP 67", "topdrucksache": "Drucksache 371/26", "topheader": "…", "linkedtop": "" }
+    { "toptitle": "TOP 67", "topdrucksache": "Drucksache 371/26", "topheader": "…" }
   ]
 }
 ```
 
+Empty fields are dropped, so `linkedtop` appears only when a TOP has a
+cross-reference, and a TOP without a Drucksache has no `topdrucksache` key. The
+feed lists the TOPs **out of order** (e.g. TOP 31, TOP 24, TOP 81), so sort them
+by number and letter suffix before printing an agenda.
+
 ```bash
-# Just the agenda, one line per TOP
-bundesrat session | jq -r '.tops[] | "\(.toptitle)\t\(.topdrucksache // "—")\t\(.topheader)"'
+# Just the agenda, one line per TOP, in TOP order
+bundesrat session \
+  | jq -r '.tops | sort_by(.toptitle // "" | capture("(?<n>\\d+)(?<s>[a-z]*)") | [(.n | tonumber), .s])[] | "\(.toptitle)\t\(.topdrucksache // "—")\t\(.topheader)"'
 
 # How many agenda items?
 bundesrat session | jq '.tops | length'
@@ -96,12 +102,18 @@ bundesrat appointments
 ```
 
 Returns an **array of calendar items** with their factual fields: `type`, `id`,
-`url`, `title`, `date`, `startdate` / `stopdate`. (The item's HTML `detail`/`abstract`
+`url`, `title`, `startdate`, and `date` / `stopdate` when the feed sets them (on
+2026-09-15 none of the 20 items had either). (The item's HTML `detail`/`abstract`
 body and any image are copyright-protected and are not surfaced.)
 
+`startdate` is a German-format string, `"25.09.2026 09:30"` (DD.MM.YYYY HH:MM),
+which doesn't sort as text. Cancelled dates stay in the list with the cancellation
+in the title („… entfällt / Umfrageverfahren").
+
 ```bash
-# Committee dates with start/stop
-bundesrat appointments | jq -r '.[] | "\(.startdate // "")\t\(.title)"'
+# Committee dates, sorted, start as YYYY-MM-DD HH:MM
+bundesrat appointments \
+  | jq -r 'map(. + {start: ((.startdate // "" | capture("(?<d>\\d{2})\\.(?<m>\\d{2})\\.(?<y>\\d{4}) ?(?<t>[0-9:]*)") | "\(.y)-\(.m)-\(.d) \(.t)") // "")}) | sort_by(.start)[] | "\(.start)\t\(.title)"'
 ```
 
 > **Only open data is exposed.** The Bundesrat feeds also carry news/press items,

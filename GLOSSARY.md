@@ -34,8 +34,10 @@ returns it as `tops`.
 
 **TOP (Tagesordnungspunkt) — `top` / `tops`.** A single agenda item. Each carries
 `toptitle` (e.g. "TOP 67"), `topheader` (a short factual label), `topdrucksache`
-(the associated document number) and `linkedtop` (a cross-reference). The feed's
-HTML description (`topdetail`) is editorial content and is not surfaced.
+(the associated document number) and `linkedtop` (a cross-reference). Empty fields
+are dropped, so `linkedtop` appears only when set. The feed lists the TOPs out of
+numerical order. The feed's HTML description (`topdetail`) is editorial content and
+is not surfaced.
 
 **Drucksache (`topdrucksache`).** A numbered printed paper, e.g. "Drucksache
 371/26" — the document a TOP is about (a bill, regulation, motion, …). Bundesrat
@@ -44,7 +46,9 @@ you look the full document up on bundesrat.de or in DIP.
 
 **Termine / appointments (`appointments`).** Committee dates and other scheduled
 events (e.g. *Umfragen* — written committee polls under § 43 GO BR). Surfaced as
-factual calendar items (`title`, `date`, `startdate`/`stopdate`).
+factual calendar items (`title`, `startdate`, and `date`/`stopdate` when the feed
+sets them). `startdate` is German-format, e.g. "25.09.2026 09:30"; a cancelled
+meeting stays listed with „entfällt" in its title.
 
 ## Concepts the feeds carry but this CLI does not surface
 
