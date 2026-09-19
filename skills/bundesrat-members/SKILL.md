@@ -5,8 +5,10 @@ description: >
   user asks "who represents Bavaria in the Bundesrat?", "list the Green members of
   the Bundesrat", "which parties are in the Bundesrat and how many members each?",
   or wants to filter Bundesrat members by federal state (Land) or party.
-version: 2.0.0
-userInvocable: true
+compatibility: >
+  Requires the `bundesrat` CLI (npm package @maschinenlesbar.org/bundesrat-cli)
+  on PATH, installed by the user; the skill never installs it. Uses jq for JSON
+  filtering. Network access to www.bundesrat.de.
 ---
 
 # Bundesrat Members
@@ -17,6 +19,8 @@ skill lists and filters them by Land or party.
 ## Tooling
 
 This skill drives the `bundesrat` command. **Before anything else, validate it is available** — run `command -v bundesrat` (or `bundesrat --version`). If it is not on your PATH, STOP and inform the user that the `bundesrat` CLI (`@maschinenlesbar.org/bundesrat-cli`) is not installed — installing it is their responsibility; never install it yourself, and do not fall back to `npx` or a local `node dist/...` build.
+
+This skill also filters JSON with `jq`. **Validate it too** — run `command -v jq`. If it is missing, inform the user that `jq` is not installed — installing it is their responsibility; never install it yourself — and carry on without it: filter the CLI output with `node -e` instead (Node is already on your PATH, since the CLI runs on it).
 
 **No API key is required** — the Bundesrat feeds are public. The CLI surfaces **only openly-licensed data**: a member's name, party, Land and status flags are facts; the feed's biography and portrait are copyright-protected and are not returned. Cite "Quelle: Bundesrat". See DATA_LICENSE.md. Use `--compact` when piping to `jq`.
 

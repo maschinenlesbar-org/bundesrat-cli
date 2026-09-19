@@ -6,8 +6,10 @@ description: >
   "which Drucksachen is the Bundesrat voting on this week?", "how many items are on
   the current Tagesordnung?", "what committee dates are coming up?", or wants the
   agenda items (TOPs) of the current plenary sitting with their Drucksachen.
-version: 2.0.0
-userInvocable: true
+compatibility: >
+  Requires the `bundesrat` CLI (npm package @maschinenlesbar.org/bundesrat-cli)
+  on PATH, installed by the user; the skill never installs it. Uses jq for JSON
+  filtering. Network access to www.bundesrat.de.
 ---
 
 # Bundesrat Agenda
@@ -19,6 +21,8 @@ dates (Termine).
 ## Tooling
 
 This skill drives the `bundesrat` command. **Before anything else, validate it is available** — run `command -v bundesrat` (or `bundesrat --version`). If it is not on your PATH, STOP and inform the user that the `bundesrat` CLI (`@maschinenlesbar.org/bundesrat-cli`) is not installed — installing it is their responsibility; never install it yourself, and do not fall back to `npx` or a local `node dist/...` build.
+
+This skill also filters JSON with `jq`. **Validate it too** — run `command -v jq`. If it is missing, inform the user that `jq` is not installed — installing it is their responsibility; never install it yourself — and carry on without it: filter the CLI output with `node -e` instead (Node is already on your PATH, since the CLI runs on it).
 
 **No API key is required** — the Bundesrat feeds are public. The CLI surfaces **only openly-licensed data**: factual fields and Drucksache numbers. The Drucksachen and Plenarprotokolle are *amtliche Werke* (free to reuse unaltered, with a source citation); cite "Quelle: Bundesrat". See DATA_LICENSE.md. Use `--compact` when piping to `jq`.
 
