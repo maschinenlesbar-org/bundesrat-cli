@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BundesratClient, FEEDS, asArray } from "../src/client/client.js";
+import { BundesratNetworkError } from "../src/client/errors.js";
 import { makeMockTransport, xmlResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -88,3 +89,14 @@ test("empty leaf fields are omitted, consistent with absent ones", async () => {
 test("only the three open-data feeds are exposed", () => {
   assert.deepEqual(Object.keys(FEEDS).sort(), ["appointments", "members", "session"]);
 });
+
+for (const baseUrl of ["file:///etc/passwd", "ftp://example.org"]) {
+  test(`the client rejects a non-http(s) base URL (${baseUrl}) with a custom transport`, () => {
+    const mt = makeMockTransport(() => xmlResponse(fx.appointmentsXml));
+    assert.throws(
+      () => new BundesratClient({ baseUrl, transport: mt.transport }),
+      (err) => err instanceof BundesratNetworkError && /Unsupported protocol/.test(err.message),
+    );
+    assert.equal(mt.calls.length, 0);
+  });
+}

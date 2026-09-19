@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { RequestEngine } from "../src/client/engine.js";
-import { BundesratApiError, BundesratParseError } from "../src/client/errors.js";
+import { BundesratApiError, BundesratNetworkError, BundesratParseError } from "../src/client/errors.js";
 import { makeMockTransport, xmlResponse, rawResponse } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -109,4 +109,24 @@ test("a pathologically deep body surfaces as BundesratParseError, not a raw erro
     () => e.getXml("/x", { view: "renderXml" }),
     (err) => err instanceof BundesratParseError && /Failed to parse XML/.test(err.message),
   );
+});
+
+for (const baseUrl of ["file:///etc/passwd", "ftp://example.org"]) {
+  test(`the engine rejects a non-http(s) base URL (${baseUrl}) before any request`, () => {
+    const mt = makeMockTransport(() => xmlResponse(fx.appointmentsXml));
+    assert.throws(
+      () => new RequestEngine({ baseUrl, transport: mt.transport }),
+      (err) => err instanceof BundesratNetworkError && /Unsupported protocol/.test(err.message),
+    );
+    assert.equal(mt.calls.length, 0);
+  });
+}
+
+test("the engine rejects an unparseable base URL with a typed error", () => {
+  const mt = makeMockTransport(() => xmlResponse(fx.appointmentsXml));
+  assert.throws(
+    () => new RequestEngine({ baseUrl: "not a url", transport: mt.transport }),
+    (err) => err instanceof BundesratNetworkError && /Invalid base URL/.test(err.message),
+  );
+  assert.equal(mt.calls.length, 0);
 });
