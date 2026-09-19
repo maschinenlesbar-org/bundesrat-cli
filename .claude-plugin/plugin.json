@@ -1,6 +1,6 @@
 {
   "name": "bundesrat",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Bundesrat (German Federal Council) skills powered by the bundesrat-cli — plenary agenda, members and committee dates (open data only).",
   "author": {
     "name": "Sebastian Schürmann",
