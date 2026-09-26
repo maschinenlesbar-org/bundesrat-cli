@@ -87,12 +87,18 @@ try {
 new BundesratClient({
   baseUrl: "https://www.bundesrat.de",
   timeoutMs: 15_000,
-  maxRetries: 3,
+  maxRetries: 3,               // 429 / 503 are retried (Retry-After, else linear backoff)
   maxResponseBytes: 100 << 20, // the default (100 MiB); set to 0 for no limit
   userAgent: "my-app/1.0",
   transport: customTransport,
 });
 ```
+
+`429`/`503` are retried up to `maxRetries` (`0`–`10` in the CLI). Each retry waits the
+response's `Retry-After` — delay-seconds or an IMF-fixdate HTTP-date, parsed by
+`parseRetryAfter` — or, without a usable one, `retryDelayMs * attempt`. A `Retry-After`
+longer than `MAX_RETRY_AFTER_MS` (30 s) is not retried: the `BundesratApiError` surfaces
+at once.
 
 ### Methods (one per open-data feed)
 
