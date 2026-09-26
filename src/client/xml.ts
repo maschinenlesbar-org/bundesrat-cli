@@ -83,16 +83,37 @@ interface Frame {
 // (belt-and-braces alongside the `Object.create(null)` node objects below).
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
+/** An XML name at a given offset (sticky, so it never scans ahead). */
+const NAME = /[A-Za-z_:][\w.:-]*/y;
+
 function parseAttrs(raw: string): Record<string, string> {
   // Null-proto so an attribute named `__proto__` becomes an own property rather
   // than invoking the Object.prototype setter and reparenting the object.
   const attrs: Record<string, string> = Object.create(null);
-  const re = /([A-Za-z_:][\w.:-]*)\s*=\s*"([^"]*)"|([A-Za-z_:][\w.:-]*)\s*=\s*'([^']*)'/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(raw)) !== null) {
-    const name = m[1] !== undefined ? m[1] : m[3];
-    if (name === undefined || DANGEROUS_KEYS.has(name)) continue;
-    attrs[name] = decodeEntities((m[1] !== undefined ? m[2] : m[4]) ?? "");
+  // A hand-written scan rather than a global regex: `name\s*=\s*"…"` retried at every
+  // offset of a long run of name characters with no `=` is quadratic. Here every
+  // step moves forward, so the cost is linear in the tag's length. Anything that is
+  // not `name="value"` / `name='value'` is skipped, as before.
+  let i = 0;
+  while (i < raw.length) {
+    NAME.lastIndex = i;
+    const m = NAME.exec(raw);
+    if (m === null) {
+      i += 1;
+      continue;
+    }
+    const name = m[0];
+    i = NAME.lastIndex;
+    while (i < raw.length && /\s/.test(raw[i]!)) i += 1;
+    if (raw[i] !== "=") continue;
+    i += 1;
+    while (i < raw.length && /\s/.test(raw[i]!)) i += 1;
+    const quote = raw[i];
+    if (quote !== '"' && quote !== "'") continue;
+    const end = raw.indexOf(quote, i + 1);
+    if (end === -1) break;
+    if (!DANGEROUS_KEYS.has(name)) attrs[name] = decodeEntities(raw.slice(i + 1, end));
+    i = end + 1;
   }
   return attrs;
 }
@@ -131,15 +152,26 @@ function frameValue(frame: Frame): XmlValue {
   return obj;
 }
 
-// One regex, alternation-ordered so specials (CDATA/comment/PI) win over tags:
-//   1 CDATA body · 2 close name · 3 open name · 4 open attrs · 5 self-close slash · 6 text
-const TOKEN =
-  /<!\[CDATA\[([\s\S]*?)\]\]>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<\/([A-Za-z_:][\w.:-]*)\s*>|<([A-Za-z_:][\w.:-]*)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>|([^<]+)/g;
+/**
+ * Find `needle` from `from` on, or throw: a construct that is opened but never
+ * closed is malformed XML. Throwing (instead of skipping the opener and scanning
+ * on, as the old single-regex tokenizer effectively did at every `<`) keeps the
+ * tokenizer linear — a body of 250 000 unterminated `<?` once took 21 s to parse.
+ */
+function endOf(xml: string, needle: string, from: number, what: string): number {
+  const end = xml.indexOf(needle, from);
+  if (end === -1) throw new Error(`Unterminated ${what} at offset ${from}`);
+  return end;
+}
 
 /**
  * Parse an XML document and return the root element's value. Throws on an empty or
- * root-less document. Unbalanced close tags are ignored defensively rather than
- * throwing, so a slightly malformed feed still yields its data.
+ * root-less document and on an unterminated comment, CDATA section, processing
+ * instruction, declaration or tag. Unbalanced close tags are ignored defensively
+ * rather than throwing, so a slightly malformed feed still yields its data.
+ *
+ * The tokenizer is a single forward scan (`indexOf` for every terminator), so
+ * parsing time is linear in the size of the body, whatever it contains.
  */
 export function parseXml(xml: string): XmlValue {
   const stack: Frame[] = [];
@@ -158,15 +190,43 @@ export function parseXml(xml: string): XmlValue {
     }
   };
 
-  TOKEN.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = TOKEN.exec(xml)) !== null) {
-    if (m[1] !== undefined) {
+  let i = 0;
+  const n = xml.length;
+  while (i < n) {
+    if (xml[i] !== "<") {
+      // Text — decode entities; only meaningful inside an element.
+      const next = xml.indexOf("<", i);
+      const end = next === -1 ? n : next;
+      if (stack.length > 0) stack[stack.length - 1]!.text += decodeEntities(xml.slice(i, end));
+      i = end;
+    } else if (xml.startsWith("<![CDATA[", i)) {
       // CDATA — verbatim, no entity decoding.
-      if (stack.length > 0) stack[stack.length - 1]!.text += m[1];
-    } else if (m[2] !== undefined) {
+      const end = endOf(xml, "]]>", i + 9, "CDATA section");
+      if (stack.length > 0) stack[stack.length - 1]!.text += xml.slice(i + 9, end);
+      i = end + 3;
+    } else if (xml.startsWith("<!--", i)) {
+      i = endOf(xml, "-->", i + 4, "comment") + 3;
+    } else if (xml.startsWith("<?", i)) {
+      i = endOf(xml, "?>", i + 2, "processing instruction") + 2;
+    } else if (xml.startsWith("<!", i)) {
+      // A declaration such as <!DOCTYPE …>, skipped. An internal subset
+      // (`<!DOCTYPE x [ … ]>`) may itself contain `>`, so skip past its `]` first.
+      // Entities declared there are never expanded.
+      const close = endOf(xml, ">", i + 2, "declaration");
+      const open = xml.slice(i + 2, close).indexOf("[");
+      const from = open === -1 ? close : endOf(xml, "]", i + 2 + open + 1, "declaration");
+      i = endOf(xml, ">", from, "declaration") + 1;
+    } else if (xml[i + 1] === "/") {
       // Close tag — pop the matching frame.
-      const name = m[2];
+      NAME.lastIndex = i + 2;
+      const m = NAME.exec(xml);
+      let j = NAME.lastIndex;
+      while (m !== null && j < n && /\s/.test(xml[j]!)) j += 1;
+      if (m === null || xml[j] !== ">") {
+        i += 1; // not a close tag: skip the "<" and read on (as the old tokenizer did)
+        continue;
+      }
+      const name = m[0];
       const top = stack[stack.length - 1];
       if (top && names[names.length - 1] === name) {
         stack.pop();
@@ -174,11 +234,28 @@ export function parseXml(xml: string): XmlValue {
         attach(name, frameValue(top));
       }
       // else: stray/unbalanced close tag — ignore.
-    } else if (m[3] !== undefined) {
-      // Open (or self-closing) tag.
-      const name = m[3];
-      const attrs = parseAttrs(m[4] ?? "");
-      if (m[5] === "/") {
+      i = j + 1;
+    } else {
+      NAME.lastIndex = i + 1;
+      const m = NAME.exec(xml);
+      if (m === null) {
+        i += 1; // a lone "<" that starts nothing: skip it and read on
+        continue;
+      }
+      // Open (or self-closing) tag: find its ">" outside quoted attribute values.
+      let j = NAME.lastIndex;
+      while (j < n && xml[j] !== ">") {
+        const c = xml[j];
+        if (c === '"' || c === "'") j = endOf(xml, c, j + 1, "attribute value");
+        j += 1;
+      }
+      if (j >= n) throw new Error(`Unterminated tag <${m[0]}> at offset ${i}`);
+      const name = m[0];
+      let raw = xml.slice(NAME.lastIndex, j);
+      const selfClosing = raw.endsWith("/");
+      if (selfClosing) raw = raw.slice(0, -1);
+      const attrs = parseAttrs(raw);
+      if (selfClosing) {
         attach(name, frameValue({ attrs, children: [], text: "", hasElements: false }));
       } else {
         if (stack.length >= MAX_DEPTH) {
@@ -187,11 +264,8 @@ export function parseXml(xml: string): XmlValue {
         stack.push({ attrs, children: [], text: "", hasElements: false });
         names.push(name);
       }
-    } else if (m[6] !== undefined) {
-      // Text — decode entities; only meaningful inside an element.
-      if (stack.length > 0) stack[stack.length - 1]!.text += decodeEntities(m[6]);
+      i = j + 1;
     }
-    // comments (no capture group set) and PIs fall through and are skipped.
   }
 
   if (root === undefined || rootName === undefined) {

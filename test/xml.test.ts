@@ -150,3 +150,42 @@ test("parsed nodes are null-proto: no reparenting, safe to string-coerce and str
   assert.doesNotThrow(() => JSON.stringify(v));
   assert.doesNotThrow(() => `${JSON.stringify(v)}`);
 });
+
+// --- Robustness: linear-time tokenizer (exploratory test 2026-09-26, finding 1) ---
+
+test("unterminated constructs repeated 250 000 times fail fast with a parse error", () => {
+  for (const [unit, message] of [
+    ["<?", /Unterminated processing instruction/],
+    ["<!--", /Unterminated comment/],
+    ["<![CDATA[", /Unterminated CDATA section/],
+    ["<!x[", /Unterminated declaration/],
+    ["<a ", /Unterminated tag <a>/],
+    ['<a b="', /Unterminated (attribute value|tag <a>)/],
+  ] as const) {
+    const started = Date.now();
+    assert.throws(() => parseXml(`<r>${unit.repeat(250_000)}`), message, unit);
+    assert.ok(Date.now() - started < 2000, `${unit} took ${Date.now() - started} ms`);
+  }
+});
+
+test("a long attribute run with no '=' parses in linear time", () => {
+  const started = Date.now();
+  const v = parseXml(`<r ${"a".repeat(500_000)}><x>1</x></r>`) as XmlObject;
+  assert.equal(v["x"], "1");
+  assert.ok(Date.now() - started < 2000, `took ${Date.now() - started} ms`);
+});
+
+test("the scanner keeps the old tokenizer's results for declarations, quotes and stray markup", () => {
+  const v = parseXml(
+    '<?xml version="1.0"?><!DOCTYPE r [<!ENTITY e "boom">]><!-- c --><r a=\'1>2\' b = "x"><t>A &amp; &e;</t>' +
+      "<s/><u k=\"v\"/><w>x < y</w></nope></r>",
+  ) as XmlObject;
+  assert.deepEqual(plain(v), {
+    "@a": "1>2",
+    "@b": "x",
+    t: "A & &e;",
+    s: "",
+    u: { "@k": "v" },
+    w: "x  y",
+  });
+});

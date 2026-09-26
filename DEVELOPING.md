@@ -127,6 +127,12 @@ It is deliberately **not** a general-purpose parser (no namespaces, DTDs, or ful
 mixed-content reconstruction) — just enough for these shallow feeds, and exercised
 hard in [`test/xml.test.ts`](test/xml.test.ts).
 
+The tokenizer is a single forward scan that finds every terminator with `indexOf`,
+so parsing time is linear in the body size. An unterminated comment, CDATA section,
+processing instruction, declaration, tag or attribute value is a parse error, and so
+is nesting deeper than 512 levels. (A regex tokenizer once retried each unterminated
+`<?` to the end of the input: 500 KB took 21 s.)
+
 ## Architecture
 
 ```
