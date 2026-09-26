@@ -207,3 +207,27 @@ test("an XML error envelope is exit 1, not an empty success", async () => {
   assert.deepEqual(cli.out, []);
   assert.match(cli.err.join("\n"), /Unexpected response shape .*expected an <iOS> root element, got <error>/);
 });
+
+test("a --base-url with a query, a fragment or surrounding whitespace is a usage error", async () => {
+  for (const [baseUrl, message] of [
+    ["http://127.0.0.1:18105/ok?x", /cannot have a query \(\?\) or fragment \(#\)/],
+    ["http://127.0.0.1:18105/ok#x", /cannot have a query \(\?\) or fragment \(#\)/],
+    ["http://127.0.0.1:18105?", /cannot have a query \(\?\) or fragment \(#\)/],
+    [" https://www.bundesrat.de", /cannot have surrounding whitespace/],
+    ["https://www.bundesrat.de\t", /cannot have surrounding whitespace/],
+  ] as const) {
+    const cli = makeCli(() => xmlResponse(fx.membersXml));
+    assert.equal(await run(["--base-url", baseUrl, "members"], cli.deps), 2, baseUrl);
+    assert.equal(cli.mt.calls.length, 0, baseUrl);
+    assert.match(cli.err.join("\n"), message, baseUrl);
+  }
+});
+
+test("a --base-url with a path prefix still works", async () => {
+  const cli = makeCli(() => xmlResponse(fx.membersXml));
+  assert.equal(await run(["--base-url", "https://mirror.example/br/", "members"], cli.deps), 0);
+  assert.equal(
+    cli.mt.last().url,
+    "https://mirror.example/br/iOS/SharedDocs/2_Mitglieder/mitglieder_table.xml?view=renderXml",
+  );
+});

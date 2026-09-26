@@ -71,10 +71,13 @@ function sanitizeServerText(text: string): string {
 }
 
 /**
- * Reject a base URL whose scheme is not http(s). The default transport already
- * gates this per hop, but the engine is exported as a library and may be handed a
- * custom transport that does no such check, so gate the configured base URL here
- * too (a `file:`/`ftp:` base URL fails fast with a typed error).
+ * Reject a base URL whose scheme is not http(s), or that has a query or fragment.
+ * The default transport already gates the scheme per hop, but the engine is
+ * exported as a library and may be handed a custom transport that does no such
+ * check, so gate the configured base URL here too (a `file:`/`ftp:` base URL fails
+ * fast with a typed error). Feed paths are appended to the base URL as a string,
+ * so a `?` or `#` in it would swallow every path: `http://h/?x` requests
+ * `/?x/iOS/...` and `http://h/#f` requests `/`.
  */
 function assertHttpScheme(baseUrl: string): void {
   let url: URL;
@@ -87,6 +90,9 @@ function assertHttpScheme(baseUrl: string): void {
     throw new BundesratNetworkError(
       `Unsupported protocol "${url.protocol}" in base URL: ${baseUrl}`,
     );
+  }
+  if (/[?#]/.test(baseUrl)) {
+    throw new BundesratNetworkError(`Base URL must not contain a query or fragment: ${baseUrl}`);
   }
 }
 
