@@ -47,9 +47,10 @@ können Sie das vollständige Dokument auf bundesrat.de oder im DIP nachschlagen
 
 **Termine (`appointments`).** Ausschusstermine und andere geplante Ereignisse (z. B.
 *Umfragen* – schriftliche Verfahren der Ausschüsse nach § 43 GO BR). Ausgegeben als
-sachliche Kalendereinträge (`title`, `startdate` sowie `date`/`stopdate`, wenn der Feed sie
-setzt). `startdate` hat deutsches Format, z. B. „25.09.2026 09:30“; eine abgesagte Sitzung
-bleibt mit „entfällt“ im Titel in der Liste.
+sachliche Kalendereinträge (`title`, `startdate` sowie `stopdate`/`date`, wenn der Feed sie
+setzt – `stopdate` oft, z. B. als Frist einer *Umfrage*). Beide Daten haben deutsches
+Format mit optionaler Uhrzeit: „25.09.2026 09:30“ oder „22.09.2026“; eine abgesagte
+Sitzung bleibt mit „entfällt“ im Titel in der Liste.
 
 ## Inhalte der Feeds, die diese CLI nicht ausgibt
 

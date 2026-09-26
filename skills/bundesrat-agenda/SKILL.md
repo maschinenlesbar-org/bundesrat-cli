@@ -30,7 +30,7 @@ This skill also filters JSON with `jq`. **Validate it too** — run `command -v 
 
 ```bash
 bundesrat session       # current sitting: { title, header, tops: [ {toptitle, topdrucksache, topheader, linkedtop?} ] }
-bundesrat appointments  # committee dates (Termine): [ {type, id, url, title, startdate} ]
+bundesrat appointments  # committee dates (Termine): [ {type, id, url, title, startdate, stopdate?} ]
 ```
 
 The CLI drops empty fields, so a field with no value is **missing**, never `""`.
@@ -64,10 +64,11 @@ bundesrat appointments \
   TOP 40. Sort by the number and letter suffix (recipe above) before presenting the
   agenda; a plain string sort puts "TOP 10" before "TOP 2".
 - **Appointment dates are German-format strings** — `startdate` is
-  `"25.09.2026 09:30"` (DD.MM.YYYY HH:MM), which doesn't sort as text; convert as in
-  the recipe. On 2026-09-15 every appointment had only `type`, `id`, `url`, `title`
-  and `startdate`; don't count on `date` or `stopdate`, which the CLI passes through
-  only when the feed sets them.
+  `"25.09.2026 09:30"` or date-only `"22.09.2026"` (DD.MM.YYYY[ HH:MM]), which
+  doesn't sort as text; convert as in the recipe (the time is optional there).
+  `stopdate` (same format) is set on some items — on 2026-09-26, 5 of 20, e.g. an
+  *Umfrage* running `"22.09.2026"` to `"29.09.2026 12:00"` — so use it for "until
+  when?" answers when present; `date` appears only when the feed sets it.
 - **Cancelled dates stay in the list.** The title says so: „Sitzung des
   Finanzausschusses entfällt / Umfrageverfahren". Mark titles containing „entfällt"
   as cancelled (a committee that decides by written poll instead holds no meeting)

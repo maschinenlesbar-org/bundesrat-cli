@@ -46,8 +46,9 @@ you look the full document up on bundesrat.de or in DIP.
 
 **Termine / appointments (`appointments`).** Committee dates and other scheduled
 events (e.g. *Umfragen* — written committee polls under § 43 GO BR). Surfaced as
-factual calendar items (`title`, `startdate`, and `date`/`stopdate` when the feed
-sets them). `startdate` is German-format, e.g. "25.09.2026 09:30"; a cancelled
+factual calendar items (`title`, `startdate`, and `stopdate`/`date` when the feed
+sets them — `stopdate` often is, e.g. for an *Umfrage*'s deadline). Both dates are
+German-format, with an optional time: "25.09.2026 09:30" or "22.09.2026"; a cancelled
 meeting stays listed with „entfällt" in its title.
 
 ## Concepts the feeds carry but this CLI does not surface

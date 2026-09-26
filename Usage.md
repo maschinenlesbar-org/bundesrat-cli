@@ -103,13 +103,14 @@ bundesrat appointments
 ```
 
 Returns an **array of calendar items** with their factual fields: `type`, `id`,
-`url`, `title`, `startdate`, and `date` / `stopdate` when the feed sets them (on
-2026-09-15 none of the 20 items had either). (The item's HTML `detail`/`abstract`
-body and any image are copyright-protected and are not surfaced.)
+`url`, `title`, `startdate`, and `stopdate` / `date` when the feed sets them (on
+2026-09-26, 5 of the 20 items had a `stopdate`, none a `date`). (The item's HTML
+`detail`/`abstract` body and any image are copyright-protected and are not surfaced.)
 
-`startdate` is a German-format string, `"25.09.2026 09:30"` (DD.MM.YYYY HH:MM),
-which doesn't sort as text. Cancelled dates stay in the list with the cancellation
-in the title („… entfällt / Umfrageverfahren").
+`startdate` and `stopdate` are German-format strings, `"25.09.2026 09:30"` or
+date-only `"22.09.2026"` (DD.MM.YYYY[ HH:MM]), which don't sort as text. Cancelled
+dates stay in the list with the cancellation in the title („… entfällt /
+Umfrageverfahren").
 
 ```bash
 # Committee dates, sorted, start as YYYY-MM-DD HH:MM
