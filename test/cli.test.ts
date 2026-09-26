@@ -314,3 +314,15 @@ test("--state / --party match a decomposed (NFD) umlaut against the feed's compo
   const rows = JSON.parse(cli.out.join("\n")) as Array<{ name: string }>;
   assert.deepEqual(rows.map((r) => r.name), ["Özdemir"]);
 });
+
+test("repeating --state or --party is a usage error, not a silent last-one-wins", async () => {
+  for (const args of [
+    ["members", "--state", "Bayern", "--state", "Hessen"],
+    ["members", "--party", "CDU", "--party", "SPD"],
+  ]) {
+    const cli = makeCli(() => xmlResponse(fx.membersXml));
+    assert.equal(await run(args, cli.deps), 2, args.join(" "));
+    assert.equal(cli.mt.calls.length, 0);
+    assert.match(cli.err.join("\n"), /Given more than once; this option takes a single value\./);
+  }
+});

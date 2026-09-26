@@ -45,6 +45,21 @@ export function parseNonEmpty(value: string): string {
 }
 
 /**
+ * Wrap a commander value-parser for a single-valued option: a second occurrence is
+ * a usage error instead of silently replacing the first (`--state Bayern --state
+ * Hessen` used to keep only Hessen). Only for options without a default, since
+ * commander passes the default as `previous` on the first call.
+ */
+export function once<T>(parse: (value: string) => T): (value: string, previous: T | undefined) => T {
+  return (value, previous) => {
+    if (previous !== undefined) {
+      throw new InvalidArgumentError("Given more than once; this option takes a single value.");
+    }
+    return parse(value);
+  };
+}
+
+/**
  * commander value-parser for `-o, --output <file>`. A blank or whitespace-only path
  * is a usage error: `-o ""` used to print to stdout silently and `-o " "` created a
  * file named " ". `-` is kept as is and means stdout (see {@link renderJson}), the

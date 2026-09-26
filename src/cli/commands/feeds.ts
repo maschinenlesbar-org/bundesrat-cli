@@ -11,7 +11,7 @@
 import type { Command } from "commander";
 import type { CliDeps } from "../io.js";
 import type { Member } from "../../client/types.js";
-import { action, parseNonEmpty, renderJson } from "../shared.js";
+import { action, once, parseNonEmpty, renderJson } from "../shared.js";
 
 /** Case- and normalisation-insensitive form of a filter value or field. */
 function fold(text: string): string {
@@ -46,9 +46,9 @@ export function registerCommands(program: Command, deps: CliDeps): void {
     .option(
       "--state <land>",
       "only members of this federal state (Land) — exact match, case-insensitive (contrast --party)",
-      parseNonEmpty,
+      once(parseNonEmpty),
     )
-    .option("--party <name>", "only members whose party contains this text, case-insensitive", parseNonEmpty)
+    .option("--party <name>", "only members whose party contains this text, case-insensitive", once(parseNonEmpty))
     .action(
       action(deps, async ({ client, global, opts }) => {
         let members = await client.members();

@@ -82,7 +82,8 @@ decodes every one.
 | `--party <text>` | Only members whose party contains this text — case-insensitive substring (e.g. `grüne`, `CDU`) |
 
 Filtering happens client-side (the feed returns everyone), so both filters compose
-and an unmatched filter yields `[]` rather than the full list.
+and an unmatched filter yields `[]` rather than the full list. Each takes one value;
+giving one twice is a usage error (exit `2`) — run the command once per Land instead.
 
 ## Output & scripting
 
