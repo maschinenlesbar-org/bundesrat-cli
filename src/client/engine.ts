@@ -212,6 +212,31 @@ function looksLikeHtml(text: string): boolean {
   return rest.startsWith("<!doctype html") || rest.startsWith("<html");
 }
 
+/**
+ * Decode an XML body by the encoding its XML declaration names
+ * (`<?xml version="1.0" encoding="ISO-8859-1"?>`), UTF-8 when it names none — the
+ * XML default. The Content-Type is ignored here too: the CMS labels its feeds
+ * inconsistently (see getXml), while the declaration travels with the document.
+ * A leading UTF-8 byte-order mark is dropped (TextDecoder does that by default).
+ * An encoding TextDecoder doesn't know is a BundesratParseError rather than
+ * mojibake.
+ */
+function decodeXml(body: Buffer, path: string): string {
+  const start = body[0] === 0xef && body[1] === 0xbb && body[2] === 0xbf ? 3 : 0;
+  const head = body.subarray(start, start + 256).toString("latin1");
+  const declared = /^\s*<\?xml\s[^>]*?\bencoding\s*=\s*["']([^"']*)["']/.exec(head)?.[1];
+  const charset = declared ?? "utf-8";
+  let decoder: TextDecoder;
+  try {
+    decoder = new TextDecoder(charset);
+  } catch {
+    throw new BundesratParseError(
+      `Unsupported response charset "${sanitizeServerText(charset)}" from ${path}.`,
+    );
+  }
+  return decoder.decode(body);
+}
+
 function htmlPageError(path: string): BundesratParseError {
   return new BundesratParseError(
     `Expected XML from ${path} but received an HTML page — the feed may have moved, ` +
@@ -321,7 +346,7 @@ export class RequestEngine {
   /** Like {@link getXml}, but also returns the root element's name. */
   async getXmlDocument(path: string, query?: QueryParams): Promise<XmlDocument> {
     const res = await this.request(path, query);
-    const text = res.data.toString("utf8");
+    const text = decodeXml(res.data, path);
     if (looksLikeHtml(text)) throw htmlPageError(path);
     // An empty body is not malformed XML — surface it as "empty" rather than the
     // generic parse-failure message so the cause is obvious.

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BundesratClient, FEEDS, asArray } from "../src/client/client.js";
 import { BundesratNetworkError, BundesratParseError } from "../src/client/errors.js";
-import { makeMockTransport, xmlResponse, queryOf } from "./helpers.js";
+import { makeMockTransport, xmlResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
 function pathOf(url: string): string {
@@ -201,4 +201,25 @@ test("whitespace runs inside a field collapse to one space (topheader newline, f
   const s = await new BundesratClient({ transport: mt.transport }).session();
   assert.equal(s.title, "1067. Sitzung des Bundesrates");
   assert.equal(s.tops[0]!.topheader, "Die humanitäre Hilfe der EU; JOIN(2026) 25 final");
+});
+
+test("the XML declaration's encoding is honoured (a Latin-1 feed is not mojibake, finding 17)", async () => {
+  const latin1 = Buffer.from(
+    '<?xml version="1.0" encoding="ISO-8859-1"?><iOS><list><employee><name>Müller</name>' +
+      "<state>Thüringen</state></employee></list></iOS>",
+    "latin1",
+  );
+  const mt = makeMockTransport(() => rawResponse(latin1, "application/xml;charset=utf-8"));
+  const rows = await new BundesratClient({ transport: mt.transport }).members();
+  assert.deepEqual(JSON.parse(JSON.stringify(rows)), [{ name: "Müller", state: "Thüringen" }]);
+
+  const bom = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from("<iOS><list><employee><name>Ä</name></employee></list></iOS>")]);
+  const mt2 = makeMockTransport(() => rawResponse(bom, "text/plain"));
+  assert.deepEqual(JSON.parse(JSON.stringify(await new BundesratClient({ transport: mt2.transport }).members())), [{ name: "Ä" }]);
+
+  const unknown = makeMockTransport(() => xmlResponse('<?xml version="1.0" encoding="x-klingon"?><iOS><list/></iOS>'));
+  await assert.rejects(
+    new BundesratClient({ transport: unknown.transport }).members(),
+    (err: unknown) => err instanceof BundesratParseError && /Unsupported response charset "x-klingon" from /.test(err.message),
+  );
 });

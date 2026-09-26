@@ -143,6 +143,10 @@ copyright-protected editorial text or images, not open data (DATA_LICENSE.md).
 - attributes → `@name` keys (only `<iOS version="…">` uses one);
 - empty / self-closing elements → `""`.
 
+The engine decodes the body by the encoding the XML declaration names
+(`encoding="ISO-8859-1"`), UTF-8 when it names none; the Content-Type is not used for
+this either. An encoding `TextDecoder` doesn't know is a `BundesratParseError`.
+
 It is deliberately **not** a general-purpose parser (no namespaces, DTDs, or full
 mixed-content reconstruction) — just enough for these shallow feeds, and exercised
 hard in [`test/xml.test.ts`](test/xml.test.ts).
