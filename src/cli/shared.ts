@@ -76,11 +76,12 @@ export function parseBaseUrl(value: string): string {
  * commander value-parser for a value that ends up in an HTTP header (`--user-agent`).
  * Node's HTTP layer throws an opaque "Invalid character in header content" at request
  * time for a CR/LF (or any other C0 control or DEL) and for any character above
- * U+00FF, which surfaced as "Unexpected error". Reject those here as a usage error.
- * Tab is allowed, as in HTTP. Checked by char code so the source stays free of
+ * U+00FF, which surfaced as "Unexpected error". Reject those here as a usage error,
+ * along with a blank value (it used to fall back to the default silently). Tab is allowed, as in HTTP. Checked by char code so the source stays free of
  * control bytes.
  */
 export function parseHeaderValue(value: string): string {
+  parseNonEmpty(value);
   for (let i = 0; i < value.length; i++) {
     const c = value.charCodeAt(i);
     if ((c < 0x20 && c !== 0x09) || c === 0x7f) {
@@ -108,9 +109,7 @@ export function toEngineOptions(global: GlobalOptions): BundesratClientOptions {
   const options: BundesratClientOptions = {};
   if (global.baseUrl !== undefined) options.baseUrl = global.baseUrl;
   if (global.timeout !== undefined) options.timeoutMs = global.timeout;
-  if (global.userAgent !== undefined && global.userAgent.trim().length > 0) {
-    options.userAgent = global.userAgent;
-  }
+  if (global.userAgent !== undefined) options.userAgent = global.userAgent;
   if (global.maxRetries !== undefined) options.maxRetries = global.maxRetries;
   if (global.maxResponseBytes !== undefined) options.maxResponseBytes = global.maxResponseBytes;
   return options;
