@@ -111,7 +111,7 @@ Use `--compact` for single-line JSON and `-o <file>` to write to a file — both
 | `2` | Bad usage / invalid argument (nothing was sent) |
 | `4` | Not found (`404` from the server) |
 | `6` | Network / transport failure (DNS, connection, timeout, size cap) |
-| `1` | Any other error — including a non-XML response (the feed returned the website's HTML shell) |
+| `1` | Any other error — including a response that is not a feed: the website's HTML shell, or XML that isn't `<iOS><list>…</list></iOS>` ("Unexpected response shape") |
 
 ## Troubleshooting
 

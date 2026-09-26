@@ -200,3 +200,10 @@ test("an unknown command exits 2", async () => {
   const cli = makeCli(() => xmlResponse(fx.membersXml));
   assert.equal(await run(["boguscmd"], cli.deps), 2);
 });
+
+test("an XML error envelope is exit 1, not an empty success", async () => {
+  const cli = makeCli(() => xmlResponse("<?xml version=\"1.0\"?><error><message>Internal CMS error</message></error>"));
+  assert.equal(await run(["--compact", "appointments"], cli.deps), 1);
+  assert.deepEqual(cli.out, []);
+  assert.match(cli.err.join("\n"), /Unexpected response shape .*expected an <iOS> root element, got <error>/);
+});

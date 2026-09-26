@@ -36,8 +36,12 @@ https://www.bundesrat.de/iOS/SharedDocs/3_Plenum/plenum_aktuelleSitzung_table.xm
 
 The client adds this parameter to every request automatically. If a response ever
 comes back as HTML anyway (the feed moved, or a proxy stripped the query), the
-engine detects the `<!doctype html>` and throws a `BundesratParseError` with a
-plain-language message rather than a cryptic parse failure. The upstream
+engine detects the `<!doctype html>` / `<html>` (also behind an XML declaration or a
+comment, and an XHTML `<html>` root) and throws a `BundesratParseError` with a
+plain-language message rather than a cryptic parse failure. Any other XML that is not
+`<iOS>` with exactly one `<list>` (an XML error envelope, a bare `<list>`, no `<list>`)
+is a `BundesratParseError` too ("Unexpected response shape from <path>: expected …"),
+so a broken feed never reads as an empty one; a real empty feed is `<iOS><list/></iOS>`. The upstream
 [bund.dev spec](https://bundesrat.api.bund.dev) documents the paths but the render
 parameter is easy to miss — this was confirmed by probing the live endpoints.
 
@@ -163,8 +167,8 @@ instead of calling `process.exit`).
 
 [`errors.ts`](src/client/errors.ts): `BundesratApiError` (non-2xx, carries
 `status`/`detail`, with `isRetryable`/`isNotFound`), `BundesratNetworkError`
-(transport failure/timeout), `BundesratParseError` (the body was not XML — usually
-the HTML shell), and `BundesratValidationError` (a client-side usage error), all
+(transport failure/timeout), `BundesratParseError` (the body was not a feed — usually
+the HTML shell, or XML of the wrong shape), and `BundesratValidationError` (a client-side usage error), all
 extending `BundesratError`.
 
 ## Testing

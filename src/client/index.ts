@@ -8,8 +8,8 @@ export { MAX_TIMEOUT_MS, nodeHttpTransport } from "./http.js";
 export type { Transport, HttpRequest, HttpResponse } from "./http.js";
 export { buildQueryString } from "./query.js";
 export type { QueryParams, QueryValue } from "./query.js";
-export { parseXml, decodeEntities } from "./xml.js";
-export type { XmlValue, XmlObject } from "./xml.js";
+export { parseXml, parseXmlDocument, decodeEntities } from "./xml.js";
+export type { XmlValue, XmlObject, XmlDocument } from "./xml.js";
 export {
   BundesratError,
   BundesratApiError,

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BundesratClient, FEEDS, asArray } from "../src/client/client.js";
-import { BundesratNetworkError } from "../src/client/errors.js";
+import { BundesratNetworkError, BundesratParseError } from "../src/client/errors.js";
 import { makeMockTransport, xmlResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -100,3 +100,54 @@ for (const baseUrl of ["file:///etc/passwd", "ftp://example.org"]) {
     assert.equal(mt.calls.length, 0);
   });
 }
+
+// --- Wrong-shaped XML is an error, not an empty result (exploratory test 2026-09-26, finding 2) ---
+
+test("a document that is not <iOS><list>…</list></iOS> is a BundesratParseError", async () => {
+  for (const [body, message] of [
+    ['<?xml version="1.0"?><error><code>500</code><message>CMS error</message></error>', /expected an <iOS> root element, got <error>\./],
+    ["<list><top><toptitle>1</toptitle></top></list>", /expected an <iOS> root element, got <list>\./],
+    ["<iOS><foo/></iOS>", /expected exactly one <list> element under <iOS>\./],
+    ["<iOS><list><a>1</a></list><list><a>2</a></list></iOS>", /expected exactly one <list> element under <iOS>\./],
+    ["<iOS><list>just text</list></iOS>", /expected exactly one <list> element under <iOS>\./],
+    ["<iOS>text</iOS>", /expected an <iOS> root element, got <iOS>\./],
+  ] as const) {
+    const mt = makeMockTransport(() => xmlResponse(body));
+    const c = new BundesratClient({ transport: mt.transport });
+    await assert.rejects(
+      c.session(),
+      (err: unknown) =>
+        err instanceof BundesratParseError &&
+        err.message.startsWith(`Unexpected response shape from ${FEEDS.session}: `) &&
+        message.test(err.message),
+      body,
+    );
+  }
+});
+
+test("a genuinely empty feed (<iOS><list/></iOS>) is still an empty result", async () => {
+  for (const body of ['<iOS version="1.0"><list/></iOS>', "<iOS><list>  </list></iOS>"]) {
+    const mt = makeMockTransport(() => xmlResponse(body));
+    const c = new BundesratClient({ transport: mt.transport });
+    assert.deepEqual(await c.members(), []);
+    assert.deepEqual(await c.session(), { tops: [] });
+    assert.deepEqual(await c.appointments(), []);
+  }
+});
+
+test("an XHTML page, or HTML behind a declaration or comment, is reported as an HTML page", async () => {
+  for (const body of [
+    '<?xml version="1.0"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0//EN" "x"><html><body>Wartung</body></html>',
+    "<!-- cms --><!DOCTYPE html><html><body>maintenance</body></html>",
+    '<?xml version="1.0"?>\n<!-- a -->\n<HTML><body>x</body></HTML>',
+    '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><body><p>x</p></body></html>',
+  ]) {
+    const mt = makeMockTransport(() => xmlResponse(body));
+    const c = new BundesratClient({ transport: mt.transport });
+    await assert.rejects(
+      c.members(),
+      (err: unknown) => err instanceof BundesratParseError && /received an HTML page/.test(err.message),
+      body,
+    );
+  }
+});

@@ -7,7 +7,7 @@
 
 import { nodeHttpTransport, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
-import { parseXml, type XmlValue } from "./xml.js";
+import { parseXmlDocument, type XmlDocument, type XmlValue } from "./xml.js";
 import { BundesratApiError, BundesratNetworkError, BundesratParseError } from "./errors.js";
 
 export const DEFAULT_BASE_URL = "https://www.bundesrat.de";
@@ -88,6 +88,34 @@ function assertHttpScheme(baseUrl: string): void {
       `Unsupported protocol "${url.protocol}" in base URL: ${baseUrl}`,
     );
   }
+}
+
+/**
+ * Whether a body is an HTML page: after any BOM, whitespace, XML declaration,
+ * processing instructions and comments, it starts with `<!doctype html` or `<html`.
+ * Only the first 4 KiB are looked at, and every skip uses `indexOf`, so this stays
+ * cheap whatever the body holds.
+ */
+function looksLikeHtml(text: string): boolean {
+  const head = text.slice(0, 4096);
+  let i = 0;
+  for (;;) {
+    while (i < head.length && (/\s/.test(head[i]!) || head[i] === "\uFEFF")) i += 1;
+    const close = head.startsWith("<?", i) ? "?>" : head.startsWith("<!--", i) ? "-->" : undefined;
+    if (close === undefined) break;
+    const end = head.indexOf(close, i + 2);
+    if (end === -1) return false;
+    i = end + close.length;
+  }
+  const rest = head.slice(i, i + 14).toLowerCase();
+  return rest.startsWith("<!doctype html") || rest.startsWith("<html");
+}
+
+function htmlPageError(path: string): BundesratParseError {
+  return new BundesratParseError(
+    `Expected XML from ${path} but received an HTML page — the feed may have moved, ` +
+      "or the request lost its ?view=renderXml parameter.",
+  );
 }
 
 const realSleep = (ms: number): Promise<void> =>
@@ -176,15 +204,14 @@ export class RequestEngine {
    * "harden" this by validating Content-Type; it would reject valid feeds.
    */
   async getXml(path: string, query?: QueryParams): Promise<XmlValue> {
+    return (await this.getXmlDocument(path, query)).value;
+  }
+
+  /** Like {@link getXml}, but also returns the root element's name. */
+  async getXmlDocument(path: string, query?: QueryParams): Promise<XmlDocument> {
     const res = await this.request(path, query);
     const text = res.data.toString("utf8");
-    const head = text.trimStart().slice(0, 200).toLowerCase();
-    if (head.startsWith("<!doctype html") || head.startsWith("<html")) {
-      throw new BundesratParseError(
-        `Expected XML from ${path} but received an HTML page — the feed may have moved, ` +
-          "or the request lost its ?view=renderXml parameter.",
-      );
-    }
+    if (looksLikeHtml(text)) throw htmlPageError(path);
     // An empty body is not malformed XML — surface it as "empty" rather than the
     // generic parse-failure message so the cause is obvious.
     if (text.trim().length === 0) {
@@ -192,11 +219,15 @@ export class RequestEngine {
         `Empty response from ${path} — the feed returned no content (expected XML).`,
       );
     }
+    let doc: XmlDocument;
     try {
-      return parseXml(text);
+      doc = parseXmlDocument(text);
     } catch (cause) {
       throw new BundesratParseError(`Failed to parse XML response from ${path}`, { cause });
     }
+    // An XHTML page parses as XML; it is still the website, not a feed.
+    if (doc.root.toLowerCase() === "html") throw htmlPageError(path);
+    return doc;
   }
 
   private toApiError(url: string, status: number, body: Buffer): BundesratApiError {

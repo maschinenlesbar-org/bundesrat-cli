@@ -18,6 +18,7 @@
 
 import { RequestEngine, type EngineOptions } from "./engine.js";
 import type { XmlObject, XmlValue } from "./xml.js";
+import { BundesratParseError } from "./errors.js";
 import type { AgendaItem, Appointment, Member, Session } from "./types.js";
 
 /** The feed paths (relative to the base URL). All are GET + `?view=renderXml`. */
@@ -89,6 +90,15 @@ function pick<T>(obj: XmlValue, keys: readonly string[]): T {
   return out as unknown as T;
 }
 
+/** A non-null, non-array object (a parsed element with children or attributes). */
+function isObject(value: XmlValue | undefined): value is XmlObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function shapeError(path: string, expected: string): BundesratParseError {
+  return new BundesratParseError(`Unexpected response shape from ${path}: expected ${expected}.`);
+}
+
 /** Options for the client (engine options only — the feeds need no auth). */
 export type BundesratClientOptions = EngineOptions;
 
@@ -100,14 +110,21 @@ export class BundesratClient {
   }
 
   /**
-   * Fetch a feed and return its `<list>` payload as an object. The document root
-   * is `<iOS><list>…</list></iOS>`; a feed with no `<list>` yields `{}`.
+   * Fetch a feed and return its `<list>` payload as an object. The document must
+   * be `<iOS><list>…</list></iOS>`; an empty `<list/>` yields `{}`. Anything else —
+   * another root element (an XML error envelope, an XHTML page), no `<list>`, two
+   * of them, or text in place of one — throws a BundesratParseError, so a broken
+   * feed is never reported as an empty one.
    */
   private async list(path: string): Promise<XmlObject> {
-    const doc = await this.engine.getXml(path, RENDER_QUERY);
-    const root = (typeof doc === "object" && !Array.isArray(doc) ? doc : {}) as XmlObject;
-    const list = root["list"];
-    return (typeof list === "object" && !Array.isArray(list) ? list : {}) as XmlObject;
+    const doc = await this.engine.getXmlDocument(path, RENDER_QUERY);
+    if (doc.root !== "iOS" || !isObject(doc.value)) {
+      throw shapeError(path, `an <iOS> root element, got <${doc.root}>`);
+    }
+    const list = doc.value["list"];
+    if (list === "") return {};
+    if (!isObject(list)) throw shapeError(path, "exactly one <list> element under <iOS>");
+    return list;
   }
 
   /**

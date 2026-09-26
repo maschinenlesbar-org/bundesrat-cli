@@ -174,6 +174,17 @@ function endOf(xml: string, needle: string, from: number, what: string): number 
  * parsing time is linear in the size of the body, whatever it contains.
  */
 export function parseXml(xml: string): XmlValue {
+  return parseXmlDocument(xml).value;
+}
+
+/** A parsed document: the root element's name and its value (see {@link parseXml}). */
+export interface XmlDocument {
+  root: string;
+  value: XmlValue;
+}
+
+/** Like {@link parseXml}, but also returns the root element's name. */
+export function parseXmlDocument(xml: string): XmlDocument {
   const stack: Frame[] = [];
   const names: string[] = [];
   let root: XmlValue | undefined;
@@ -271,5 +282,5 @@ export function parseXml(xml: string): XmlValue {
   if (root === undefined || rootName === undefined) {
     throw new Error("No root element found in XML document");
   }
-  return root;
+  return { root: rootName, value: root };
 }
