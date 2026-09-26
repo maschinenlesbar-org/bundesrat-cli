@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MAX_RETRY_AFTER_MS, RequestEngine, parseRetryAfter } from "../src/client/engine.js";
-import { BundesratApiError, BundesratNetworkError, BundesratParseError } from "../src/client/errors.js";
+import { BundesratApiError, BundesratNetworkError, BundesratParseError, redactUrl } from "../src/client/errors.js";
 import { makeMockTransport, xmlResponse, rawResponse } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -200,4 +200,17 @@ test("parseRetryAfter reads delay-seconds and IMF-fixdate HTTP-dates", () => {
     assert.equal(parseRetryAfter(bad, now), undefined, String(bad));
   }
   assert.equal(MAX_RETRY_AFTER_MS, 30_000);
+});
+
+test("redactUrl hides userinfo; base-URL errors never show the password", () => {
+  assert.equal(redactUrl("https://u:pw@h.test/x?y=1"), "https://***@h.test/x?y=1");
+  assert.equal(redactUrl("https://h.test/x"), "https://h.test/x");
+  assert.equal(redactUrl("not a url"), "not a url");
+  assert.throws(
+    () => new RequestEngine({ baseUrl: "ftp://u:pw@h.test" }),
+    (err: unknown) => err instanceof BundesratNetworkError && !/pw/.test(err.message) && /\*\*\*@h\.test/.test(err.message),
+  );
+  const api = new BundesratApiError({ status: 500, url: "https://u:pw@h.test/x", method: "GET", body: "" });
+  assert.equal(api.url, "https://***@h.test/x");
+  assert.doesNotMatch(api.message, /pw/);
 });

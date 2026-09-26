@@ -16,6 +16,7 @@ export {
   BundesratNetworkError,
   BundesratValidationError,
   BundesratParseError,
+  redactUrl,
 } from "./errors.js";
 
 export * from "./types.js";

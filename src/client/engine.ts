@@ -8,7 +8,7 @@
 import { nodeHttpTransport, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
 import { parseXmlDocument, type XmlDocument, type XmlValue } from "./xml.js";
-import { BundesratApiError, BundesratNetworkError, BundesratParseError } from "./errors.js";
+import { BundesratApiError, BundesratNetworkError, BundesratParseError, redactUrl } from "./errors.js";
 
 export const DEFAULT_BASE_URL = "https://www.bundesrat.de";
 const DEFAULT_USER_AGENT = "bundesrat-cli";
@@ -122,15 +122,15 @@ function assertHttpScheme(baseUrl: string): void {
   try {
     url = new URL(baseUrl);
   } catch {
-    throw new BundesratNetworkError(`Invalid base URL: ${baseUrl}`);
+    throw new BundesratNetworkError(`Invalid base URL: ${redactUrl(baseUrl)}`);
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new BundesratNetworkError(
-      `Unsupported protocol "${url.protocol}" in base URL: ${baseUrl}`,
+      `Unsupported protocol "${url.protocol}" in base URL: ${redactUrl(baseUrl)}`,
     );
   }
   if (/[?#]/.test(baseUrl)) {
-    throw new BundesratNetworkError(`Base URL must not contain a query or fragment: ${baseUrl}`);
+    throw new BundesratNetworkError(`Base URL must not contain a query or fragment: ${redactUrl(baseUrl)}`);
   }
 }
 

@@ -270,3 +270,12 @@ test("-o with a blank path is a usage error; -o - writes to stdout, not a file n
   assert.equal((JSON.parse(cli.out.join("\n")) as unknown[]).length, 2);
   assert.doesNotMatch(cli.err.join("\n"), /Wrote/);
 });
+
+test("credentials in --base-url are redacted in error messages but still sent", async () => {
+  const cli = makeCli(() => rawResponse("Not found here", "text/plain", 404));
+  assert.equal(await run(["--base-url", "http://user:s3cret@127.0.0.1:18105/404", "session"], cli.deps), 4);
+  const err = cli.err.join("\n");
+  assert.doesNotMatch(err, /s3cret|user:/);
+  assert.match(err, /HTTP 404 for GET http:\/\/\*\*\*@127\.0\.0\.1:18105\/404\/iOS\//);
+  assert.match(cli.mt.last().url, /^http:\/\/user:s3cret@127\.0\.0\.1:18105\//);
+});
