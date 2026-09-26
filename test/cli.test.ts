@@ -279,3 +279,19 @@ test("credentials in --base-url are redacted in error messages but still sent", 
   assert.match(err, /HTTP 404 for GET http:\/\/\*\*\*@127\.0\.0\.1:18105\/404\/iOS\//);
   assert.match(cli.mt.last().url, /^http:\/\/user:s3cret@127\.0\.0\.1:18105\//);
 });
+
+test("bidi controls are stripped from stderr error text and escaped in JSON output", async () => {
+  const rlo = String.fromCharCode(0x202e);
+  const bad = makeCli(() =>
+    rawResponse(`${String.fromCharCode(0x1b)}]8;;http://evil${String.fromCharCode(7)}click ${rlo}evil\nError: forged`, "text/plain", 404),
+  );
+  assert.equal(await run(["session"], bad.deps), 4);
+  const err = bad.err.join("\n");
+  assert.equal([...err].some((c) => c.charCodeAt(0) === 0x202e || c.charCodeAt(0) === 0x1b), false);
+  assert.match(err, /: \]8;;http:\/\/evilclick evil Error: forged$/m);
+
+  const xml = `<iOS><list><employee><name>A&#x202E;B&#x2066;C</name></employee></list></iOS>`;
+  const ok = makeCli(() => xmlResponse(xml));
+  assert.equal(await run(["--compact", "members"], ok.deps), 0);
+  assert.equal(ok.out.join("\n"), '[{"name":"A\\u202eB\\u2066C"}]');
+});
