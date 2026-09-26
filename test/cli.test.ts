@@ -307,3 +307,10 @@ test("a parse error names the parser's reason", async () => {
     assert.match(cli.err.join("\n"), reason);
   }
 });
+
+test("--state / --party match a decomposed (NFD) umlaut against the feed's composed one", async () => {
+  const cli = makeCli(() => xmlResponse(fx.membersXml));
+  assert.equal(await run(["members", "--state", "Baden-Württemberg", "--party", "grüne"], cli.deps), 0);
+  const rows = JSON.parse(cli.out.join("\n")) as Array<{ name: string }>;
+  assert.deepEqual(rows.map((r) => r.name), ["Özdemir"]);
+});
