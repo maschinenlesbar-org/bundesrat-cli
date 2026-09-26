@@ -180,3 +180,15 @@ test("inline (non-CDATA) editorial HTML in topheader does not pass the allowlist
   const s = await new BundesratClient({ transport: mt.transport }).session();
   assert.deepEqual(JSON.parse(JSON.stringify(s)), { tops: [{ toptitle: "TOP 1" }] });
 });
+
+test("session title/header follow the same plain-text rule as TOP fields (finding 6)", async () => {
+  for (const [body, expected] of [
+    ["<iOS><list><title>A</title><title>B</title><header>H</header></list></iOS>", { header: "H", tops: [] }],
+    ['<iOS><list><title lang="de">T</title><header/></list></iOS>', { title: "T", tops: [] }],
+    ["<iOS><list><title><b>T</b></title><top><toptitle>X</toptitle><toptitle>Y</toptitle></top></list></iOS>", { tops: [{}] }],
+  ] as const) {
+    const mt = makeMockTransport(() => xmlResponse(body));
+    const s = await new BundesratClient({ transport: mt.transport }).session();
+    assert.deepEqual(JSON.parse(JSON.stringify(s)), expected, body);
+  }
+});

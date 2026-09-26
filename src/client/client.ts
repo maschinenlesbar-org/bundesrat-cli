@@ -161,9 +161,12 @@ export class BundesratClient {
    */
   async session(): Promise<Session> {
     const list = await this.list(FEEDS.session);
+    // The same plain-text rule as every TOP field (pick): text with attributes is
+    // kept; markup, a repeat or an empty value leaves the key out.
+    const { title, header } = pick<{ title?: string; header?: string }>(list, ["title", "header"]);
     return {
-      ...(typeof list["title"] === "string" ? { title: list["title"] } : {}),
-      ...(typeof list["header"] === "string" ? { header: list["header"] } : {}),
+      ...(title !== undefined ? { title } : {}),
+      ...(header !== undefined ? { header } : {}),
       tops: asArray<XmlValue>(list["top"]).map((t) => pick<AgendaItem>(t, TOP_FIELDS)),
     };
   }
