@@ -44,6 +44,16 @@ export function parseNonEmpty(value: string): string {
 }
 
 /**
+ * commander value-parser for `-o, --output <file>`. A blank or whitespace-only path
+ * is a usage error: `-o ""` used to print to stdout silently and `-o " "` created a
+ * file named " ". `-` is kept as is and means stdout (see {@link renderJson}), the
+ * usual convention, rather than a file named "-".
+ */
+export function parseOutputPath(value: string): string {
+  return parseNonEmpty(value);
+}
+
+/**
  * commander value-parser for --base-url. The base URL is trusted input, but only
  * `http:`/`https:` are accepted so a stray `file:`/`ftp:` value fails at parse
  * time (exit 2) with a clear message rather than deep in the transport.
@@ -138,11 +148,11 @@ export function escapeControlChars(json: string): string {
 /**
  * Render a JSON value, pretty by default and compact with --compact. Writes to the
  * file given by --output (with a short stderr confirmation so stdout stays clean
- * for piping), or to stdout otherwise.
+ * for piping), or to stdout otherwise — also for `--output -`.
  */
 export function renderJson(deps: CliDeps, global: GlobalOptions, value: unknown): void {
   const text = escapeControlChars(global.compact ? JSON.stringify(value) : JSON.stringify(value, null, 2));
-  if (global.output) {
+  if (global.output !== undefined && global.output !== "-") {
     const data = Buffer.from(text + "\n", "utf8");
     try {
       deps.io.writeFile(global.output, data);

@@ -140,7 +140,7 @@ Given **before or after** the command, e.g. `bundesrat --compact session`:
 | `-V, --version` | Print the version number |
 | `-h, --help` | Show help for the program or a command |
 | `--compact` | Print JSON on a single line instead of pretty-printed |
-| `-o, --output <file>` | Write output to this file instead of stdout |
+| `-o, --output <file>` | Write output to this file instead of stdout (`-` = stdout) |
 | `--base-url <url>` | API base URL (default `https://www.bundesrat.de`; `http:`/`https:` only, no query or fragment) |
 | `--timeout <ms>` | Time limit per request, reading the whole response included (default `30000`; `0` = none; at most `2147483647`) |
 | `--user-agent <ua>` | `User-Agent` header value |

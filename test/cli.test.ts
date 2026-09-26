@@ -255,3 +255,18 @@ test("a blank --user-agent is a usage error, not a silent fallback to the defaul
     assert.match(cli.err.join("\n"), /Expected a non-empty value/);
   }
 });
+
+test("-o with a blank path is a usage error; -o - writes to stdout, not a file named '-'", async () => {
+  for (const path of ["", " "]) {
+    const cli = makeCli(() => xmlResponse(fx.membersXml));
+    assert.equal(await run(["-o", path, "members"], cli.deps), 2, JSON.stringify(path));
+    assert.equal(cli.mt.calls.length, 0);
+    assert.deepEqual(cli.files, {});
+    assert.match(cli.err.join("\n"), /Expected a non-empty value/);
+  }
+  const cli = makeCli(() => xmlResponse(fx.membersXml));
+  assert.equal(await run(["--compact", "-o", "-", "members"], cli.deps), 0);
+  assert.deepEqual(cli.files, {});
+  assert.equal((JSON.parse(cli.out.join("\n")) as unknown[]).length, 2);
+  assert.doesNotMatch(cli.err.join("\n"), /Wrote/);
+});
