@@ -104,7 +104,11 @@ at once.
 
 Only the three feeds that return open data are exposed. Each result is projected to
 a whitelist of factual fields (`MEMBER_FIELDS` / `TOP_FIELDS` / `APPOINTMENT_FIELDS`
-in `client.ts`); copyright editorial/image fields are dropped.
+in `client.ts`); copyright editorial/image fields are dropped. The whitelist vouches
+for a field's **plain text** only: a whitelisted element that holds markup
+(`<topheader><p>…</p></topheader>`) or is repeated is dropped too, so inline
+editorial HTML never passes as a nested object and every surfaced field is a
+string. Attributes on a text element are ignored and its text is kept.
 
 > **Maintenance:** the whitelists are fixed, so a *new* field the feed later serves is
 > dropped silently — including a factual one. Revisit the lists in `client.ts` when the

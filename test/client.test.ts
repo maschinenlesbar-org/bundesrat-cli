@@ -151,3 +151,32 @@ test("an XHTML page, or HTML behind a declaration or comment, is reported as an 
     );
   }
 });
+
+// --- Allowlist projects plain text only (exploratory test 2026-09-26, finding 5) ---
+
+test("a whitelisted field holding markup or repeated is dropped; text with attributes keeps its text", async () => {
+  const members =
+    "<iOS><list>" +
+    "<employee><name><b>Bold</b></name><state>Bayern</state></employee>" +
+    "<employee><name>Dr. <i>X</i> Y</name><state>Bayern</state></employee>" +
+    '<employee><name lang="de">Solo</name><party>CDU</party><state>Bayern</state></employee>' +
+    "<employee><name>A</name><party>CDU</party><party>CSU</party></employee>" +
+    "</list></iOS>";
+  const mt = makeMockTransport(() => xmlResponse(members));
+  const rows = await new BundesratClient({ transport: mt.transport }).members();
+  assert.deepEqual(JSON.parse(JSON.stringify(rows)), [
+    { state: "Bayern" },
+    { state: "Bayern" },
+    { name: "Solo", party: "CDU", state: "Bayern" },
+    { name: "A" },
+  ]);
+});
+
+test("inline (non-CDATA) editorial HTML in topheader does not pass the allowlist", async () => {
+  const session =
+    '<iOS><list><top><toptitle a="1>2">TOP 1</toptitle>' +
+    "<topheader><p>Editorial <b>HTML</b> body</p></topheader></top></list></iOS>";
+  const mt = makeMockTransport(() => xmlResponse(session));
+  const s = await new BundesratClient({ transport: mt.transport }).session();
+  assert.deepEqual(JSON.parse(JSON.stringify(s)), { tops: [{ toptitle: "TOP 1" }] });
+});

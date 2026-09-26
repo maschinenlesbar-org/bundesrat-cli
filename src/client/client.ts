@@ -75,17 +75,36 @@ export function asArray<T>(value: XmlValue | undefined): T[] {
 }
 
 /**
+ * The plain text of a whitelisted field, or `undefined` when it is not a single
+ * plain-text value. Text with attributes (`<name lang="de">Solo</name>`) gives its
+ * text. An element holding markup (`<topheader><p>…</p></topheader>`) or repeated
+ * (`<party>A</party><party>B</party>`) gives `undefined`: the allowlist vouches for
+ * a field's plain text only, so inline editorial HTML must not pass through as a
+ * nested object, and every surfaced field stays the `string` the types promise.
+ */
+function textOf(value: XmlValue | undefined): string | undefined {
+  if (typeof value === "string") return value;
+  if (!isObject(value)) return undefined;
+  for (const key of Object.keys(value)) {
+    if (key !== "#text" && !key.startsWith("@")) return undefined;
+  }
+  const text = value["#text"];
+  return typeof text === "string" ? text : "";
+}
+
+/**
  * Project a parsed element down to a whitelist of open, factual keys — dropping
- * every copyright-protected editorial/image field. Only defined, **non-empty** keys
- * are copied, so an absent field and an empty one (`<linkedtop/>`) both simply don't
- * appear — a consistent "a present key always has a value" shape for consumers.
+ * every copyright-protected editorial/image field. Only **non-empty plain-text**
+ * values are copied (see {@link textOf}), so an absent field, an empty one
+ * (`<linkedtop/>`) and one holding markup or repeated all simply don't appear — a
+ * consistent "a present key always has a string value" shape for consumers.
  */
 function pick<T>(obj: XmlValue, keys: readonly string[]): T {
-  const src = (typeof obj === "object" && obj !== null && !Array.isArray(obj) ? obj : {}) as XmlObject;
-  const out: Record<string, XmlValue> = {};
+  const src = isObject(obj) ? obj : {};
+  const out: Record<string, string> = {};
   for (const key of keys) {
-    const value = src[key];
-    if (value !== undefined && value !== "") out[key] = value;
+    const text = textOf(src[key]);
+    if (text !== undefined && text !== "") out[key] = text;
   }
   return out as unknown as T;
 }
