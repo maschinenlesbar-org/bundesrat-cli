@@ -231,3 +231,18 @@ test("a --base-url with a path prefix still works", async () => {
     "https://mirror.example/br/iOS/SharedDocs/2_Mitglieder/mitglieder_table.xml?view=renderXml",
   );
 });
+
+test("a --user-agent with control or non-Latin-1 characters is a usage error, no request", async () => {
+  for (const [ua, message] of [
+    ["日本", /outside Latin-1/],
+    ["a\r\nX-Evil: 1", /control characters/],
+  ] as const) {
+    const cli = makeCli(() => xmlResponse(fx.sessionXml));
+    assert.equal(await run(["--user-agent", ua, "session"], cli.deps), 2, ua);
+    assert.equal(cli.mt.calls.length, 0, ua);
+    assert.match(cli.err.join("\n"), message, ua);
+  }
+  const ok = makeCli(() => xmlResponse(fx.sessionXml));
+  assert.equal(await run(["--user-agent", "bot\tmüller/1.0", "session"], ok.deps), 0);
+  assert.equal(ok.mt.last().headers?.["User-Agent"], "bot\tmüller/1.0");
+});

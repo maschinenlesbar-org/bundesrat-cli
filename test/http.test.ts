@@ -95,3 +95,13 @@ test("enforces maxResponseBytes", async () => {
     },
   );
 });
+
+test("a header value Node cannot send rejects with a typed BundesratNetworkError", async () => {
+  for (const ua of ["a\r\nX-Evil: 1", "日本"]) {
+    await assert.rejects(
+      nodeHttpTransport({ method: "GET", url: "http://127.0.0.1:9/x", headers: { "User-Agent": ua } }),
+      (err: unknown) => err instanceof BundesratNetworkError && /^Invalid request: /.test(err.message),
+      JSON.stringify(ua),
+    );
+  }
+});
