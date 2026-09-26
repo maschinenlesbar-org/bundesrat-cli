@@ -81,15 +81,23 @@ export function asArray<T>(value: XmlValue | undefined): T[] {
  * (`<party>A</party><party>B</party>`) gives `undefined`: the allowlist vouches for
  * a field's plain text only, so inline editorial HTML must not pass through as a
  * nested object, and every surfaced field stays the `string` the types promise.
+ *
+ * Runs of whitespace inside the text (the feed puts a raw newline into some
+ * `topheader`s) become one space: these are short one-line labels, and the
+ * documented "one line per TOP" recipes rely on that.
  */
 function textOf(value: XmlValue | undefined): string | undefined {
-  if (typeof value === "string") return value;
+  if (typeof value === "string") return oneLine(value);
   if (!isObject(value)) return undefined;
   for (const key of Object.keys(value)) {
     if (key !== "#text" && !key.startsWith("@")) return undefined;
   }
   const text = value["#text"];
-  return typeof text === "string" ? text : "";
+  return typeof text === "string" ? oneLine(text) : "";
+}
+
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
 }
 
 /**

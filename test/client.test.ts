@@ -192,3 +192,13 @@ test("session title/header follow the same plain-text rule as TOP fields (findin
     assert.deepEqual(JSON.parse(JSON.stringify(s)), expected, body);
   }
 });
+
+test("whitespace runs inside a field collapse to one space (topheader newline, finding 15)", async () => {
+  const session =
+    "<iOS><list><title>1067. Sitzung\n  des Bundesrates</title><top><toptitle>TOP a</toptitle>" +
+    "<topheader>Die humanitäre Hilfe der EU; \nJOIN(2026) 25 final</topheader></top></list></iOS>";
+  const mt = makeMockTransport(() => xmlResponse(session));
+  const s = await new BundesratClient({ transport: mt.transport }).session();
+  assert.equal(s.title, "1067. Sitzung des Bundesrates");
+  assert.equal(s.tops[0]!.topheader, "Die humanitäre Hilfe der EU; JOIN(2026) 25 final");
+});
