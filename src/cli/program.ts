@@ -70,7 +70,10 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
     )
     .option("--compact", "print JSON on a single line instead of pretty-printed")
     .option("-o, --output <file>", "write output to this file instead of stdout (- = stdout)", parseOutputPath)
-    .showHelpAfterError();
+    .showHelpAfterError()
+    // Global options work before or after the command, so list them in each
+    // command's --help too. Set before registerCommands: subcommands copy it.
+    .configureHelp({ showGlobalOptions: true });
 
   registerCommands(program, deps);
 

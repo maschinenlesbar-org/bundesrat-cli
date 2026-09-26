@@ -326,3 +326,13 @@ test("repeating --state or --party is a usage error, not a silent last-one-wins"
     assert.match(cli.err.join("\n"), /Given more than once; this option takes a single value\./);
   }
 });
+
+test("a command's --help lists the global options too", async () => {
+  const cli = makeCli(() => xmlResponse(fx.sessionXml));
+  assert.equal(await run(["session", "--help"], cli.deps), 0);
+  const help = cli.out.join("\n");
+  assert.match(help, /Global Options:/);
+  for (const flag of ["--compact", "-o, --output <file>", "--timeout <ms>", "--base-url <url>"]) {
+    assert.ok(help.includes(flag), flag);
+  }
+});
