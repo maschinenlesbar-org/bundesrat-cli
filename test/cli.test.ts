@@ -295,3 +295,15 @@ test("bidi controls are stripped from stderr error text and escaped in JSON outp
   assert.equal(await run(["--compact", "members"], ok.deps), 0);
   assert.equal(ok.out.join("\n"), '[{"name":"A\\u202eB\\u2066C"}]');
 });
+
+test("a parse error names the parser's reason", async () => {
+  for (const [body, reason] of [
+    [`<iOS>${"<x>".repeat(600)}`, /: XML nesting too deep \(exceeded 512 levels\)$/],
+    ["<iOS><list><top><toptitle>TOP 1</toptitle><topheader", /: Unterminated tag <topheader> at offset \d+$/],
+  ] as const) {
+    const cli = makeCli(() => xmlResponse(body));
+    assert.equal(await run(["session"], cli.deps), 1);
+    assert.match(cli.err.join("\n"), /^Error: Failed to parse XML response from \/iOS\/SharedDocs\/3_Plenum\/plenum_aktuelleSitzung_table\.xml: /);
+    assert.match(cli.err.join("\n"), reason);
+  }
+});

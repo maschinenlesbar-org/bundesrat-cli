@@ -296,7 +296,10 @@ export class RequestEngine {
     try {
       doc = parseXmlDocument(text);
     } catch (cause) {
-      throw new BundesratParseError(`Failed to parse XML response from ${path}`, { cause });
+      // Name the parser's reason (nesting too deep, unterminated tag, no root
+      // element): run.ts prints only the message, never the cause.
+      const reason = sanitizeServerText(cause instanceof Error ? cause.message : String(cause));
+      throw new BundesratParseError(`Failed to parse XML response from ${path}: ${reason}`, { cause });
     }
     // An XHTML page parses as XML; it is still the website, not a feed.
     if (doc.root.toLowerCase() === "html") throw htmlPageError(path);
