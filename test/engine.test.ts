@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MAX_RETRY_AFTER_MS, RequestEngine, parseRetryAfter } from "../src/client/engine.js";
-import { BundesratApiError, BundesratNetworkError, BundesratParseError, redactUrl } from "../src/client/errors.js";
+import {
+  BundesratApiError,
+  BundesratNetworkError,
+  BundesratParseError,
+  BundesratValidationError,
+  redactUrl,
+} from "../src/client/errors.js";
 import { makeMockTransport, xmlResponse, rawResponse } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -213,4 +219,29 @@ test("redactUrl hides userinfo; base-URL errors never show the password", () => 
   const api = new BundesratApiError({ status: 500, url: "https://u:pw@h.test/x", method: "GET", body: "" });
   assert.equal(api.url, "https://***@h.test/x");
   assert.doesNotMatch(api.message, /pw/);
+});
+
+test("out-of-range numeric engine options throw a BundesratValidationError (finding 16)", () => {
+  for (const [name, value] of [
+    ["maxRetries", Infinity],
+    ["maxRetries", 11],
+    ["timeoutMs", NaN],
+    ["timeoutMs", -5],
+    ["timeoutMs", 2 ** 31],
+    ["retryDelayMs", 1.5],
+    ["retryDelayMs", 30_001],
+    ["maxResponseBytes", -1],
+  ] as const) {
+    assert.throws(
+      () => new RequestEngine({ [name]: value }),
+      (err: unknown) =>
+        err instanceof BundesratValidationError &&
+        err.message.startsWith(`Invalid option ${name}: expected an integer from 0 to `),
+      `${name}=${value}`,
+    );
+  }
+  assert.doesNotThrow(
+    () => new RequestEngine({ maxRetries: 0, timeoutMs: 0, retryDelayMs: 0, maxResponseBytes: 0 }),
+  );
+  assert.doesNotThrow(() => new RequestEngine({ maxRetries: 10, timeoutMs: 2 ** 31 - 1, retryDelayMs: 30_000 }));
 });

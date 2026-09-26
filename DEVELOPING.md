@@ -100,6 +100,12 @@ response's `Retry-After` — delay-seconds or an IMF-fixdate HTTP-date, parsed b
 longer than `MAX_RETRY_AFTER_MS` (30 s) is not retried: the `BundesratApiError` surfaces
 at once.
 
+The numeric options are validated in the constructor: `timeoutMs` 0..`MAX_TIMEOUT_MS`,
+`maxRetries` 0..`MAX_RETRIES` (10), `retryDelayMs` 0..`MAX_RETRY_AFTER_MS`,
+`maxResponseBytes` 0..`Number.MAX_SAFE_INTEGER`, integers only. Anything else (NaN,
+negative, `Infinity`, fractional) throws a `BundesratValidationError` rather than
+silently disabling the timeout or retrying for ever.
+
 ### Methods (one per open-data feed)
 
 Only the three feeds that return open data are exposed. Each result is projected to

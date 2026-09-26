@@ -5,10 +5,16 @@
 // carry the `?view=renderXml` render parameter to return XML rather than the
 // website's HTML shell.
 
-import { nodeHttpTransport, type Transport } from "./http.js";
+import { MAX_TIMEOUT_MS, nodeHttpTransport, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
 import { parseXmlDocument, type XmlDocument, type XmlValue } from "./xml.js";
-import { BundesratApiError, BundesratNetworkError, BundesratParseError, redactUrl } from "./errors.js";
+import {
+  BundesratApiError,
+  BundesratNetworkError,
+  BundesratParseError,
+  BundesratValidationError,
+  redactUrl,
+} from "./errors.js";
 
 export const DEFAULT_BASE_URL = "https://www.bundesrat.de";
 const DEFAULT_USER_AGENT = "bundesrat-cli";
@@ -19,6 +25,11 @@ export interface RawResponse {
   status: number;
 }
 
+/**
+ * Options for {@link RequestEngine} and the client. The numeric options must be
+ * integers within their documented range; anything else (negative, fractional,
+ * NaN, Infinity, too large) makes the constructor throw a BundesratValidationError.
+ */
 export interface EngineOptions {
   /** Base URL of the API. Defaults to https://www.bundesrat.de */
   baseUrl?: string;
@@ -30,16 +41,20 @@ export interface EngineOptions {
   defaultHeaders?: Record<string, string>;
   /**
    * Time limit per request in milliseconds, covering the whole response body, not
-   * only idle gaps (0 disables; capped at `MAX_TIMEOUT_MS`, 2^31 - 1 ms).
+   * only idle gaps (0 disables; at most `MAX_TIMEOUT_MS`, 2^31 - 1 ms).
    */
   timeoutMs?: number;
   /**
-   * Number of automatic retries for transient (429/503) responses. Each waits the
+   * Number of automatic retries for transient (429/503) responses, 0..`MAX_RETRIES`
+   * (10). Each waits the
    * response's `Retry-After` (up to `MAX_RETRY_AFTER_MS`; a longer one is not
    * retried), or else `retryDelayMs * attempt`.
    */
   maxRetries?: number;
-  /** Base backoff between retries in milliseconds (grows linearly); used without a Retry-After. */
+  /**
+   * Base backoff between retries in milliseconds (grows linearly); used without a
+   * Retry-After. At most `MAX_RETRY_AFTER_MS`.
+   */
   retryDelayMs?: number;
   /**
    * Hard cap on response body size in bytes (defends against memory exhaustion
@@ -59,6 +74,24 @@ const DEFAULT_MAX_RESPONSE_BYTES = 100 * 1024 * 1024;
  * out, and a hostile value must not stall the CLI.
  */
 export const MAX_RETRY_AFTER_MS = 30_000;
+
+/** Most automatic retries a caller may ask for (the CLI's --max-retries shares it). */
+export const MAX_RETRIES = 10;
+
+/**
+ * Read a numeric engine option: `undefined` gives the default; anything but an
+ * integer in [0, max] throws. Without this a negative or NaN `timeoutMs` silently
+ * disabled the timeout, and `maxRetries: Infinity` retried for ever.
+ */
+function intOption(name: string, value: number | undefined, fallback: number, max: number): number {
+  if (value === undefined) return fallback;
+  if (!Number.isSafeInteger(value) || value < 0 || value > max) {
+    throw new BundesratValidationError(
+      `Invalid option ${name}: expected an integer from 0 to ${max}, got ${String(value)}.`,
+    );
+  }
+  return value;
+}
 
 /** An IMF-fixdate (RFC 9110 §5.6.7), the one HTTP-date form senders must generate. */
 const IMF_FIXDATE =
@@ -206,10 +239,15 @@ export class RequestEngine {
     this.transport = options.transport ?? nodeHttpTransport;
     this.userAgent = options.userAgent ?? DEFAULT_USER_AGENT;
     this.defaultHeaders = options.defaultHeaders ?? {};
-    this.timeoutMs = options.timeoutMs ?? 30_000;
-    this.maxRetries = options.maxRetries ?? 2;
-    this.retryDelayMs = options.retryDelayMs ?? 200;
-    this.maxResponseBytes = options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES;
+    this.timeoutMs = intOption("timeoutMs", options.timeoutMs, 30_000, MAX_TIMEOUT_MS);
+    this.maxRetries = intOption("maxRetries", options.maxRetries, 2, MAX_RETRIES);
+    this.retryDelayMs = intOption("retryDelayMs", options.retryDelayMs, 200, MAX_RETRY_AFTER_MS);
+    this.maxResponseBytes = intOption(
+      "maxResponseBytes",
+      options.maxResponseBytes,
+      DEFAULT_MAX_RESPONSE_BYTES,
+      Number.MAX_SAFE_INTEGER,
+    );
     this.sleep = options.sleep ?? realSleep;
   }
 
