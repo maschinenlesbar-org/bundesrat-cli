@@ -168,6 +168,7 @@ src/
     http.ts      # the Transport interface + default node:http/https transport
     engine.ts    # URL building, retry/backoff, XML decode + HTML-shell guard, errors
     errors.ts    # BundesratError / …ApiError / …NetworkError / …ValidationError / …ParseError
+    validate.ts  # the Problem type + assertValid: input rules shared by library and CLI
     client.ts    # BundesratClient — session/members/appointments + open-field projection
   cli/
     io.ts        # injectable I/O seam (stdout/stderr/file)
@@ -188,8 +189,20 @@ instead of calling `process.exit`).
 [`errors.ts`](src/client/errors.ts): `BundesratApiError` (non-2xx, carries
 `status`/`detail`, with `isRetryable`/`isNotFound`), `BundesratNetworkError`
 (transport failure/timeout), `BundesratParseError` (the body was not a feed — usually
-the HTML shell, or XML of the wrong shape), and `BundesratValidationError` (a client-side usage error), all
-extending `BundesratError`.
+the HTML shell, or XML of the wrong shape), and `BundesratValidationError` (a rejected
+input, thrown before any request), all extending `BundesratError`.
+
+### Input validation
+
+The library owns every rule about what a request may contain; the CLI calls the same
+functions instead of keeping its own copy. A rule is a pure, exported `Problem`
+([`validate.ts`](src/client/validate.ts)): it returns the reason a value is invalid, or
+`undefined`. The library enforces it with `assertValid(name, value, problem)`, which
+throws `BundesratValidationError` with the message `Invalid <name>: <reason>` before
+any request (a constructor throws; a method returning a promise rejects). The CLI's
+commander parsers turn the same reason into a usage error (exit 2), and `run.ts` maps a
+`BundesratValidationError` raised during an action to exit 2 too, printed as
+`Error: <message>`.
 
 ## Testing
 
@@ -207,6 +220,10 @@ npm test          # builds, then runs `node --test` over dist/test
   `asArray` normalisation — mocked transport.
 - **`cli.test.ts`** — command parsing, the `members` `--state`/`--party` filters,
   `--output`, and exit codes — mocked client.
+- **`validate.test.ts`** — `assertValid`, the `run.ts` mapping of
+  `BundesratValidationError`, and the `parity()` helper (`test/helpers.ts`), which sends
+  one input through `run()` and through the library on one recording mock transport so
+  a test can assert both give the same outcome.
 
 ## Continuous integration
 

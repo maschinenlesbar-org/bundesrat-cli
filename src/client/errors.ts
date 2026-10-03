@@ -64,7 +64,11 @@ export class BundesratApiError extends BundesratError {
 /** A transport-level failure (DNS, connection reset, timeout, ...). */
 export class BundesratNetworkError extends BundesratError {}
 
-/** A client-side validation error (e.g. an unknown feed name) — no request made. */
+/**
+ * A rejected input — a client option or a method argument that breaks one of the
+ * library's rules (see validate.ts). Thrown before any request is made; the CLI
+ * maps it to its usage exit code (2).
+ */
 export class BundesratValidationError extends BundesratError {}
 
 /**
