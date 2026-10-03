@@ -7,7 +7,7 @@ import type { CliDeps } from "./io.js";
 import type { BundesratClientOptions } from "../client/client.js";
 import { BundesratError } from "../client/errors.js";
 import { isBidiControl } from "../client/engine.js";
-import { headerValueProblem, nonBlankProblem } from "../client/validate.js";
+import { baseUrlWhitespaceProblem, headerValueProblem, nonBlankProblem } from "../client/validate.js";
 
 /**
  * commander value-parser: a plain base-10 non-negative integer.
@@ -76,6 +76,9 @@ export function parseOutputPath(value: string): string {
  */
 export function parseBaseUrl(value: string): string {
   if (value.trim() === "") throw new InvalidArgumentError("Expected a non-empty URL.");
+  // The library's rule: no surrounding or inner whitespace / control characters.
+  const spacing = baseUrlWhitespaceProblem(value);
+  if (spacing !== undefined) throw new InvalidArgumentError(spacing);
   let url: URL;
   try {
     url = new URL(value);
@@ -89,11 +92,6 @@ export function parseBaseUrl(value: string): string {
   // swallow the feed path ("http://h/#f" requests "/" for every command).
   if (/[?#]/.test(value)) {
     throw new InvalidArgumentError("A base URL cannot have a query (?) or fragment (#).");
-  }
-  // new URL() trims surrounding whitespace silently; the raw value is what the
-  // engine uses, so reject it rather than guess.
-  if (value !== value.trim()) {
-    throw new InvalidArgumentError("A base URL cannot have surrounding whitespace.");
   }
   return value;
 }

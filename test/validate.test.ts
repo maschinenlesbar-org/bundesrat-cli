@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assertValid, nonBlankProblem, type Problem } from "../src/client/validate.js";
+import { assertValid, baseUrlWhitespaceProblem, nonBlankProblem, type Problem } from "../src/client/validate.js";
 import * as lib from "../src/index.js";
 import { BundesratError, BundesratValidationError } from "../src/client/errors.js";
 import { BundesratClient } from "../src/client/client.js";
@@ -65,4 +65,13 @@ test("nonBlankProblem: blank and non-string values have a reason, others none", 
   assert.equal(nonBlankProblem(" \t\n"), "Expected a non-empty value.");
   assert.equal(nonBlankProblem(5), "Expected a string.");
   assert.equal(nonBlankProblem(null), "Expected a string.");
+});
+
+test("baseUrlWhitespaceProblem: surrounding and inner whitespace or controls have a reason", () => {
+  assert.equal(baseUrlWhitespaceProblem("https://h.example/br/"), undefined);
+  assert.equal(baseUrlWhitespaceProblem(" https://h.example"), "A base URL cannot have surrounding whitespace.");
+  assert.equal(baseUrlWhitespaceProblem("https://h.example/\n"), "A base URL cannot have surrounding whitespace.");
+  for (const bad of ["https://h.example/a b", "https://h.ex\tample", "https://h.example/\u0000", "https://h/\u007f"]) {
+    assert.equal(baseUrlWhitespaceProblem(bad), "A base URL cannot contain whitespace or control characters.", bad);
+  }
 });

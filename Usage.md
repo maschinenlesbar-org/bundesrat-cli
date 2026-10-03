@@ -12,7 +12,7 @@ bundesrat [global options] <command>
 
 | Option | Description |
 |---|---|
-| `--base-url <url>` | API base URL (only `http:`/`https:`; no query, fragment or surrounding whitespace) |
+| `--base-url <url>` | API base URL (only `http:`/`https:`; no query, fragment, whitespace or control characters) |
 | `--timeout <ms>` | time limit per request in ms, whole response included (0 = no timeout; at most 2147483647) |
 | `--user-agent <ua>` | User-Agent header value |
 | `--max-retries <n>` | retries for transient 429/503 responses (0..10; each waits the server's `Retry-After`, up to 30 s) |

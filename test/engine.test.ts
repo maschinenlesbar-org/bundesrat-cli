@@ -138,7 +138,7 @@ for (const baseUrl of ["file:///etc/passwd", "ftp://example.org"]) {
 test("the engine rejects an unparseable base URL with a typed error", () => {
   const mt = makeMockTransport(() => xmlResponse(fx.appointmentsXml));
   assert.throws(
-    () => new RequestEngine({ baseUrl: "not a url", transport: mt.transport }),
+    () => new RequestEngine({ baseUrl: "not-a-url", transport: mt.transport }),
     (err) => err instanceof BundesratNetworkError && /Invalid base URL/.test(err.message),
   );
   assert.equal(mt.calls.length, 0);

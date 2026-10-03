@@ -107,6 +107,11 @@ The numeric options are validated in the constructor: `timeoutMs` 0..`MAX_TIMEOU
 negative, `Infinity`, fractional) throws a `BundesratValidationError` rather than
 silently disabling the timeout or retrying for ever.
 
+`baseUrl` is checked on the raw value, before trailing slashes are stripped: surrounding
+or inner whitespace and control characters throw a `BundesratValidationError`
+(`baseUrlWhitespaceProblem`), since `new URL()` would hide them while the engine joins
+the raw string to each feed path (`"https://h/ "` would request `/%20/iOS/...`).
+
 `userAgent` and every `defaultHeaders` value are checked there too, with the same rule
 as the CLI's `--user-agent` (`headerValueProblem`, also exported as
 `assertHeaderValue(name, value)`): a blank value, a control character other than tab

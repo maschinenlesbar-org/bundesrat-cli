@@ -102,3 +102,32 @@ test("user agent: tab and Latin-1 are sent identically by both", async () => {
     assert.deepEqual(cli.requests, lib.requests);
   }
 });
+
+// ---- Finding 2: base URL with whitespace ----
+
+test("base URL: surrounding or inner whitespace is rejected by both, with no request", async () => {
+  const surrounding = "A base URL cannot have surrounding whitespace.";
+  const inner = "A base URL cannot contain whitespace or control characters.";
+  for (const [baseUrl, reason] of [
+    ["https://example.org/ ", surrounding],
+    [" https://example.org", surrounding],
+    ["https://example.org\n", surrounding],
+    ["\thttps://example.org/", surrounding],
+    ["https://example.org/a b", inner],
+    ["https://exa\tmple.org", inner],
+    ["https://example.org/p\r\nq", inner],
+  ] as const) {
+    const { cli, lib } = await parity(
+      ["--compact", "--base-url", baseUrl, "session"],
+      (transport) => new BundesratClient({ baseUrl, transport }).session(),
+      () => xmlResponse(fx.sessionXml),
+    );
+    const label = JSON.stringify(baseUrl);
+    assert.equal(cli.code, 2, label);
+    assert.ok(cli.err.includes(reason), label);
+    assert.equal(cli.requests.length, 0, label);
+    assert.ok(!lib.ok && lib.error instanceof BundesratValidationError, label);
+    assert.equal((lib as { error: Error }).error.message, `Invalid baseUrl: ${reason}`, label);
+    assert.equal(lib.requests.length, 0, label);
+  }
+});

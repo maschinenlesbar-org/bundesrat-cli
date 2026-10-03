@@ -15,7 +15,7 @@ import {
   BundesratValidationError,
   redactUrl,
 } from "./errors.js";
-import { assertValid, headerNameProblem, headerValueProblem } from "./validate.js";
+import { assertValid, baseUrlWhitespaceProblem, headerNameProblem, headerValueProblem } from "./validate.js";
 
 export const DEFAULT_BASE_URL = "https://www.bundesrat.de";
 const DEFAULT_USER_AGENT = "bundesrat-cli";
@@ -32,7 +32,10 @@ export interface RawResponse {
  * NaN, Infinity, too large) makes the constructor throw a BundesratValidationError.
  */
 export interface EngineOptions {
-  /** Base URL of the API. Defaults to https://www.bundesrat.de */
+  /**
+   * Base URL of the API. Defaults to https://www.bundesrat.de. Surrounding or inner
+   * whitespace and control characters throw a BundesratValidationError.
+   */
   baseUrl?: string;
   /** Swappable transport. Defaults to the built-in node http/https transport. */
   transport?: Transport;
@@ -287,7 +290,13 @@ export class RequestEngine {
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(options: EngineOptions = {}) {
-    this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    // The raw value is checked before the trailing-slash strip, so "https://h/ "
+    // cannot slip past it; only an omitted baseUrl selects the default.
+    const baseUrl =
+      options.baseUrl === undefined
+        ? DEFAULT_BASE_URL
+        : assertValid("baseUrl", options.baseUrl, baseUrlWhitespaceProblem);
+    this.baseUrl = baseUrl.replace(/\/+$/, "");
     assertHttpScheme(this.baseUrl);
     this.transport = options.transport ?? nodeHttpTransport;
     // Only an omitted userAgent selects the default: a blank one is an error, not

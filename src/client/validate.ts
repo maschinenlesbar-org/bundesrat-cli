@@ -62,3 +62,16 @@ export const headerNameProblem: Problem<unknown> = (value) =>
   typeof value === "string" && /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/.test(value)
     ? undefined
     : "Expected an HTTP header name (a token such as X-Request-Id).";
+
+/**
+ * A base URL must not carry whitespace or control characters. `new URL()` trims
+ * surrounding whitespace and drops tab/CR/LF silently, but the engine joins the
+ * raw string to each feed path, so "https://h/ " would request `/%20/iOS/...` and
+ * a custom transport would see the raw value. Reject rather than guess.
+ */
+export const baseUrlWhitespaceProblem: Problem<unknown> = (value) => {
+  if (typeof value !== "string") return "Expected a string.";
+  if (value !== value.trim()) return "A base URL cannot have surrounding whitespace.";
+  if (/[\s\u0000-\u001f\u007f]/.test(value)) return "A base URL cannot contain whitespace or control characters.";
+  return undefined;
+};
