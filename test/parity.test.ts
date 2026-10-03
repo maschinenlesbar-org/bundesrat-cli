@@ -131,3 +131,47 @@ test("base URL: surrounding or inner whitespace is rejected by both, with no req
     assert.equal(lib.requests.length, 0, label);
   }
 });
+
+// ---- Finding 4: an invalid base URL is a validation error on both sides ----
+
+test("base URL: every invalid shape is a BundesratValidationError with the CLI's reason", async () => {
+  for (const [baseUrl, reason] of [
+    ["", "Expected a non-empty URL."],
+    ["   ", "Expected a non-empty URL."],
+    ["not-a-url", "Expected a valid URL."],
+    ["ftp://h.example", "Only http: and https: base URLs are supported."],
+    ["file:///etc", "Only http: and https: base URLs are supported."],
+    ["https://h.example/?x=1", "A base URL cannot have a query (?) or fragment (#)."],
+    ["https://h.example/#f", "A base URL cannot have a query (?) or fragment (#)."],
+  ] as const) {
+    const { cli, lib } = await parity(
+      ["--compact", "--base-url", baseUrl, "members"],
+      (transport) => new BundesratClient({ baseUrl, transport }).members(),
+      () => xmlResponse(fx.membersXml),
+    );
+    const label = JSON.stringify(baseUrl);
+    assert.equal(cli.code, 2, label);
+    assert.ok(cli.err.includes(reason), label);
+    assert.equal(cli.requests.length, 0, label);
+    assert.ok(!lib.ok && lib.error instanceof BundesratValidationError, label);
+    assert.ok(!(lib as { error: unknown }).error?.constructor.name.includes("Network"), label);
+    assert.equal((lib as { error: Error }).error.message, `Invalid baseUrl: ${reason}`, label);
+    assert.equal(lib.requests.length, 0, label);
+  }
+});
+
+test("base URL: a valid one with a path prefix gives the identical request", async () => {
+  const baseUrl = "https://mirror.example/br/";
+  const { cli, lib } = await parity(
+    ["--compact", "--base-url", baseUrl, "members"],
+    (transport) => new BundesratClient({ baseUrl, transport }).members(),
+    () => xmlResponse(fx.membersXml),
+  );
+  assert.equal(cli.code, 0);
+  assert.ok(lib.ok);
+  assert.deepEqual(cli.requests, lib.requests);
+  assert.equal(
+    cli.requests[0]!.url,
+    "https://mirror.example/br/iOS/SharedDocs/2_Mitglieder/mitglieder_table.xml?view=renderXml",
+  );
+});

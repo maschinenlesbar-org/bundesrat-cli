@@ -7,7 +7,7 @@ import type { CliDeps } from "./io.js";
 import type { BundesratClientOptions } from "../client/client.js";
 import { BundesratError } from "../client/errors.js";
 import { isBidiControl } from "../client/engine.js";
-import { baseUrlWhitespaceProblem, headerValueProblem, nonBlankProblem } from "../client/validate.js";
+import { baseUrlProblem, headerValueProblem, nonBlankProblem } from "../client/validate.js";
 
 /**
  * commander value-parser: a plain base-10 non-negative integer.
@@ -70,29 +70,14 @@ export function parseOutputPath(value: string): string {
 }
 
 /**
- * commander value-parser for --base-url. The base URL is trusted input, but only
- * `http:`/`https:` are accepted so a stray `file:`/`ftp:` value fails at parse
- * time (exit 2) with a clear message rather than deep in the transport.
+ * commander value-parser for --base-url. The base URL is trusted input, but it must
+ * pass the library's {@link baseUrlProblem} (non-blank, no whitespace, `http:`/`https:`
+ * only, no query or fragment), so a bad value fails at parse time (exit 2) with a clear
+ * message rather than deep in the transport. The CLI keeps no rules of its own.
  */
 export function parseBaseUrl(value: string): string {
-  if (value.trim() === "") throw new InvalidArgumentError("Expected a non-empty URL.");
-  // The library's rule: no surrounding or inner whitespace / control characters.
-  const spacing = baseUrlWhitespaceProblem(value);
-  if (spacing !== undefined) throw new InvalidArgumentError(spacing);
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new InvalidArgumentError("Expected a valid URL.");
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new InvalidArgumentError("Only http: and https: base URLs are supported.");
-  }
-  // Paths are appended to the base URL as a string, so a query or fragment would
-  // swallow the feed path ("http://h/#f" requests "/" for every command).
-  if (/[?#]/.test(value)) {
-    throw new InvalidArgumentError("A base URL cannot have a query (?) or fragment (#).");
-  }
+  const problem = baseUrlProblem(value);
+  if (problem !== undefined) throw new InvalidArgumentError(problem);
   return value;
 }
 

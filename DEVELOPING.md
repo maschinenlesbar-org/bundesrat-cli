@@ -107,10 +107,14 @@ The numeric options are validated in the constructor: `timeoutMs` 0..`MAX_TIMEOU
 negative, `Infinity`, fractional) throws a `BundesratValidationError` rather than
 silently disabling the timeout or retrying for ever.
 
-`baseUrl` is checked on the raw value, before trailing slashes are stripped: surrounding
-or inner whitespace and control characters throw a `BundesratValidationError`
-(`baseUrlWhitespaceProblem`), since `new URL()` would hide them while the engine joins
-the raw string to each feed path (`"https://h/ "` would request `/%20/iOS/...`).
+`baseUrl` is checked on the raw value, before trailing slashes are stripped, by the
+exported `validateBaseUrl` (rule: `baseUrlProblem`, the same one the CLI's `--base-url`
+uses). A blank value, surrounding or inner whitespace or control characters (`new URL()`
+would hide them while the engine joins the raw string to each feed path, so
+`"https://h/ "` would request `/%20/iOS/...`), an unparseable URL, a scheme other than
+`http:`/`https:`, and a query or fragment each throw a `BundesratValidationError`
+(`Invalid baseUrl: <reason>`) — a configuration error, not a `BundesratNetworkError`.
+Only an omitted `baseUrl` selects the default.
 
 `userAgent` and every `defaultHeaders` value are checked there too, with the same rule
 as the CLI's `--user-agent` (`headerValueProblem`, also exported as
@@ -208,7 +212,8 @@ instead of calling `process.exit`).
 
 [`errors.ts`](src/client/errors.ts): `BundesratApiError` (non-2xx, carries
 `status`/`detail`, with `isRetryable`/`isNotFound`), `BundesratNetworkError`
-(transport failure/timeout), `BundesratParseError` (the body was not a feed — usually
+(transport failure/timeout, and the default transport's per-hop scheme check; a bad
+configured `baseUrl` is a `BundesratValidationError` instead), `BundesratParseError` (the body was not a feed — usually
 the HTML shell, or XML of the wrong shape), and `BundesratValidationError` (a rejected
 input, thrown before any request), all extending `BundesratError`.
 

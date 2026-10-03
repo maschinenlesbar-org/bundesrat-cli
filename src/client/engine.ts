@@ -10,12 +10,10 @@ import { buildQueryString, type QueryParams } from "./query.js";
 import { parseXmlDocument, type XmlDocument, type XmlValue } from "./xml.js";
 import {
   BundesratApiError,
-  BundesratNetworkError,
   BundesratParseError,
   BundesratValidationError,
-  redactUrl,
 } from "./errors.js";
-import { assertValid, baseUrlWhitespaceProblem, headerNameProblem, headerValueProblem } from "./validate.js";
+import { assertValid, baseUrlProblem, headerNameProblem, headerValueProblem } from "./validate.js";
 
 export const DEFAULT_BASE_URL = "https://www.bundesrat.de";
 const DEFAULT_USER_AGENT = "bundesrat-cli";
@@ -33,8 +31,9 @@ export interface RawResponse {
  */
 export interface EngineOptions {
   /**
-   * Base URL of the API. Defaults to https://www.bundesrat.de. Surrounding or inner
-   * whitespace and control characters throw a BundesratValidationError.
+   * Base URL of the API. Defaults to https://www.bundesrat.de. A value that breaks
+   * a rule of {@link validateBaseUrl} (blank, whitespace or control characters, not
+   * http(s), a query or fragment) throws a BundesratValidationError.
    */
   baseUrl?: string;
   /** Swappable transport. Defaults to the built-in node http/https transport. */
@@ -197,29 +196,16 @@ export function sanitizeServerText(text: string): string {
 }
 
 /**
- * Reject a base URL whose scheme is not http(s), or that has a query or fragment.
- * The default transport already gates the scheme per hop, but the engine is
- * exported as a library and may be handed a custom transport that does no such
- * check, so gate the configured base URL here too (a `file:`/`ftp:` base URL fails
- * fast with a typed error). Feed paths are appended to the base URL as a string,
- * so a `?` or `#` in it would swallow every path: `http://h/?x` requests
- * `/?x/iOS/...` and `http://h/#f` requests `/`.
+ * Check a base URL against every rule of {@link baseUrlProblem} — blank,
+ * whitespace or control characters, unparseable, a scheme other than
+ * `http:`/`https:`, a query or fragment — and return it with trailing slashes
+ * stripped. A bad value throws a BundesratValidationError ("Invalid baseUrl:
+ * <reason>"): it is a configuration error, not a transport failure. The default
+ * transport still gates the scheme per hop, but the engine may be handed a custom
+ * transport that does no such check, so the configured value is checked here.
  */
-function assertHttpScheme(baseUrl: string): void {
-  let url: URL;
-  try {
-    url = new URL(baseUrl);
-  } catch {
-    throw new BundesratNetworkError(`Invalid base URL: ${redactUrl(baseUrl)}`);
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new BundesratNetworkError(
-      `Unsupported protocol "${url.protocol}" in base URL: ${redactUrl(baseUrl)}`,
-    );
-  }
-  if (/[?#]/.test(baseUrl)) {
-    throw new BundesratNetworkError(`Base URL must not contain a query or fragment: ${redactUrl(baseUrl)}`);
-  }
+export function validateBaseUrl(raw: string): string {
+  return assertValid("baseUrl", raw, baseUrlProblem).replace(/\/+$/, "");
 }
 
 /**
@@ -292,12 +278,7 @@ export class RequestEngine {
   constructor(options: EngineOptions = {}) {
     // The raw value is checked before the trailing-slash strip, so "https://h/ "
     // cannot slip past it; only an omitted baseUrl selects the default.
-    const baseUrl =
-      options.baseUrl === undefined
-        ? DEFAULT_BASE_URL
-        : assertValid("baseUrl", options.baseUrl, baseUrlWhitespaceProblem);
-    this.baseUrl = baseUrl.replace(/\/+$/, "");
-    assertHttpScheme(this.baseUrl);
+    this.baseUrl = validateBaseUrl(options.baseUrl === undefined ? DEFAULT_BASE_URL : options.baseUrl);
     this.transport = options.transport ?? nodeHttpTransport;
     // Only an omitted userAgent selects the default: a blank one is an error, not
     // a silent fallback, and a malformed one fails here rather than at request time.

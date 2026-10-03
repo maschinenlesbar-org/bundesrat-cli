@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BundesratClient, FEEDS, asArray, filterMembers, type MemberFilter } from "../src/client/client.js";
-import { BundesratNetworkError, BundesratParseError, BundesratValidationError } from "../src/client/errors.js";
+import { BundesratParseError, BundesratValidationError } from "../src/client/errors.js";
 import type { Member } from "../src/client/types.js";
 import { makeMockTransport, xmlResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
@@ -96,7 +96,7 @@ for (const baseUrl of ["file:///etc/passwd", "ftp://example.org"]) {
     const mt = makeMockTransport(() => xmlResponse(fx.appointmentsXml));
     assert.throws(
       () => new BundesratClient({ baseUrl, transport: mt.transport }),
-      (err) => err instanceof BundesratNetworkError && /Unsupported protocol/.test(err.message),
+      (err) => err instanceof BundesratValidationError && /Only http: and https: base URLs/.test(err.message),
     );
     assert.equal(mt.calls.length, 0);
   });

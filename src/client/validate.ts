@@ -75,3 +75,26 @@ export const baseUrlWhitespaceProblem: Problem<unknown> = (value) => {
   if (/[\s\u0000-\u001f\u007f]/.test(value)) return "A base URL cannot contain whitespace or control characters.";
   return undefined;
 };
+
+/**
+ * Every rule for a base URL, in order: a non-blank string, no whitespace or control
+ * characters (see {@link baseUrlWhitespaceProblem}), a parseable URL, the `http:` or
+ * `https:` scheme, and no query or fragment — feed paths are appended to the base
+ * URL as a string, so a `?` or `#` would swallow every path (`http://h/#f` requests
+ * `/`). The reasons never echo the URL, so a credential in it cannot leak.
+ */
+export const baseUrlProblem: Problem<unknown> = (value) => {
+  if (typeof value !== "string") return "Expected a string.";
+  if (value.trim() === "") return "Expected a non-empty URL.";
+  const spacing = baseUrlWhitespaceProblem(value);
+  if (spacing !== undefined) return spacing;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return "Expected a valid URL.";
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return "Only http: and https: base URLs are supported.";
+  if (/[?#]/.test(value)) return "A base URL cannot have a query (?) or fragment (#).";
+  return undefined;
+};

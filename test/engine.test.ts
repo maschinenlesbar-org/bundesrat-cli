@@ -5,12 +5,12 @@ import {
   RequestEngine,
   assertHeaderValue,
   parseRetryAfter,
+  validateBaseUrl,
   type EngineOptions,
 } from "../src/client/engine.js";
-import { headerValueProblem } from "../src/client/validate.js";
+import { baseUrlProblem, headerValueProblem } from "../src/client/validate.js";
 import {
   BundesratApiError,
-  BundesratNetworkError,
   BundesratParseError,
   BundesratValidationError,
   redactUrl,
@@ -129,19 +129,29 @@ for (const baseUrl of ["file:///etc/passwd", "ftp://example.org"]) {
     const mt = makeMockTransport(() => xmlResponse(fx.appointmentsXml));
     assert.throws(
       () => new RequestEngine({ baseUrl, transport: mt.transport }),
-      (err) => err instanceof BundesratNetworkError && /Unsupported protocol/.test(err.message),
+      (err) =>
+        err instanceof BundesratValidationError &&
+        err.message === "Invalid baseUrl: Only http: and https: base URLs are supported.",
     );
     assert.equal(mt.calls.length, 0);
   });
 }
 
-test("the engine rejects an unparseable base URL with a typed error", () => {
-  const mt = makeMockTransport(() => xmlResponse(fx.appointmentsXml));
-  assert.throws(
-    () => new RequestEngine({ baseUrl: "not-a-url", transport: mt.transport }),
-    (err) => err instanceof BundesratNetworkError && /Invalid base URL/.test(err.message),
-  );
-  assert.equal(mt.calls.length, 0);
+test("the engine rejects a blank or unparseable base URL with a BundesratValidationError", () => {
+  for (const [baseUrl, reason] of [
+    ["", "Expected a non-empty URL."],
+    ["  ", "Expected a non-empty URL."],
+    ["not-a-url", "Expected a valid URL."],
+    ["not a url", "A base URL cannot contain whitespace or control characters."],
+  ] as const) {
+    const mt = makeMockTransport(() => xmlResponse(fx.appointmentsXml));
+    assert.throws(
+      () => new RequestEngine({ baseUrl, transport: mt.transport }),
+      (err) => err instanceof BundesratValidationError && err.message === `Invalid baseUrl: ${reason}`,
+      baseUrl,
+    );
+    assert.equal(mt.calls.length, 0);
+  }
 });
 
 test("a base URL with a query or fragment is rejected at construction", () => {
@@ -150,10 +160,19 @@ test("a base URL with a query or fragment is rejected at construction", () => {
     assert.throws(
       () => new RequestEngine({ transport: mt.transport, baseUrl }),
       (err: unknown) =>
-        err instanceof BundesratNetworkError && /Base URL must not contain a query or fragment/.test(err.message),
+        err instanceof BundesratValidationError && /cannot have a query \(\?\) or fragment \(#\)/.test(err.message),
       baseUrl,
     );
+    assert.equal(mt.calls.length, 0);
   }
+});
+
+test("validateBaseUrl returns the value without trailing slashes, or throws", () => {
+  assert.equal(validateBaseUrl("https://h.example/br//"), "https://h.example/br");
+  assert.equal(validateBaseUrl("http://h.example"), "http://h.example");
+  assert.throws(() => validateBaseUrl("ftp://h.example"), BundesratValidationError);
+  assert.equal(baseUrlProblem("https://h.example/"), undefined);
+  assert.equal(baseUrlProblem(42), "Expected a string.");
 });
 
 // ---- Retry-After (exploratory test 2026-09-26, finding 4) ----
@@ -221,7 +240,7 @@ test("redactUrl hides userinfo; base-URL errors never show the password", () => 
   assert.equal(redactUrl("not a url"), "not a url");
   assert.throws(
     () => new RequestEngine({ baseUrl: "ftp://u:pw@h.test" }),
-    (err: unknown) => err instanceof BundesratNetworkError && !/pw/.test(err.message) && /\*\*\*@h\.test/.test(err.message),
+    (err: unknown) => err instanceof BundesratValidationError && !/pw/.test(err.message),
   );
   const api = new BundesratApiError({ status: 500, url: "https://u:pw@h.test/x", method: "GET", body: "" });
   assert.equal(api.url, "https://***@h.test/x");
