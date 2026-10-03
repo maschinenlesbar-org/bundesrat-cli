@@ -7,7 +7,7 @@ import type { CliDeps } from "./io.js";
 import type { BundesratClientOptions } from "../client/client.js";
 import { BundesratError } from "../client/errors.js";
 import { isBidiControl } from "../client/engine.js";
-import { nonBlankProblem } from "../client/validate.js";
+import { headerValueProblem, nonBlankProblem } from "../client/validate.js";
 
 /**
  * commander value-parser: a plain base-10 non-negative integer.
@@ -100,23 +100,13 @@ export function parseBaseUrl(value: string): string {
 
 /**
  * commander value-parser for a value that ends up in an HTTP header (`--user-agent`).
- * Node's HTTP layer throws an opaque "Invalid character in header content" at request
- * time for a CR/LF (or any other C0 control or DEL) and for any character above
- * U+00FF, which surfaced as "Unexpected error". Reject those here as a usage error,
- * along with a blank value (it used to fall back to the default silently). Tab is allowed, as in HTTP. Checked by char code so the source stays free of
- * control bytes.
+ * The rule is the library's {@link headerValueProblem} — blank, control characters
+ * other than tab, and characters above U+00FF are rejected — so a bad value is a
+ * usage error (exit 2) here instead of an opaque failure at request time.
  */
 export function parseHeaderValue(value: string): string {
-  parseNonEmpty(value);
-  for (let i = 0; i < value.length; i++) {
-    const c = value.charCodeAt(i);
-    if ((c < 0x20 && c !== 0x09) || c === 0x7f) {
-      throw new InvalidArgumentError("Value contains control characters.");
-    }
-    if (c > 0xff) {
-      throw new InvalidArgumentError("Value contains characters outside Latin-1 (above U+00FF).");
-    }
-  }
+  const problem = headerValueProblem(value);
+  if (problem !== undefined) throw new InvalidArgumentError(problem);
   return value;
 }
 

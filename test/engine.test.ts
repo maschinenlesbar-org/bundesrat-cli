@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_RETRY_AFTER_MS, RequestEngine, parseRetryAfter } from "../src/client/engine.js";
+import {
+  MAX_RETRY_AFTER_MS,
+  RequestEngine,
+  assertHeaderValue,
+  parseRetryAfter,
+  type EngineOptions,
+} from "../src/client/engine.js";
+import { headerValueProblem } from "../src/client/validate.js";
 import {
   BundesratApiError,
   BundesratNetworkError,
@@ -244,4 +251,46 @@ test("out-of-range numeric engine options throw a BundesratValidationError (find
     () => new RequestEngine({ maxRetries: 0, timeoutMs: 0, retryDelayMs: 0, maxResponseBytes: 0 }),
   );
   assert.doesNotThrow(() => new RequestEngine({ maxRetries: 10, timeoutMs: 2 ** 31 - 1, retryDelayMs: 30_000 }));
+});
+
+// ---- Header values (CLI <-> library parity, finding 3) ----
+
+test("assertHeaderValue returns a valid value and throws BundesratValidationError otherwise", () => {
+  assert.equal(assertHeaderValue("userAgent", "my-app/1.0 (müller)\tx"), "my-app/1.0 (müller)\tx");
+  for (const bad of ["", "  ", "a\nb", "a\u007fb", "€"]) {
+    assert.throws(
+      () => assertHeaderValue("userAgent", bad),
+      (err: unknown) => err instanceof BundesratValidationError && /^Invalid userAgent: /.test(err.message),
+      JSON.stringify(bad),
+    );
+  }
+});
+
+test("headerValueProblem names the reason", () => {
+  assert.equal(headerValueProblem("ok"), undefined);
+  assert.equal(headerValueProblem(" "), "Expected a non-empty value.");
+  assert.equal(headerValueProblem("a\rb"), "Value contains control characters.");
+  assert.equal(headerValueProblem("Ā"), "Value contains characters outside Latin-1 (above U+00FF).");
+  assert.equal(headerValueProblem(1), "Expected a string.");
+});
+
+test("the engine checks userAgent and defaultHeaders at construction, before any request", () => {
+  const cases: EngineOptions[] = [
+    { userAgent: "" },
+    { userAgent: "a\r\nX: 1" },
+    { defaultHeaders: { "X-Note": "a\nb" } },
+    { defaultHeaders: { "Bad Name": "v" } },
+    { defaultHeaders: { "": "v" } },
+  ];
+  for (const options of cases) {
+    const mt = makeMockTransport(() => xmlResponse(fx.membersXml));
+    assert.throws(
+      () => new RequestEngine({ ...options, transport: mt.transport }),
+      BundesratValidationError,
+      JSON.stringify(options),
+    );
+    assert.equal(mt.calls.length, 0);
+  }
+  // An omitted userAgent still means the default.
+  assert.doesNotThrow(() => new RequestEngine({ defaultHeaders: { "X-Note": "ok" } }));
 });

@@ -107,6 +107,13 @@ The numeric options are validated in the constructor: `timeoutMs` 0..`MAX_TIMEOU
 negative, `Infinity`, fractional) throws a `BundesratValidationError` rather than
 silently disabling the timeout or retrying for ever.
 
+`userAgent` and every `defaultHeaders` value are checked there too, with the same rule
+as the CLI's `--user-agent` (`headerValueProblem`, also exported as
+`assertHeaderValue(name, value)`): a blank value, a control character other than tab
+(CR/LF would inject a header), DEL or a character above U+00FF throws a
+`BundesratValidationError` before any request. Only an omitted `userAgent` selects the
+default `bundesrat-cli`. `defaultHeaders` names must be HTTP tokens.
+
 ### Methods (one per open-data feed)
 
 Only the three feeds that return open data are exposed. Each result is projected to
