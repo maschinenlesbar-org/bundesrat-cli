@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BundesratClient, FEEDS, asArray } from "../src/client/client.js";
-import { BundesratNetworkError, BundesratParseError } from "../src/client/errors.js";
+import { BundesratClient, FEEDS, asArray, filterMembers, type MemberFilter } from "../src/client/client.js";
+import { BundesratNetworkError, BundesratParseError, BundesratValidationError } from "../src/client/errors.js";
+import type { Member } from "../src/client/types.js";
 import { makeMockTransport, xmlResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -222,4 +223,43 @@ test("the XML declaration's encoding is honoured (a Latin-1 feed is not mojibake
     new BundesratClient({ transport: unknown.transport }).members(),
     (err: unknown) => err instanceof BundesratParseError && /Unsupported response charset "x-klingon" from /.test(err.message),
   );
+});
+
+// --- members(filter) / filterMembers (CLI <-> library parity, finding 1) ---
+
+test("filterMembers: exact Land match and party substring, case- and NFC-insensitive, trimmed", () => {
+  const members: Member[] = [
+    { name: "A", state: "Bayern", party: "CSU" },
+    { name: "B", state: "BAYERN", party: "CSU" },
+    { name: "C", state: "Baden-Württemberg".normalize("NFD"), party: "BÜNDNIS 90/DIE GRÜNEN" },
+    { name: "D", party: "SPD" },
+    { name: "E", state: "Hessen" },
+  ];
+  const names = (rows: Member[]) => rows.map((m) => m.name);
+  assert.deepEqual(names(filterMembers(members, {})), ["A", "B", "C", "D", "E"]);
+  assert.deepEqual(names(filterMembers(members, { state: " bayern " })), ["A", "B"]);
+  assert.deepEqual(names(filterMembers(members, { state: "Bay" })), []); // exact, not a substring
+  assert.deepEqual(names(filterMembers(members, { state: "Baden-Württemberg" })), ["C"]);
+  assert.deepEqual(names(filterMembers(members, { party: "grüne" })), ["C"]);
+  assert.deepEqual(names(filterMembers(members, { state: "Bayern", party: "cs" })), ["A", "B"]);
+  // A member without the field never matches (no crash on a missing value).
+  assert.deepEqual(names(filterMembers(members, { party: "s" })), ["A", "B", "C", "D"]);
+});
+
+test("filterMembers rejects a blank or non-string filter value with BundesratValidationError", () => {
+  for (const filter of [{ state: "" }, { state: "  " }, { party: "\t" }, { state: 1 }, { party: null }, "Bayern", ["Bayern"]]) {
+    assert.throws(
+      () => filterMembers([], filter as unknown as MemberFilter),
+      (err: unknown) => err instanceof BundesratValidationError && /^Invalid (state|party|filter): /.test(err.message),
+      JSON.stringify(filter),
+    );
+  }
+});
+
+test("members(filter) rejects a blank filter before any request (a rejection, not a throw)", async () => {
+  const mt = makeMockTransport(() => xmlResponse(fx.membersXml));
+  const c = new BundesratClient({ transport: mt.transport });
+  const pending = c.members({ state: " " });
+  await assert.rejects(pending, BundesratValidationError);
+  assert.equal(mt.calls.length, 0);
 });

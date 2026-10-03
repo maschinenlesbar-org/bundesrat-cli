@@ -1,7 +1,7 @@
 // The Bundesrat command group. Each command fetches one public feed and prints
 // its parsed JSON, projected to the openly-licensed factual fields (see
-// DATA_LICENSE.md). `members` additionally filters client-side by --state /
-// --party (the feed itself returns the full list).
+// DATA_LICENSE.md). `members` passes --state / --party to the library's
+// members(filter), which filters the full list the feed returns.
 //
 // Only the feeds that return open data are exposed: `session` (agenda TOPs +
 // Drucksachen), `members` (names, party, Land), and `appointments` (Termine dates).
@@ -10,13 +10,8 @@
 
 import type { Command } from "commander";
 import type { CliDeps } from "../io.js";
-import type { Member } from "../../client/types.js";
+import type { MemberFilter } from "../../client/client.js";
 import { action, once, parseNonEmpty, renderJson } from "../shared.js";
-
-/** Case- and normalisation-insensitive form of a filter value or field. */
-function fold(text: string): string {
-  return text.normalize("NFC").toLowerCase();
-}
 
 /** Register a trivial "fetch a feed and render it" command. */
 function feedCommand(
@@ -51,24 +46,10 @@ export function registerCommands(program: Command, deps: CliDeps): void {
     .option("--party <name>", "only members whose party contains this text, case-insensitive", once(parseNonEmpty))
     .action(
       action(deps, async ({ client, global, opts }) => {
-        let members = await client.members();
-        const state = opts["state"] as string | undefined;
-        const party = opts["party"] as string | undefined;
-        // Filter client-side (the feed returns everyone). Guard the field types so a
-        // filter never silently matches nothing due to a non-string field. Both sides
-        // are NFC-normalised, so a decomposed umlaut (macOS file names, some input
-        // methods) matches the feed's composed one.
-        if (state !== undefined) {
-          const needle = fold(state.trim());
-          members = members.filter((m: Member) => typeof m.state === "string" && fold(m.state) === needle);
-        }
-        if (party !== undefined) {
-          const needle = fold(party.trim());
-          members = members.filter(
-            (m: Member) => typeof m.party === "string" && fold(m.party).includes(needle),
-          );
-        }
-        renderJson(deps, global, members);
+        const filter: MemberFilter = {};
+        if (opts["state"] !== undefined) filter.state = opts["state"] as string;
+        if (opts["party"] !== undefined) filter.party = opts["party"] as string;
+        renderJson(deps, global, await client.members(filter));
       }),
     );
 }

@@ -105,5 +105,8 @@ urheberrechtlich geschützt. Siehe [DATA_LICENSE.md](DATA_LICENSE.md).
 **`--state` vs. `--party`.** `--state` passt **exakt** auf ein Land (ohne Beachtung der
 Groß-/Kleinschreibung); `--party` passt auf eine **Teilzeichenkette** des Parteinamens
 (ebenfalls ohne Beachtung der Groß-/Kleinschreibung), sodass `grüne`
-„BÜNDNIS 90/DIE GRÜNEN“ findet. Beide werden clientseitig angewendet, nachdem die
-vollständige Mitgliederliste abgerufen wurde.
+„BÜNDNIS 90/DIE GRÜNEN“ findet. Beide ignorieren umgebende Leerzeichen und die
+Unicode-Form (ein zerlegter Umlaut passt auch), und ein leerer Wert ist ein Bedienfehler.
+Angewendet werden sie von der Bibliothek, nachdem die vollständige Mitgliederliste
+abgerufen wurde: `members({ state, party })`, oder `filterMembers(liste, { state, party })`
+auf einer bereits abgerufenen Liste.

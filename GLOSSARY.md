@@ -100,5 +100,7 @@ failure · `1` other (incl. a non-XML/HTML-shell response). See
 
 **`--state` vs `--party`.** `--state` matches a Land **exactly** (case-insensitive);
 `--party` matches a **substring** of the party name (case-insensitive), so `grüne`
-finds "BÜNDNIS 90/DIE GRÜNEN". Both are applied client-side after fetching the full
-members list.
+finds "BÜNDNIS 90/DIE GRÜNEN". Both ignore surrounding whitespace and Unicode form
+(a decomposed umlaut matches), and a blank value is a usage error. The library applies
+them, after fetching the full members list: `members({ state, party })`, or
+`filterMembers(list, { state, party })` on a list already fetched.

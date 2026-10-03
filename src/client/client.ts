@@ -14,11 +14,13 @@
 //   const c = new BundesratClient();
 //   await c.session();       // the current plenary sitting's agenda (TOPs + Drucksachen)
 //   await c.members();       // the members of the Bundesrat (names, party, Land)
+//   await c.members({ state: "Bayern", party: "csu" });  // filtered by Land / party
 //   await c.appointments();  // committee appointments / dates (Termine)
 
 import { RequestEngine, type EngineOptions } from "./engine.js";
 import type { XmlObject, XmlValue } from "./xml.js";
 import { BundesratParseError } from "./errors.js";
+import { assertValid, nonBlankProblem } from "./validate.js";
 import type { AgendaItem, Appointment, Member, Session } from "./types.js";
 
 /** The feed paths (relative to the base URL). All are GET + `?view=renderXml`. */
@@ -126,6 +128,57 @@ function shapeError(path: string, expected: string): BundesratParseError {
   return new BundesratParseError(`Unexpected response shape from ${path}: expected ${expected}.`);
 }
 
+/**
+ * Narrow the members list. The feed always returns everyone, so the filter is
+ * applied after the fetch (see {@link filterMembers}).
+ */
+export interface MemberFilter {
+  /** Only members of this Land: an exact match, ignoring case, Unicode form and surrounding whitespace. */
+  state?: string;
+  /** Only members whose party contains this text, ignoring case, Unicode form and surrounding whitespace. */
+  party?: string;
+}
+
+/** Case- and normalisation-insensitive form of a filter value or a field. */
+function fold(text: string): string {
+  return text.normalize("NFC").toLowerCase();
+}
+
+/**
+ * Check a {@link MemberFilter}: each given value must be a non-blank string, or
+ * a {@link BundesratValidationError} is thrown. `undefined` means "not given".
+ */
+function assertMemberFilter(filter: MemberFilter | null | undefined): MemberFilter {
+  const f = assertValid("filter", filter ?? {}, (v) =>
+    typeof v === "object" && !Array.isArray(v) ? undefined : "Expected an object with state and/or party.",
+  );
+  if (f.state !== undefined) assertValid("state", f.state, nonBlankProblem);
+  if (f.party !== undefined) assertValid("party", f.party, nonBlankProblem);
+  return f;
+}
+
+/**
+ * Filter members by Land and/or party, the way the `members --state / --party`
+ * command does. `state` matches a Land exactly, `party` matches a substring of the
+ * party name; both trim the needle and compare case-insensitively on the NFC form,
+ * so a decomposed umlaut (macOS file names, some input methods) matches the feed's
+ * composed one. A member without the field never matches. A blank or non-string
+ * value throws a {@link BundesratValidationError}. Pure: the input is not changed.
+ */
+export function filterMembers(members: readonly Member[], filter: MemberFilter): Member[] {
+  const { state, party } = assertMemberFilter(filter);
+  let result = [...members];
+  if (state !== undefined) {
+    const needle = fold(state.trim());
+    result = result.filter((m) => typeof m.state === "string" && fold(m.state) === needle);
+  }
+  if (party !== undefined) {
+    const needle = fold(party.trim());
+    result = result.filter((m) => typeof m.party === "string" && fold(m.party).includes(needle));
+  }
+  return result;
+}
+
 /** Options for the client (engine options only — the feeds need no auth). */
 export type BundesratClientOptions = EngineOptions;
 
@@ -157,10 +210,15 @@ export class BundesratClient {
   /**
    * The members of the Bundesrat (Länder ministers and plenipotentiaries),
    * projected to their factual fields (name, party, Land, membership flags).
+   * The optional `filter` narrows the list by Land and/or party (see
+   * {@link filterMembers}); a blank filter value rejects with a
+   * BundesratValidationError before any request.
    */
-  async members(): Promise<Member[]> {
+  async members(filter: MemberFilter = {}): Promise<Member[]> {
+    const checked = assertMemberFilter(filter);
     const list = await this.list(FEEDS.members);
-    return asArray<XmlValue>(list["employee"]).map((e) => pick<Member>(e, MEMBER_FIELDS));
+    const all = asArray<XmlValue>(list["employee"]).map((e) => pick<Member>(e, MEMBER_FIELDS));
+    return filterMembers(all, checked);
   }
 
   /**

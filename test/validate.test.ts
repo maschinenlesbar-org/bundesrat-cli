@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assertValid, type Problem } from "../src/client/validate.js";
+import { assertValid, nonBlankProblem, type Problem } from "../src/client/validate.js";
 import * as lib from "../src/index.js";
 import { BundesratError, BundesratValidationError } from "../src/client/errors.js";
 import { BundesratClient } from "../src/client/client.js";
@@ -56,4 +56,13 @@ test("parity() runs one input through the CLI and the library on one recording t
   assert.equal(l.requests.length, 1);
   assert.equal(cli.requests[0]!.url, l.requests[0]!.url);
   assert.deepEqual(JSON.parse(cli.out), l.ok ? l.value : undefined);
+});
+
+test("nonBlankProblem: blank and non-string values have a reason, others none", () => {
+  assert.equal(nonBlankProblem("Bayern"), undefined);
+  assert.equal(nonBlankProblem(" x "), undefined);
+  assert.equal(nonBlankProblem(""), "Expected a non-empty value.");
+  assert.equal(nonBlankProblem(" \t\n"), "Expected a non-empty value.");
+  assert.equal(nonBlankProblem(5), "Expected a string.");
+  assert.equal(nonBlankProblem(null), "Expected a string.");
 });

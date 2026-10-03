@@ -7,6 +7,7 @@ import type { CliDeps } from "./io.js";
 import type { BundesratClientOptions } from "../client/client.js";
 import { BundesratError } from "../client/errors.js";
 import { isBidiControl } from "../client/engine.js";
+import { nonBlankProblem } from "../client/validate.js";
 
 /**
  * commander value-parser: a plain base-10 non-negative integer.
@@ -36,11 +37,10 @@ export function parseBoundedInt(min: number, max: number): (value: string) => nu
   };
 }
 
-/** commander value-parser: a non-empty (after trimming) string. */
+/** commander value-parser: a non-empty (after trimming) string — the library's nonBlankProblem. */
 export function parseNonEmpty(value: string): string {
-  if (value.trim() === "") {
-    throw new InvalidArgumentError("Expected a non-empty value.");
-  }
+  const problem = nonBlankProblem(value);
+  if (problem !== undefined) throw new InvalidArgumentError(problem);
   return value;
 }
 

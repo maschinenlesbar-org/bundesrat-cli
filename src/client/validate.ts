@@ -25,3 +25,14 @@ export function assertValid<T>(name: string, value: T, problem: Problem<T>): T {
   if (reason !== undefined) throw new BundesratValidationError(`Invalid ${name}: ${reason}`);
   return value;
 }
+
+/**
+ * A free-text or filter value must be a string with something besides whitespace
+ * in it. The feeds and the CLI treat a blank value as "no filter", so a blank one
+ * is rejected rather than silently matching everyone (or no one).
+ */
+export const nonBlankProblem: Problem<unknown> = (value) => {
+  if (typeof value !== "string") return "Expected a string.";
+  if (value.trim() === "") return "Expected a non-empty value.";
+  return undefined;
+};

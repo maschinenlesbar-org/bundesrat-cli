@@ -90,3 +90,22 @@ export const nestedXml = `<?xml version="1.0"?>
 /** The website's HTML shell, returned when ?view=renderXml is lost. */
 export const htmlShell = `<!doctype html>
 <html lang="de"><head><title>Bundesrat</title></head><body>nope</body></html>`;
+
+/**
+ * Seven members whose Land and party spellings differ in case and Unicode form
+ * (the parity report's fixture): Upper's Land is upper case, Decomp's
+ * "Baden-Württemberg" is decomposed (NFD), NoState and NoParty lack a field.
+ */
+const nfdBw = "Baden-Württemberg".normalize("NFD");
+export const membersParityXml = `<?xml version="1.0"?>
+<iOS version="1.0">
+  <list>
+    <employee><name>Söder</name><party>CSU</party><state>Bayern</state></employee>
+    <employee><name>Upper</name><party>CSU</party><state>BAYERN</state></employee>
+    <employee><name>Kretschmann</name><party>BÜNDNIS 90/DIE GRÜNEN</party><state>Baden-Württemberg</state></employee>
+    <employee><name>Decomp</name><party>CDU</party><state>${nfdBw}</state></employee>
+    <employee><name>Rhein</name><party>CDU</party><state>Hessen</state></employee>
+    <employee><name>NoState</name><party>SPD</party></employee>
+    <employee><name>NoParty</name><state>Hessen</state></employee>
+  </list>
+</iOS>`;

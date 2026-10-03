@@ -63,7 +63,7 @@ bundesrat --help
 ## Library usage
 
 ```ts
-import { BundesratClient, BundesratParseError } from "@maschinenlesbar.org/bundesrat-cli";
+import { BundesratClient, BundesratParseError, filterMembers } from "@maschinenlesbar.org/bundesrat-cli";
 
 const client = new BundesratClient();
 
@@ -72,7 +72,8 @@ console.log(session.title, session.tops.length);
 for (const top of session.tops) console.log(top.toptitle, top.topdrucksache);
 
 const members = await client.members();      // Member[] (name, party, Land, flags)
-const bavaria = members.filter((m) => m.state === "Bayern");
+const bavaria = await client.members({ state: "Bayern" });  // same filter as --state
+const greens = filterMembers(members, { party: "grüne" });   // on a list already fetched
 
 try {
   await client.appointments();               // Appointment[] (title, dates)
@@ -123,8 +124,15 @@ string. Attributes on a text element are ignored and its text is kept.
 | Method | Feed | Returns |
 |---|---|---|
 | `session()` | current plenary sitting | `{ title?, header?, tops: AgendaItem[] }` |
-| `members()` | members | `Member[]` (name, party, Land, status flags, url) |
+| `members(filter?)` | members | `Member[]` (name, party, Land, status flags, url) |
 | `appointments()` | Termine | `Appointment[]` (title, dates, url) |
+
+`members({ state, party })` filters the full list the feed returns, exactly as the
+CLI's `--state` / `--party` do: `state` matches a Land exactly, `party` a substring of
+the party name, both trimmed and compared case-insensitively on the NFC form, and a
+member without the field never matches. A blank or non-string value rejects with
+`BundesratValidationError` before any request. The same rule is exported as the pure
+`filterMembers(list, filter)`.
 
 The wholly-editorial feeds (news, BundesratKOMPAKT, Stimmverteilung, Präsidium,
 next-sittings) are intentionally **not** methods — their payload is
