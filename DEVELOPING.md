@@ -170,7 +170,10 @@ in `client.ts`); copyright editorial/image fields are dropped. The whitelist vou
 for a field's **plain text** only: a whitelisted element that holds markup
 (`<topheader><p>…</p></topheader>`) or is repeated is dropped too, so inline
 editorial HTML never passes as a nested object and every surfaced field is a
-string. Attributes on a text element are ignored and its text is kept.
+string. The one exception is `topdrucksache` (`REPEATABLE_FIELDS`): a TOP that covers
+several Drucksachen repeats it, and each occurrence is a reference of its own, so their
+plain texts are joined with `REPEAT_SEPARATOR` (`"; "`) — dropping them made the TOP
+look like a procedural item. Attributes on a text element are ignored and its text is kept.
 
 > **Maintenance:** the whitelists are fixed, so a *new* field the feed later serves is
 > dropped silently — including a factual one. Revisit the lists in `client.ts` when the

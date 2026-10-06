@@ -42,7 +42,9 @@ bundesrat session
 
 Every field is a plain string. Empty fields are dropped (and so is a field whose
 value isn't plain text, e.g. inline markup), so `linkedtop` appears only when a TOP has a
-cross-reference, and a TOP without a Drucksache has no `topdrucksache` key. The
+cross-reference, and a TOP without a Drucksache has no `topdrucksache` key. A TOP that
+covers several Drucksachen lists them all, joined with `"; "` ("Drucksache 343/26;
+Drucksache 344/26"); the recipe below splits them. The
 feed lists the TOPs **out of order** (e.g. TOP 31, TOP 24, TOP 81), so sort them
 by number and letter suffix before printing an agenda.
 
@@ -55,7 +57,7 @@ bundesrat session \
 bundesrat session | jq '.tops | length'
 
 # Every Drucksache on the agenda
-bundesrat session | jq -r '.tops[].topdrucksache | select(.)'
+bundesrat session | jq -r '.tops[].topdrucksache | select(.) | split("; ")[]'
 ```
 
 > The agenda item's HTML description (`topdetail`) is copyright-protected editorial

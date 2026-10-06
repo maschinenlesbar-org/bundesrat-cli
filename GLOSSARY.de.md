@@ -42,6 +42,9 @@ ist redaktioneller Inhalt und wird nicht ausgegeben.
 
 **Drucksache (`topdrucksache`).** Ein nummeriertes Dokument, z. B. „Drucksache 371/26“ –
 das Dokument, um das es in einem TOP geht (ein Gesetz, eine Verordnung, ein Antrag …).
+Ein TOP zu mehreren Drucksachen nennt sie alle in einer Zeichenkette, getrennt durch „; “
+(„Drucksache 343/26; Drucksache 344/26“); ein TOP ohne Drucksache (ein Verfahrenspunkt)
+hat kein `topdrucksache`.
 Drucksachen des Bundesrates sind *amtliche Werke* und damit gemeinfrei; mit den Nummern
 können Sie das vollständige Dokument auf bundesrat.de oder im DIP nachschlagen.
 

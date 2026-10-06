@@ -54,6 +54,15 @@ const MEMBER_FIELDS = [
   "url",
 ] as const;
 const TOP_FIELDS = ["toptitle", "topdrucksache", "topheader", "linkedtop"] as const;
+/**
+ * Whitelisted fields that may repeat: every occurrence is a reference of its own (a TOP
+ * that covers two Drucksachen lists two `<topdrucksache>`s), so the plain texts are joined
+ * with {@link REPEAT_SEPARATOR} instead of dropping the field. Any other repeated field is
+ * still dropped (see {@link textOf}).
+ */
+const REPEATABLE_FIELDS: ReadonlySet<string> = new Set(["topdrucksache"]);
+/** Joins the occurrences of a {@link REPEATABLE_FIELDS} field: "Drucksache 343/26; Drucksache 344/26". */
+export const REPEAT_SEPARATOR = "; ";
 const APPOINTMENT_FIELDS = [
   "type",
   "id",
@@ -80,7 +89,8 @@ export function asArray<T>(value: XmlValue | undefined): T[] {
  * The plain text of a whitelisted field, or `undefined` when it is not a single
  * plain-text value. Text with attributes (`<name lang="de">Solo</name>`) gives its
  * text. An element holding markup (`<topheader><p>…</p></topheader>`) or repeated
- * (`<party>A</party><party>B</party>`) gives `undefined`: the allowlist vouches for
+ * (`<party>A</party><party>B</party>`; `topdrucksache` is joined instead, see
+ * {@link REPEATABLE_FIELDS}) gives `undefined`: the allowlist vouches for
  * a field's plain text only, so inline editorial HTML must not pass through as a
  * nested object, and every surfaced field stays the `string` the types promise.
  *
@@ -113,10 +123,27 @@ function pick<T>(obj: XmlValue, keys: readonly string[]): T {
   const src = isObject(obj) ? obj : {};
   const out: Record<string, string> = {};
   for (const key of keys) {
-    const text = textOf(src[key]);
+    const value = src[key];
+    const text = Array.isArray(value) && REPEATABLE_FIELDS.has(key) ? joinedTextOf(value) : textOf(value);
     if (text !== undefined && text !== "") out[key] = text;
   }
   return out as unknown as T;
+}
+
+/**
+ * The occurrences of a repeatable field, joined with {@link REPEAT_SEPARATOR}: each must
+ * be plain text (see {@link textOf}), or the whole field is dropped, as one with markup
+ * is; empty occurrences are skipped. A TOP with two `<topdrucksache>`s used to come out
+ * with none, which the docs explain as "a procedural item".
+ */
+function joinedTextOf(values: readonly XmlValue[]): string | undefined {
+  const texts: string[] = [];
+  for (const value of values) {
+    const text = textOf(value);
+    if (text === undefined) return undefined;
+    if (text !== "") texts.push(text);
+  }
+  return texts.join(REPEAT_SEPARATOR);
 }
 
 /** A non-null, non-array object (a parsed element with children or attributes). */

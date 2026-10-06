@@ -40,7 +40,9 @@ numerical order. The feed's HTML description (`topdetail`) is editorial content 
 is not surfaced.
 
 **Drucksache (`topdrucksache`).** A numbered printed paper, e.g. "Drucksache
-371/26" — the document a TOP is about (a bill, regulation, motion, …). Bundesrat
+371/26" — the document a TOP is about (a bill, regulation, motion, …). A TOP about
+several lists them all in one string, joined with "; " ("Drucksache 343/26; Drucksache
+344/26"); a TOP without one (a procedural item) has no `topdrucksache`. Bundesrat
 Drucksachen are *amtliche Werke* (public-domain official works); the numbers let
 you look the full document up on bundesrat.de or in DIP.
 

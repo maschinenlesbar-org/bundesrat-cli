@@ -46,7 +46,7 @@ bundesrat session \
 bundesrat session | jq '{title, header, items: (.tops | length)}'
 
 # Every Drucksache the sitting will deal with
-bundesrat session | jq -r '.tops[].topdrucksache | select(.)'
+bundesrat session | jq -r '.tops[].topdrucksache | select(.) | split("; ")[]'
 
 # Upcoming committee dates, sorted, start as YYYY-MM-DD HH:MM
 bundesrat appointments \
@@ -59,7 +59,9 @@ bundesrat appointments \
   `topdrucksache` ("Drucksache 371/26") and `topheader` (short factual label).
   `linkedtop` (a cross-reference) appears only when set — on 2026-09-15 none of the
   95 TOPs had one. `topdrucksache` may be **missing** on a procedural item — use
-  `// "—"` or `select(.)`.
+  `// "—"` or `select(.)`. A TOP that covers **several** Drucksachen lists them all in
+  that one string, joined with `"; "` ("Drucksache 343/26; Drucksache 344/26") — split
+  on `"; "` to count or cite them one by one.
 - **TOPs come out of order.** The feed lists them as e.g. TOP 31, TOP 24, TOP 81,
   TOP 40. Sort by the number and letter suffix (recipe above) before presenting the
   agenda; a plain string sort puts "TOP 10" before "TOP 2".

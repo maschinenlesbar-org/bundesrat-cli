@@ -1,6 +1,6 @@
 // Public entry point for the API client library.
 
-export { BundesratClient, FEEDS, asArray, filterMembers } from "./client.js";
+export { BundesratClient, FEEDS, REPEAT_SEPARATOR, asArray, filterMembers } from "./client.js";
 export type { BundesratClientOptions, MemberFilter } from "./client.js";
 export {
   RequestEngine,

@@ -95,7 +95,7 @@ Every command prints **JSON to stdout**; diagnostics go to stderr, so piping int
 bundesrat session | jq '.tops | length'
 
 # Drucksachen on the agenda
-bundesrat session | jq -r '.tops[].topdrucksache | select(.)'
+bundesrat session | jq -r '.tops[].topdrucksache | select(.) | split("; ")[]'
 
 # Members grouped by party (mitglied marks the 69 members; the rest are deputies and plenipotentiaries)
 bundesrat members | jq -r '[.[] | select(.mitglied == "true")] | group_by(.party)[] | "\(.[0].party // "no party given"): \(length)"'

@@ -46,7 +46,11 @@ export interface Member {
 export interface AgendaItem {
   /** e.g. "TOP 67". */
   toptitle?: string;
-  /** The associated Drucksache, e.g. "Drucksache 371/26" (an *amtliches Werk*). */
+  /**
+   * The associated Drucksache, e.g. "Drucksache 371/26" (an *amtliches Werk*). A TOP
+   * that covers several lists them all, joined with "; " ("Drucksache 343/26; Drucksache
+   * 344/26"). Absent when the TOP has none (a procedural item).
+   */
   topdrucksache?: string;
   /** Short factual label of the item. */
   topheader?: string;

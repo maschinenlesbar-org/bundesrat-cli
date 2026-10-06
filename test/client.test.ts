@@ -182,6 +182,31 @@ test("inline (non-CDATA) editorial HTML in topheader does not pass the allowlist
   assert.deepEqual(JSON.parse(JSON.stringify(s)), { tops: [{ toptitle: "TOP 1" }] });
 });
 
+test("a TOP with several Drucksachen lists them all, joined with '; ' (2026-10-05 result 03, bug 2)", async () => {
+  const session =
+    "<iOS><list><title>1070. Sitzung</title>" +
+    "<top>\n  <toptitle>TOP 12</toptitle>\n  <topdrucksache>Drucksache 343/26</topdrucksache>\n" +
+    "  <topdrucksache>Drucksache 344/26</topdrucksache>\n  <topheader>Entschließung</topheader>\n" +
+    "  <linkedtop></linkedtop>\n  <topdetail><![CDATA[<div>x</div>]]></topdetail>\n</top>" +
+    "<top><toptitle>TOP 13</toptitle><topdrucksache>Drucksache 1/26</topdrucksache><topdrucksache/></top>" +
+    "<top><toptitle>TOP 14</toptitle><topdrucksache>Drucksache 2/26</topdrucksache><topdrucksache><b>3</b></topdrucksache></top>" +
+    "<top><toptitle>TOP 15</toptitle><topheader>A</topheader><topheader>B</topheader></top>" +
+    "</list></iOS>";
+  const mt = makeMockTransport(() => xmlResponse(session));
+  const s = await new BundesratClient({ transport: mt.transport }).session();
+  assert.deepEqual(JSON.parse(JSON.stringify(s)), {
+    title: "1070. Sitzung",
+    tops: [
+      { toptitle: "TOP 12", topdrucksache: "Drucksache 343/26; Drucksache 344/26", topheader: "Entschließung" },
+      { toptitle: "TOP 13", topdrucksache: "Drucksache 1/26" },
+      // One occurrence holds markup: the field is dropped, as a single one with markup is.
+      { toptitle: "TOP 14" },
+      // Other repeated fields are still dropped.
+      { toptitle: "TOP 15" },
+    ],
+  });
+});
+
 test("session title/header follow the same plain-text rule as TOP fields (finding 6)", async () => {
   for (const [body, expected] of [
     ["<iOS><list><title>A</title><title>B</title><header>H</header></list></iOS>", { header: "H", tops: [] }],
