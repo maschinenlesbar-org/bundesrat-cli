@@ -24,7 +24,7 @@ can pipe straight into [`jq`](https://jqlang.github.io/jq/).
   to write to disk.
 
 > Want to use this as a TypeScript library, or curious how it parses the XML feeds
-> with zero dependencies? See **[DEVELOPING.md](DEVELOPING.md)**.
+> with zero dependencies? See **[DEVELOPING.md](https://github.com/maschinenlesbar-org/bundesrat-cli/blob/main/DEVELOPING.md)**.
 
 ## Install
 
@@ -64,7 +64,7 @@ bundesrat appointments | jq -r '.[] | "\(.startdate // "")\t\(.title)"'
 | `members` | Members of the Bundesrat (`--state <Land>`, `--party <text>`) |
 | `appointments` | Committee appointments and dates (Termine) |
 
-New to terms like *TOP*, *Drucksache* or *Land*? The **[Glossary](GLOSSARY.md)**
+New to terms like *TOP*, *Drucksache* or *Land*? The **[Glossary](https://github.com/maschinenlesbar-org/bundesrat-cli/blob/main/GLOSSARY.md)**
 decodes every one.
 
 > **Why only three commands?** The Bundesrat feeds also carry news/press items, the
@@ -158,10 +158,10 @@ are unchanged.
 
 ## Learn more
 
-- **[SKILLS.md](SKILLS.md)** — Claude Code Agent Skills that drive this CLI.
-- **[Usage.md](Usage.md)** — full use-case-driven cookbook.
-- **[GLOSSARY.md](GLOSSARY.md)** — every domain term explained.
-- **[DEVELOPING.md](DEVELOPING.md)** — TypeScript library usage, the XML parser, architecture, testing, CI.
+- **[SKILLS.md](https://github.com/maschinenlesbar-org/bundesrat-cli/blob/main/SKILLS.md)** — Claude Code Agent Skills that drive this CLI.
+- **[Usage.md](https://github.com/maschinenlesbar-org/bundesrat-cli/blob/main/Usage.md)** — full use-case-driven cookbook.
+- **[GLOSSARY.md](https://github.com/maschinenlesbar-org/bundesrat-cli/blob/main/GLOSSARY.md)** — every domain term explained.
+- **[DEVELOPING.md](https://github.com/maschinenlesbar-org/bundesrat-cli/blob/main/DEVELOPING.md)** — TypeScript library usage, the XML parser, architecture, testing, CI.
 
 ## Data license
 

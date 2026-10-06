@@ -337,7 +337,9 @@ npm test          # builds, then runs `node --test` over dist/test
   (retry backoff and `Retry-After`), P7 (closed pipes and exit codes, on the built bin),
   P8 + P9 + P13 (declared charset, feed shape, wrong-typed input), P10 (strict filter
   keys and Länder), P12 (`-o -`), P20 (the stderr warning for a plain-`http:` base URL;
-  the env-variable and other-secret cases are skipped: no environment variable, no key).
+  the env-variable and other-secret cases are skipped: no environment variable, no key),
+  P21 (the README's relative links: README.md ships to npmjs.com, so a link to a document
+  the `files` allowlist leaves out must be an absolute GitHub URL).
 
 ## Continuous integration
 
