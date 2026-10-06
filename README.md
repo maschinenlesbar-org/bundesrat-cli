@@ -149,6 +149,13 @@ Given **before or after** the command, e.g. `bundesrat --compact session`:
 | `--max-retries <n>` | Retries for transient `429`/`503` responses and reset connections (0..10, default `2`). Each waits 200 ms × attempt, or a `429`/`503`'s `Retry-After` (seconds or HTTP-date) when that is longer; a `Retry-After` above 30 s is not retried, and the error names the requested wait |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
+A base URL on plain `http:` to a host other than loopback (`localhost`, `127.0.0.0/8`,
+`::1`) works, but the CLI writes one line to stderr before the first request, e.g.
+`warning: requests to mirror.example are sent unencrypted (http:, not https:)`, or
+`warning: the base URL's credentials are sent unencrypted to mirror.example (http:, not https:)`
+when it carries a `user:password@` (never printed). stdout, `-o` files and the exit code
+are unchanged.
+
 ## Learn more
 
 - **[SKILLS.md](SKILLS.md)** — Claude Code Agent Skills that drive this CLI.

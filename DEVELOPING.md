@@ -145,6 +145,15 @@ of the value part of `--opt=value`) and redacts every line printed on stdout and
 command '…'`, `too many arguments … got 1: …`). `test/conformance-p1-cli-redaction.test.ts`
 checks ten passwords in seven URL shapes at nine argv positions.
 
+A plain-`http:` base URL gets a warning, not a refusal. `cleartextProblem(baseUrl,
+secrets)` (engine, exported) returns one sentence naming the host (`url.host`, never the
+userinfo) and what travels unencrypted — the base URL's credentials when it carries
+userinfo — or `undefined` for `https:`, an unparseable URL and loopback hosts
+(`localhost`, `127.0.0.0/8`, `::1`). The CLI's `action()` wrapper (`shared.ts`,
+`warnOnCleartext`) prints it once per run as `warning: <sentence>` on stderr, after the
+options are parsed and before the first request; `--help`, `--version` and usage errors
+never get there. `test/conformance-p20-cleartext-warning.test.ts` checks it.
+
 The library keeps them out of what a caller logs, too. The engine holds the base URL in
 a real `#private` field (so `console.log(client)`, `util.inspect` and `JSON.stringify`
 never show it) next to its userinfo, raw and percent-decoded, and scrubs that from
@@ -327,7 +336,8 @@ npm test          # builds, then runs `node --test` over dist/test
   (`timeoutMs`, `maxResponseBytes`, headers, bodies and errors for any transport), P6
   (retry backoff and `Retry-After`), P7 (closed pipes and exit codes, on the built bin),
   P8 + P9 + P13 (declared charset, feed shape, wrong-typed input), P10 (strict filter
-  keys and Länder), P12 (`-o -`).
+  keys and Länder), P12 (`-o -`), P20 (the stderr warning for a plain-`http:` base URL;
+  the env-variable and other-secret cases are skipped: no environment variable, no key).
 
 ## Continuous integration
 
