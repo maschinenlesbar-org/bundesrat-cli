@@ -34,6 +34,8 @@ export {
   BundesratValidationError,
   BundesratParseError,
   redactUrl,
+  credentialsIn,
+  redactCredentials,
 } from "./errors.js";
 
 export * from "./types.js";
