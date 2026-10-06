@@ -5,6 +5,7 @@
 // carry the `?view=renderXml` render parameter to return XML rather than the
 // website's HTML shell.
 
+import { TextDecoder } from "node:util";
 import {
   MAX_TIMEOUT_MS,
   nodeHttpTransport,

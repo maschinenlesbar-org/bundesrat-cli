@@ -32,7 +32,7 @@ can pipe straight into [`jq`](https://jqlang.github.io/jq/).
 npm i -g @maschinenlesbar.org/bundesrat-cli
 ```
 
-This installs the **`bundesrat`** command. Requires **Node.js 20+**. No API key.
+This installs the **`bundesrat`** command. Requires **Node.js 22.12+**. No API key.
 
 Check it works:
 
@@ -117,7 +117,7 @@ Use `--compact` for single-line JSON and `-o <file>` to write to a file — both
 ## Troubleshooting
 
 - **`command not found: bundesrat`** — the global npm bin directory isn't on your
-  `PATH`. Run `npm bin -g` to find it and add it, or run via
+  `PATH`. It is `$(npm prefix -g)/bin`; add that to your `PATH`, or run via
   `npx @maschinenlesbar.org/bundesrat-cli …`.
 - **Exit `1` / "received an HTML page"** — the feed returned the website's HTML
   shell instead of XML (it may have moved). The CLI already adds the required
