@@ -62,6 +62,25 @@ test("members --state with no match returns an empty array (not everyone)", asyn
   assert.deepEqual(JSON.parse(cli.out.join("\n")), []);
 });
 
+test("members --state that names no Land is a usage error listing the Länder, before any request", async () => {
+  for (const state of ["Thueringen", "Bay", "Baden Württemberg"]) {
+    const cli = makeCli(() => xmlResponse(fx.membersXml));
+    assert.equal(await run(["members", "--state", state], cli.deps), 2, state);
+    assert.match(cli.err.join("\n"), /Not a Land; expected one of Baden-Württemberg, Bayern, .*Thüringen\./);
+    assert.equal(cli.mt.calls.length, 0);
+  }
+});
+
+test("members --party that matches nothing prints [] and a note on stderr naming the filter", async () => {
+  const cli = makeCli(() => xmlResponse(fx.membersXml));
+  assert.equal(await run(["members", "--party", "Piraten"], cli.deps), 0);
+  assert.deepEqual(JSON.parse(cli.out.join("\n")), []);
+  assert.match(cli.err.join("\n"), /^Note: no member has a party containing "Piraten"/);
+  const quiet = makeCli(() => xmlResponse(fx.membersXml));
+  await run(["members", "--state", "Hamburg"], quiet.deps);
+  assert.deepEqual(quiet.err, []);
+});
+
 test("appointments works and returns projected calendar items (no editorial body)", async () => {
   const cli = makeCli(() => xmlResponse(fx.appointmentsXml));
   const code = await run(["appointments"], cli.deps);

@@ -183,11 +183,19 @@ string. Attributes on a text element are ignored and its text is kept.
 | `appointments()` | Termine | `Appointment[]` (title, dates, url) |
 
 `members({ state, party })` filters the full list the feed returns, exactly as the
-CLI's `--state` / `--party` do: `state` matches a Land exactly, `party` a substring of
-the party name, both trimmed and compared case-insensitively on the NFC form, and a
-member without the field never matches. A blank or non-string value rejects with
-`BundesratValidationError` before any request. The same rule is exported as the pure
-`filterMembers(list, filter)`.
+CLI's `--state` / `--party` do: `state` names one of the sixteen Länder (`LAENDER`,
+rule `stateProblem`) and matches it exactly, `party` a substring of the party name,
+both trimmed and compared case-insensitively on the NFC form, and a member without the
+field never matches. A key the filter doesn't have (`State`, `states`, a `__proto__` key
+from `JSON.parse`), a state that is not a Land (`Thueringen`, `Bay`), and a blank or
+non-string value each reject with `BundesratValidationError` before any request
+(`Invalid filter: Unknown key "State"; expected one of state, party.`) — the misspelled
+key used to be ignored and all 193 members came back. So is an unknown client option
+(`timeout` for `timeoutMs`; the known ones are `ENGINE_OPTION_KEYS`). The same rule is
+exported as the pure `filterMembers(list, filter)`. The CLI's `--state` uses the same
+`stateProblem`, and an empty `--party` result gets a note on stderr, since the feed can't
+tell "no such party" from "nobody". `test/conformance-p10-strict-filters.test.ts` checks
+unknown keys, unknown Länder, arrays and NaN, and repeated `--state`/`--party` flags.
 
 The wholly-editorial feeds (news, BundesratKOMPAKT, Stimmverteilung, Präsidium,
 next-sittings) are intentionally **not** methods — their payload is

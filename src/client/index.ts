@@ -5,6 +5,7 @@ export type { BundesratClientOptions, MemberFilter } from "./client.js";
 export {
   RequestEngine,
   DEFAULT_BASE_URL,
+  ENGINE_OPTION_KEYS,
   MAX_RETRIES,
   MAX_RETRY_AFTER_MS,
   assertHeaderValue,
@@ -21,8 +22,13 @@ export {
   baseUrlWhitespaceProblem,
   headerNameProblem,
   headerValueProblem,
+  foldLand,
+  knownKeysProblem,
   nonBlankProblem,
+  stateProblem,
 } from "./validate.js";
+export { LAENDER } from "./enums.js";
+export type { Land } from "./enums.js";
 export type { Problem } from "./validate.js";
 export type { QueryParams, QueryValue } from "./query.js";
 export { parseXml, parseXmlDocument, decodeEntities } from "./xml.js";

@@ -70,7 +70,7 @@ bundesrat session | jq -r '.tops[].topdrucksache | select(.)'
 
 ```bash
 bundesrat members                      # everyone (~190, all Länder)
-bundesrat members --state Bayern       # one Land (case-insensitive, exact match)
+bundesrat members --state Bayern       # one of the 16 Länder (case-insensitive, exact match)
 bundesrat members --party grüne        # party substring, case-insensitive
 bundesrat members --state Hessen --party CDU
 ```
@@ -94,7 +94,9 @@ bundesrat members --state "Nordrhein-Westfalen" \
 bundesrat members | jq -r '[.[] | select(.mitglied == "true")] | group_by(.party)[] | "\(.[0].party // "no party given"): \(length)"'
 ```
 
-Filtering is client-side, so an unmatched filter returns `[]` (not the full list).
+Filtering is client-side, so an unmatched `--party` returns `[]` (not the full list),
+with a note on stderr. A `--state` that is not one of the 16 Länder (`Thueringen`, `Bay`)
+is a usage error (exit `2`) that lists them.
 
 ## `appointments` — committee dates (Termine)
 

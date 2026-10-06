@@ -11,6 +11,7 @@
 //   reject rather than throw synchronously; constructors throw.
 
 import { BundesratValidationError } from "./errors.js";
+import { LAENDER } from "./enums.js";
 
 /** A validation rule: the reason `value` is invalid, or `undefined` when it is valid. */
 export type Problem<T = unknown> = (value: T) => string | undefined;
@@ -25,6 +26,45 @@ export function assertValid<T>(name: string, value: T, problem: Problem<T>): T {
   if (reason !== undefined) throw new BundesratValidationError(`Invalid ${name}: ${reason}`);
   return value;
 }
+
+/**
+ * An options object must be a plain object (or `undefined`, for "none") whose own keys
+ * are all in `known`. A misspelled or unknown key (`State`, `timeout`), or a
+ * `__proto__` key from `JSON.parse`, used to be ignored without a word, so
+ * `members({ State: "Bayern" })` returned all 193 members. Returns a `Problem` naming
+ * the first unknown key (cut, JSON-quoted) and the known ones.
+ */
+export function knownKeysProblem(known: readonly string[]): Problem<unknown> {
+  return (value) => {
+    if (value === undefined) return undefined;
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return "Expected an object.";
+    for (const key of Object.keys(value)) {
+      if (!known.includes(key)) {
+        return `Unknown key ${JSON.stringify(key.slice(0, 60))}; expected one of ${known.join(", ")}.`;
+      }
+    }
+    return undefined;
+  };
+}
+
+/** Case- and normalisation-insensitive form of a Land name: trimmed, NFC, lower case. */
+export function foldLand(text: string): string {
+  return text.trim().normalize("NFC").toLowerCase();
+}
+
+/**
+ * A `state` filter must name one of the sixteen {@link LAENDER}, ignoring case, Unicode
+ * form and surrounding whitespace. Anything else (`Thueringen`, `Bay`, `Baden
+ * Württemberg`) can only match nothing, which used to come back as `[]` with exit 0,
+ * indistinguishable from a Land without members; the reason lists the valid names.
+ */
+export const stateProblem: Problem<unknown> = (value) => {
+  const blank = nonBlankProblem(value);
+  if (blank !== undefined) return blank;
+  const folded = foldLand(value as string);
+  if (LAENDER.some((land) => foldLand(land) === folded)) return undefined;
+  return `Not a Land; expected one of ${LAENDER.join(", ")}.`;
+};
 
 /**
  * A free-text or filter value must be a string with something besides whitespace

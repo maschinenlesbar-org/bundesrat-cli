@@ -102,10 +102,12 @@ urheberrechtlich geschützt. Siehe [DATA_LICENSE.md](DATA_LICENSE.md).
 `1` Sonstiges (inkl. einer Nicht-XML-Antwort bzw. HTML-Hülle). Siehe
 [Usage.md](Usage.md#exit-codes).
 
-**`--state` vs. `--party`.** `--state` passt **exakt** auf ein Land (ohne Beachtung der
-Groß-/Kleinschreibung); `--party` passt auf eine **Teilzeichenkette** des Parteinamens
-(ebenfalls ohne Beachtung der Groß-/Kleinschreibung), sodass `grüne`
-„BÜNDNIS 90/DIE GRÜNEN“ findet. Beide ignorieren umgebende Leerzeichen und die
+**`--state` vs. `--party`.** `--state` nennt eines der **sechzehn Länder** und passt
+**exakt** darauf (ohne Beachtung der Groß-/Kleinschreibung); jeder andere Wert
+(`Thueringen`, `Bay`) ist ein Bedienfehler, der die sechzehn Namen aufzählt. `--party`
+passt auf eine **Teilzeichenkette** des Parteinamens (ebenfalls ohne Beachtung der
+Groß-/Kleinschreibung), sodass `grüne` „BÜNDNIS 90/DIE GRÜNEN“ findet; passt sie auf
+niemanden, kommt `[]` mit einem Hinweis auf stderr. Beide ignorieren umgebende Leerzeichen und die
 Unicode-Form (ein zerlegter Umlaut passt auch), und ein leerer Wert ist ein Bedienfehler.
 Angewendet werden sie von der Bibliothek, nachdem die vollständige Mitgliederliste
 abgerufen wurde: `members({ state, party })`, oder `filterMembers(liste, { state, party })`

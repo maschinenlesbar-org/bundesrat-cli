@@ -50,13 +50,15 @@ voting-member flag. Some plenipotentiaries are members too (4 of the 16 records 
 
 ## Filters
 
-- `--state <Land>` — **exact** Land match, case-insensitive (`Bayern`,
-  `Baden-Württemberg`, `Nordrhein-Westfalen`).
+- `--state <Land>` — one of the **16 Länder**, exact match, case-insensitive
+  (`Bayern`, `Baden-Württemberg`, `Nordrhein-Westfalen`). Any other value
+  (`Thueringen`, `Bay`) exits `2` with the list of the sixteen names — pick the right
+  one from it and run again.
 - `--party <text>` — party name **substring**, case-insensitive (`grüne` matches
   "BÜNDNIS 90/DIE GRÜNEN"; `CDU`, `SPD`, `CSU`, …).
 
-Both apply client-side after fetching the full list, so an unmatched filter returns
-`[]` (not everyone).
+Both apply client-side after fetching the full list, so an unmatched `--party`
+returns `[]` (not everyone), with a note on stderr.
 
 ## Recipes
 
@@ -77,7 +79,9 @@ bundesrat members | jq '[.[] | select(.mitglied == "true")] | length'
 
 ## Traps
 
-- **`--state` is an exact Land match** (not a substring) — use the full Land name.
+- **`--state` is an exact Land match** (not a substring) — use the full Land name with
+  its umlaut (`Thüringen`, `Baden-Württemberg`); a misspelt one is rejected, not
+  answered with `[]`.
   `--party` is a substring, so keep it short (`grüne`, not the full party string).
 - **Status flags are strings** `"true"`/`"false"`, not booleans — compare as
   strings in `jq` (`select(.mitglied == "true")`).

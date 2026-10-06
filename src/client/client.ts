@@ -20,7 +20,7 @@
 import { RequestEngine, type EngineOptions } from "./engine.js";
 import type { XmlObject, XmlValue } from "./xml.js";
 import { BundesratParseError } from "./errors.js";
-import { assertValid, nonBlankProblem } from "./validate.js";
+import { assertValid, knownKeysProblem, nonBlankProblem, stateProblem } from "./validate.js";
 import type { AgendaItem, Appointment, Member, Session } from "./types.js";
 
 /** The feed paths (relative to the base URL). All are GET + `?view=renderXml`. */
@@ -133,7 +133,10 @@ function shapeError(path: string, expected: string): BundesratParseError {
  * applied after the fetch (see {@link filterMembers}).
  */
 export interface MemberFilter {
-  /** Only members of this Land: an exact match, ignoring case, Unicode form and surrounding whitespace. */
+  /**
+   * Only members of this Land: one of the sixteen `LAENDER`, ignoring case, Unicode form
+   * and surrounding whitespace. Any other value is a BundesratValidationError.
+   */
   state?: string;
   /** Only members whose party contains this text, ignoring case, Unicode form and surrounding whitespace. */
   party?: string;
@@ -144,28 +147,38 @@ function fold(text: string): string {
   return text.normalize("NFC").toLowerCase();
 }
 
+/** The keys of a {@link MemberFilter}; any other key is a validation error. */
+const MEMBER_FILTER_KEYS = ["state", "party"] as const;
+
 /**
- * Check a {@link MemberFilter}: each given value must be a non-blank string, or
- * a {@link BundesratValidationError} is thrown. `undefined` means "not given".
+ * Check a {@link MemberFilter}: a plain object with no keys but `state` and `party`
+ * (a misspelled `State` used to be ignored, returning everyone); `state` one of the
+ * sixteen Länder, `party` a non-blank string. Anything else throws a
+ * {@link BundesratValidationError}. `undefined` means "no filter".
  */
-function assertMemberFilter(filter: MemberFilter | null | undefined): MemberFilter {
-  const f = assertValid("filter", filter ?? {}, (v) =>
-    typeof v === "object" && !Array.isArray(v) ? undefined : "Expected an object with state and/or party.",
-  );
-  if (f.state !== undefined) assertValid("state", f.state, nonBlankProblem);
+function assertMemberFilter(filter: MemberFilter | undefined): MemberFilter {
+  if (filter === undefined) return {};
+  const f = assertValid("filter", filter, knownKeysProblem(MEMBER_FILTER_KEYS)) as MemberFilter;
+  if (f.state !== undefined) assertValid("state", f.state, stateProblem);
   if (f.party !== undefined) assertValid("party", f.party, nonBlankProblem);
   return f;
 }
 
 /**
  * Filter members by Land and/or party, the way the `members --state / --party`
- * command does. `state` matches a Land exactly, `party` matches a substring of the
- * party name; both trim the needle and compare case-insensitively on the NFC form,
+ * command does. `state` names one of the sixteen Länder and matches it exactly,
+ * `party` matches a substring of the party name; both trim the needle and compare case-insensitively on the NFC form,
  * so a decomposed umlaut (macOS file names, some input methods) matches the feed's
- * composed one. A member without the field never matches. A blank or non-string
- * value throws a {@link BundesratValidationError}. Pure: the input is not changed.
+ * composed one. A member without the field never matches. An unknown key, a state
+ * that is not a Land, a blank or non-string value, or a `members` that is not an array
+ * throws a {@link BundesratValidationError}. Pure: the input is not changed.
  */
 export function filterMembers(members: readonly Member[], filter: MemberFilter): Member[] {
+  assertValid("members", members, (v) =>
+    Array.isArray(v) && v.every((m) => typeof m === "object" && m !== null && !Array.isArray(m))
+      ? undefined
+      : "Expected an array of member objects.",
+  );
   const { state, party } = assertMemberFilter(filter);
   let result = [...members];
   if (state !== undefined) {
@@ -211,8 +224,8 @@ export class BundesratClient {
    * The members of the Bundesrat (Länder ministers and plenipotentiaries),
    * projected to their factual fields (name, party, Land, membership flags).
    * The optional `filter` narrows the list by Land and/or party (see
-   * {@link filterMembers}); a blank filter value rejects with a
-   * BundesratValidationError before any request.
+   * {@link filterMembers}); an unknown key, a state that is not a Land or a blank
+   * value rejects with a BundesratValidationError before any request.
    */
   async members(filter: MemberFilter = {}): Promise<Member[]> {
     const checked = assertMemberFilter(filter);

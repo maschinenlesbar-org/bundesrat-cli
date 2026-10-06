@@ -238,7 +238,14 @@ test("filterMembers: exact Land match and party substring, case- and NFC-insensi
   const names = (rows: Member[]) => rows.map((m) => m.name);
   assert.deepEqual(names(filterMembers(members, {})), ["A", "B", "C", "D", "E"]);
   assert.deepEqual(names(filterMembers(members, { state: " bayern " })), ["A", "B"]);
-  assert.deepEqual(names(filterMembers(members, { state: "Bay" })), []); // exact, not a substring
+  // Not a Land (a prefix, a transliteration): rejected, not an empty list (P10).
+  for (const state of ["Bay", "Thueringen", "Baden Württemberg"]) {
+    assert.throws(
+      () => filterMembers(members, { state }),
+      (err: unknown) => err instanceof BundesratValidationError && /^Invalid state: Not a Land; expected one of Baden-Württemberg, Bayern, /.test(err.message),
+      state,
+    );
+  }
   assert.deepEqual(names(filterMembers(members, { state: "Baden-Württemberg" })), ["C"]);
   assert.deepEqual(names(filterMembers(members, { party: "grüne" })), ["C"]);
   assert.deepEqual(names(filterMembers(members, { state: "Bayern", party: "cs" })), ["A", "B"]);

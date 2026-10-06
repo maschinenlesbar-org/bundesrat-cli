@@ -7,7 +7,7 @@ import type { CliDeps } from "./io.js";
 import type { BundesratClientOptions } from "../client/client.js";
 import { BundesratError } from "../client/errors.js";
 import { isBidiControl } from "../client/engine.js";
-import { baseUrlProblem, headerValueProblem, nonBlankProblem } from "../client/validate.js";
+import { baseUrlProblem, headerValueProblem, nonBlankProblem, stateProblem } from "../client/validate.js";
 
 /**
  * commander value-parser: a plain base-10 non-negative integer.
@@ -40,6 +40,17 @@ export function parseBoundedInt(min: number, max: number): (value: string) => nu
 /** commander value-parser: a non-empty (after trimming) string — the library's nonBlankProblem. */
 export function parseNonEmpty(value: string): string {
   const problem = nonBlankProblem(value);
+  if (problem !== undefined) throw new InvalidArgumentError(problem);
+  return value;
+}
+
+/**
+ * commander value-parser for `members --state`: one of the sixteen Länder, the library's
+ * {@link stateProblem}. Any other value is a usage error naming the valid ones, instead
+ * of an empty list with exit 0.
+ */
+export function parseState(value: string): string {
+  const problem = stateProblem(value);
   if (problem !== undefined) throw new InvalidArgumentError(problem);
   return value;
 }

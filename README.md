@@ -78,11 +78,11 @@ decodes every one.
 
 | Option | Meaning |
 | --- | --- |
-| `--state <Land>` | Only members of that federal state — case-insensitive, exact Land match (e.g. `Bayern`, `Baden-Württemberg`) |
+| `--state <Land>` | Only members of that federal state — one of the 16 Länder, case-insensitive, exact match (e.g. `Bayern`, `Baden-Württemberg`); any other value is a usage error (exit `2`) that lists them |
 | `--party <text>` | Only members whose party contains this text — case-insensitive substring (e.g. `grüne`, `CDU`) |
 
 Filtering happens client-side (the feed returns everyone), so both filters compose
-and an unmatched filter yields `[]` rather than the full list. Each takes one value;
+and an unmatched `--party` yields `[]` (with a note on stderr) rather than the full list. Each takes one value;
 giving one twice is a usage error (exit `2`) — run the command once per Land instead.
 
 ## Output & scripting

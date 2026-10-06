@@ -98,9 +98,11 @@ may be reused freely if left **unaltered** (§ 62) and **with a source citation*
 failure · `1` other (incl. a non-XML/HTML-shell response). See
 [Usage.md](Usage.md#exit-codes).
 
-**`--state` vs `--party`.** `--state` matches a Land **exactly** (case-insensitive);
-`--party` matches a **substring** of the party name (case-insensitive), so `grüne`
-finds "BÜNDNIS 90/DIE GRÜNEN". Both ignore surrounding whitespace and Unicode form
-(a decomposed umlaut matches), and a blank value is a usage error. The library applies
+**`--state` vs `--party`.** `--state` names one of the **sixteen Länder** and matches
+it **exactly** (case-insensitive); any other value (`Thueringen`, `Bay`) is a usage
+error that lists the sixteen names. `--party` matches a **substring** of the party
+name (case-insensitive), so `grüne` finds "BÜNDNIS 90/DIE GRÜNEN"; one that matches
+nobody gives `[]` and a note on stderr. Both ignore surrounding whitespace and Unicode
+form (a decomposed umlaut matches), and a blank value is a usage error. The library applies
 them, after fetching the full members list: `members({ state, party })`, or
 `filterMembers(list, { state, party })` on a list already fetched.

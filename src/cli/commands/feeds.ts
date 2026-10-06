@@ -11,7 +11,7 @@
 import type { Command } from "commander";
 import type { CliDeps } from "../io.js";
 import type { MemberFilter } from "../../client/client.js";
-import { action, once, parseNonEmpty, renderJson } from "../shared.js";
+import { action, once, parseNonEmpty, parseState, renderJson } from "../shared.js";
 
 /** Register a trivial "fetch a feed and render it" command. */
 function feedCommand(
@@ -40,8 +40,8 @@ export function registerCommands(program: Command, deps: CliDeps): void {
     .description("Members of the Bundesrat (Länder ministers and plenipotentiaries)")
     .option(
       "--state <land>",
-      "only members of this federal state (Land) — exact match, case-insensitive (contrast --party)",
-      once(parseNonEmpty),
+      "only members of this federal state (Land) — one of the 16 Länder, case-insensitive (contrast --party)",
+      once(parseState),
     )
     .option("--party <name>", "only members whose party contains this text, case-insensitive", once(parseNonEmpty))
     .action(
@@ -49,7 +49,16 @@ export function registerCommands(program: Command, deps: CliDeps): void {
         const filter: MemberFilter = {};
         if (opts["state"] !== undefined) filter.state = opts["state"] as string;
         if (opts["party"] !== undefined) filter.party = opts["party"] as string;
-        renderJson(deps, global, await client.members(filter));
+        const members = await client.members(filter);
+        renderJson(deps, global, members);
+        // The feed can't say "no such party": an empty list is all a typo gets. Say so on
+        // stderr (stdout stays the plain `[]`), naming the filter.
+        if (members.length === 0 && filter.party !== undefined) {
+          deps.io.err(
+            `Note: no member${filter.state !== undefined ? " of that Land" : ""} has a party containing ` +
+              `${JSON.stringify(filter.party)} (--party matches a substring of the party name).`,
+          );
+        }
       }),
     );
 }
