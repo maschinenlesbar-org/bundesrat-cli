@@ -67,6 +67,18 @@ export function redactCredentials(text: string, credentials: readonly string[]):
   return out;
 }
 
+/**
+ * Longest echoed value or server text (in characters) an error message shows. A huge
+ * value or a hostile body would otherwise put kilobytes on one stderr line; the error's
+ * own properties (`url`, `body`) keep the full value.
+ */
+export const MAX_MESSAGE_VALUE_LENGTH = 500;
+
+/** `text` cut to MAX_MESSAGE_VALUE_LENGTH characters, ending in "…" when cut. */
+export function cutForMessage(text: string): string {
+  return text.length > MAX_MESSAGE_VALUE_LENGTH ? `${text.slice(0, MAX_MESSAGE_VALUE_LENGTH)}…` : text;
+}
+
 /** Base class for every error originating from this client. */
 export class BundesratError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
@@ -110,7 +122,7 @@ export class BundesratApiError extends BundesratError {
       );
     }
     const detailPart = parts.length > 0 ? `: ${parts.join("; ")}` : "";
-    super(`HTTP ${args.status} for ${args.method} ${url}${detailPart}`);
+    super(`HTTP ${args.status} for ${args.method} ${cutForMessage(url)}${detailPart}`);
     this.status = args.status;
     this.url = url;
     this.method = args.method;

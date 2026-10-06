@@ -272,7 +272,14 @@ instead of calling `process.exit`).
 (transport failure/timeout, and the default transport's per-hop scheme check; a bad
 configured `baseUrl` is a `BundesratValidationError` instead), `BundesratParseError` (the body was not a feed — usually
 the HTML shell, or XML of the wrong shape), and `BundesratValidationError` (a rejected
-input, thrown before any request), all extending `BundesratError`.
+input, thrown before any request), all extending `BundesratError`. A wrong-typed input is
+that validation error too, never a raw `TypeError`: a non-object filter or options value
+(`members("Bayern")`, `members(null)`, `new BundesratClient(null)`), a non-array list for
+`filterMembers`, a `transport` or `sleep` that isn't a function. Echoed values and
+server text are cut at 500 characters in messages (`cutForMessage`); the error's
+properties keep the full value. `test/conformance-p8-p9-p13-responses-and-errors.test.ts`
+checks the declared charset (P8), the feed's document shape (P9) and twenty-one
+wrong-typed calls (P13).
 
 ### Input validation
 
