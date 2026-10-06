@@ -88,7 +88,7 @@ try {
 new BundesratClient({
   baseUrl: "https://www.bundesrat.de",
   timeoutMs: 15_000,
-  maxRetries: 3,               // 429 / 503 are retried (Retry-After, else linear backoff)
+  maxRetries: 3,               // 429/503 and resets; linear backoff, or a longer Retry-After (<= 30 s)
   maxResponseBytes: 100 << 20, // the default (100 MiB); set to 0 for no limit
   userAgent: "my-app/1.0",
   transport: customTransport,
@@ -98,10 +98,13 @@ new BundesratClient({
 `429`/`503` and reset connections (`ECONNRESET`, `EPIPE`, `ECONNABORTED`, undici's
 `UND_ERR_SOCKET`, anywhere in the error's `cause` chain) are retried up to `maxRetries`
 (`0`–`10` in the CLI); a refused connection, a DNS failure and a timeout are not. Each
-`429`/`503` retry waits the response's `Retry-After` — delay-seconds or an IMF-fixdate HTTP-date, parsed by
-`parseRetryAfter` — or, without a usable one, `retryDelayMs * attempt`. A `Retry-After`
-longer than `MAX_RETRY_AFTER_MS` (30 s) is not retried: the `BundesratApiError` surfaces
-at once.
+retry waits `retryDelayMs * attempt` (200 ms × attempt by default), or a `429`/`503`'s
+`Retry-After` — delay-seconds or an IMF-fixdate HTTP-date, parsed by `parseRetryAfter` —
+when that is longer. **Retries never burst:** the backoff is the floor, so `Retry-After: 0`
+or a date in the past no longer sends the retries back to back. A `Retry-After` longer
+than `MAX_RETRY_AFTER_MS` (30 s) is not retried: the `BundesratApiError` surfaces at
+once, names the requested wait and carries it as `retryAfterMs`.
+`test/conformance-p6-retry-policy.test.ts` checks both.
 
 The engine enforces the transport contract itself, so the limits hold for a custom
 transport (a `fetch` wrapper, a raw `node:http` one) too: every call races a deadline of

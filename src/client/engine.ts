@@ -72,14 +72,15 @@ export interface EngineOptions {
   /**
    * Number of automatic retries for transient (429/503) responses and reset connections
    * (`ECONNRESET`, `EPIPE`, `ECONNABORTED`, undici's `UND_ERR_SOCKET`), 0..`MAX_RETRIES`
-   * (10). A refused connection, a DNS failure and a timeout are not retried. Each waits
-   * the response's `Retry-After` (up to `MAX_RETRY_AFTER_MS`; a longer one is not
-   * retried), or else `retryDelayMs * attempt`.
+   * (10). A refused connection, a DNS failure and a timeout are not retried. Each retry
+   * waits `retryDelayMs * attempt`, or the response's `Retry-After` when that is longer (up
+   * to `MAX_RETRY_AFTER_MS`; a longer one is not retried, and the error names the requested
+   * wait).
    */
   maxRetries?: number;
   /**
-   * Base backoff between retries in milliseconds (grows linearly); used without a
-   * Retry-After. At most `MAX_RETRY_AFTER_MS`.
+   * Base backoff between retries in milliseconds (grows linearly; default 200). A
+   * `Retry-After` can make a wait longer, never shorter. At most `MAX_RETRY_AFTER_MS`.
    */
   retryDelayMs?: number;
   /**
@@ -98,7 +99,7 @@ const DEFAULT_MAX_RESPONSE_BYTES = 100 * 1024 * 1024;
 /**
  * Longest `Retry-After` the engine waits out before retrying a 429/503. When the
  * server asks for longer, the engine does not retry at all and surfaces the error at
- * once: retrying early would only land inside the window the server asked us to wait
+ * once, naming the requested wait (`BundesratApiError.retryAfterMs`): retrying early would only land inside the window the server asked us to wait
  * out, and a hostile value must not stall the CLI.
  */
 export const MAX_RETRY_AFTER_MS = 30_000;
@@ -528,20 +529,25 @@ export class RequestEngine {
         throw new BundesratNetworkError(sizeLimitMessage(this.maxResponseBytes));
       }
       const retryable = status === 429 || status === 503;
+      const retryAfter = retryable ? parseRetryAfter(responseHeaders["retry-after"]) : undefined;
       if (retryable && attempt < this.maxRetries) {
-        // Honour Retry-After; without a usable one, back off linearly. A Retry-After
-        // beyond MAX_RETRY_AFTER_MS is not retried: the error below surfaces at once.
-        const retryAfter = parseRetryAfter(responseHeaders["retry-after"]);
+        // Back off linearly (retryDelayMs * attempt). A Retry-After can make the wait longer,
+        // never shorter: `Retry-After: 0` or a date in the past turned the retries into a
+        // zero-delay burst against a server that had just asked for less load. A Retry-After
+        // beyond MAX_RETRY_AFTER_MS is not retried: the error below surfaces at once and
+        // names the wait the server asked for.
         if (retryAfter === undefined || retryAfter <= MAX_RETRY_AFTER_MS) {
           attempt += 1;
-          await this.sleep(retryAfter ?? this.retryDelayMs * attempt);
+          const backoff = this.retryDelayMs * attempt;
+          await this.sleep(retryAfter === undefined ? backoff : Math.max(retryAfter, backoff));
           continue;
         }
       }
 
       const contentType = String(responseHeaders["content-type"] ?? "");
       if (status < 200 || status >= 300) {
-        throw this.toApiError(url, status, body);
+        const tooLong = retryable && retryAfter !== undefined && retryAfter > MAX_RETRY_AFTER_MS;
+        throw this.toApiError(url, status, body, tooLong ? retryAfter : undefined);
       }
 
       return { data: body, contentType, status };
@@ -591,7 +597,7 @@ export class RequestEngine {
     return doc;
   }
 
-  private toApiError(url: string, status: number, body: Buffer): BundesratApiError {
+  private toApiError(url: string, status: number, body: Buffer, retryAfterMs?: number): BundesratApiError {
     // The body is kept on the error (`body`) and may echo the request URL: scrub it.
     const text = this.scrub(body.toString("utf8"));
     // The Bundesrat serves HTML error pages, not a structured envelope; surface a
@@ -607,6 +613,6 @@ export class RequestEngine {
     // raw to stderr; strip control and bidi characters so a hostile endpoint cannot
     // inject terminal escape sequences or reorder the line.
     if (detail !== undefined) detail = sanitizeServerText(detail);
-    return new BundesratApiError({ status, url, method: "GET", body: text, detail });
+    return new BundesratApiError({ status, url, method: "GET", body: text, detail, retryAfterMs });
   }
 }
