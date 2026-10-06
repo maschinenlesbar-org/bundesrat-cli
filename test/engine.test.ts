@@ -313,3 +313,28 @@ test("the engine checks userAgent and defaultHeaders at construction, before any
   // An omitted userAgent still means the default.
   assert.doesNotThrow(() => new RequestEngine({ defaultHeaders: { "X-Note": "ok" } }));
 });
+
+test("a body that declares no encoding is decoded by the Content-Type charset", async () => {
+  const xml = '<?xml version="1.0"?><iOS><list><item><title>K\u00e4se</title></item></list></iOS>';
+  const mt = makeMockTransport(() => rawResponse(Buffer.from(xml, "latin1"), "text/xml; charset=ISO-8859-1"));
+  const value = await new RequestEngine({ transport: mt.transport }).getXml("/f.xml");
+  assert.deepEqual(JSON.parse(JSON.stringify(value)), { list: { item: { title: "Käse" } } });
+});
+
+test("the XML declaration outranks the Content-Type charset, a byte-order mark outranks both", async () => {
+  const declared = '<?xml version="1.0" encoding="ISO-8859-1"?><iOS><list><t>K\u00e4se</t></list></iOS>';
+  let mt = makeMockTransport(() => rawResponse(Buffer.from(declared, "latin1"), "application/xml;charset=utf-8"));
+  assert.deepEqual(JSON.parse(JSON.stringify(await new RequestEngine({ transport: mt.transport }).getXml("/f"))), { list: { t: "Käse" } });
+  const plain = '<?xml version="1.0"?><iOS><list><t>K\u00e4se</t></list></iOS>';
+  const utf16 = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(plain, "utf16le")]);
+  mt = makeMockTransport(() => rawResponse(utf16, "application/xml;charset=iso-8859-1"));
+  assert.deepEqual(JSON.parse(JSON.stringify(await new RequestEngine({ transport: mt.transport }).getXml("/f"))), { list: { t: "Käse" } });
+});
+
+test("an unknown Content-Type charset is a parse error", async () => {
+  const mt = makeMockTransport(() => rawResponse("<iOS><list/></iOS>", "application/xml; charset=x-bogus"));
+  await assert.rejects(
+    () => new RequestEngine({ transport: mt.transport }).getXml("/f.xml"),
+    (err) => err instanceof BundesratParseError && /Unsupported response charset "x-bogus"/.test(err.message),
+  );
+});

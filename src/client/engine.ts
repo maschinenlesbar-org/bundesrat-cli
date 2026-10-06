@@ -318,25 +318,34 @@ function looksLikeHtml(text: string): boolean {
 }
 
 /**
- * Decode an XML body by the encoding its XML declaration names
- * (`<?xml version="1.0" encoding="ISO-8859-1"?>`), UTF-8 when it names none — the
- * XML default. The Content-Type is ignored here too: the CMS labels its feeds
- * inconsistently (see getXml), while the declaration travels with the document.
- * A leading UTF-8 byte-order mark is dropped (TextDecoder does that by default).
- * An encoding TextDecoder doesn't know is a BundesratParseError rather than
- * mojibake.
+ * Decode an XML body by the encoding it is declared in, in this order:
+ *   1. a byte-order mark (UTF-8, UTF-16LE, UTF-16BE), which TextDecoder then drops;
+ *   2. the XML declaration's `encoding` (`<?xml version="1.0" encoding="ISO-8859-1"?>`);
+ *   3. the `charset` parameter of the Content-Type (`application/xml;charset=utf-8`);
+ *   4. UTF-8, the XML default.
+ * This deliberately puts the declaration before the Content-Type, the reverse of RFC 7303:
+ * the CMS stamps `charset=utf-8` on every feed (seen live 2026-10-06), so the declaration,
+ * which travels with the document, is the better witness when the two disagree (finding 17
+ * of 2026-09-26: a Latin-1 feed labelled utf-8). The Content-Type charset is used when the
+ * document declares nothing; it used to be ignored, so a Latin-1 body declared only there
+ * was read as UTF-8. An encoding TextDecoder doesn't know is a BundesratParseError rather
+ * than mojibake. (Bytes invalid in the declared encoding become U+FFFD, as everywhere in
+ * the WHATWG decoders.)
  */
-function decodeXml(body: Buffer, path: string): string {
-  const start = body[0] === 0xef && body[1] === 0xbb && body[2] === 0xbf ? 3 : 0;
-  const head = body.subarray(start, start + 256).toString("latin1");
-  const declared = /^\s*<\?xml\s[^>]*?\bencoding\s*=\s*["']([^"']*)["']/.exec(head)?.[1];
-  const charset = declared ?? "utf-8";
+function decodeXml(body: Buffer, contentType: string, path: string): string {
+  let charset: string | undefined;
+  if (body[0] === 0xef && body[1] === 0xbb && body[2] === 0xbf) charset = "utf-8";
+  else if (body[0] === 0xff && body[1] === 0xfe) charset = "utf-16le";
+  else if (body[0] === 0xfe && body[1] === 0xff) charset = "utf-16be";
+  charset ??= /^\s*<\?xml\s[^>]*?\bencoding\s*=\s*["']([^"']*)["']/.exec(body.subarray(0, 256).toString("latin1"))?.[1];
+  charset ??= /;\s*charset\s*=\s*"?([^";\s]+)"?/i.exec(contentType)?.[1];
+  charset ??= "utf-8";
   let decoder: TextDecoder;
   try {
     decoder = new TextDecoder(charset);
   } catch {
     throw new BundesratParseError(
-      `Unsupported response charset "${sanitizeServerText(charset)}" from ${path}.`,
+      `Unsupported response charset "${sanitizeServerText(charset).slice(0, 100)}" from ${path}.`,
     );
   }
   return decoder.decode(body);
@@ -559,11 +568,12 @@ export class RequestEngine {
    * `view=renderXml` render parameter; without it the server returns its HTML
    * shell, which we detect and reject with a helpful BundesratParseError.
    *
-   * NOTE: the response Content-Type is intentionally *ignored*. The Government Site
-   * Builder CMS is inconsistent about it (feeds have been seen as `text/plain`,
-   * `application/xml`, `text/html`), so we sniff the body — an `<!doctype html>` /
-   * `<html>` prefix is the HTML-shell guard — rather than trust the header. Don't
-   * "harden" this by validating Content-Type; it would reject valid feeds.
+   * NOTE: the response Content-Type does not decide whether the body is a feed. The
+   * Government Site Builder CMS is inconsistent about the media type (feeds have been
+   * seen as `text/plain`, `application/xml`, `text/html`), so we sniff the body — an
+   * `<!doctype html>` / `<html>` prefix is the HTML-shell guard — rather than trust the
+   * header. Don't "harden" this by validating Content-Type; it would reject valid feeds.
+   * Only its `charset` is used, to decode a body that declares no encoding (decodeXml).
    */
   async getXml(path: string, query?: QueryParams): Promise<XmlValue> {
     return (await this.getXmlDocument(path, query)).value;
@@ -572,7 +582,7 @@ export class RequestEngine {
   /** Like {@link getXml}, but also returns the root element's name. */
   async getXmlDocument(path: string, query?: QueryParams): Promise<XmlDocument> {
     const res = await this.request(path, query);
-    const text = decodeXml(res.data, path);
+    const text = decodeXml(res.data, res.contentType, path);
     if (looksLikeHtml(text)) throw htmlPageError(path);
     // An empty body is not malformed XML — surface it as "empty" rather than the
     // generic parse-failure message so the cause is obvious.

@@ -206,9 +206,13 @@ copyright-protected editorial text or images, not open data (DATA_LICENSE.md).
 - attributes → `@name` keys (only `<iOS version="…">` uses one);
 - empty / self-closing elements → `""`.
 
-The engine decodes the body by the encoding the XML declaration names
-(`encoding="ISO-8859-1"`), UTF-8 when it names none; the Content-Type is not used for
-this either. An encoding `TextDecoder` doesn't know is a `BundesratParseError`.
+The engine decodes the body by the encoding it is declared in: a byte-order mark (UTF-8,
+UTF-16), then the XML declaration's `encoding` (`encoding="ISO-8859-1"`), then the
+Content-Type's `charset`, else UTF-8. The declaration comes before the header — the
+reverse of RFC 7303 — because the CMS stamps `charset=utf-8` on every feed, so a
+document that declares another encoding is the better witness. An encoding
+`TextDecoder` doesn't know is a `BundesratParseError`; bytes invalid in the declared
+encoding become U+FFFD.
 
 It is deliberately **not** a general-purpose parser (no namespaces, DTDs, or full
 mixed-content reconstruction) — just enough for these shallow feeds, and exercised
