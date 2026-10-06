@@ -3,7 +3,7 @@
 Echte Beispiele für die Claude-Code-Skills des Plugins `bundesrat`, eines pro Skill: eine
 Anfrage, die `bundesrat`-Befehle, die der Skill ausgeführt hat, und Claudes Antwort.
 
-Jedes Beispiel lief am 15. September 2026 mit `bundesrat` 0.0.6 gegen die Live-API.
+Jedes Beispiel lief am 6. Oktober 2026 mit `bundesrat` 0.2.0 gegen die Live-API.
 Die Daten ändern sich, Ihre Ergebnisse werden also abweichen; mit den gezeigten IDs und
 Schlüsseln können Sie die Anfragen selbst ausprobieren. Lange Listen sind gekürzt.
 
@@ -16,47 +16,51 @@ Skills: [bundesrat-agenda](#bundesrat-agenda) · [bundesrat-members](#bundesrat-
 > Worüber stimmt der Bundesrat in seiner nächsten Sitzung ab, und wann tagen danach die Ausschüsse?
 
 ```bash
-bundesrat --compact session | jq '{title, header, items: (.tops | length)}'   # Error: read ECONNRESET, wiederholt
 bundesrat --compact session > session.json
 jq '{title, header, items: (.tops | length)}' session.json
-jq -r '.tops | sort_by(.toptitle | capture("TOP (?<n>[0-9]+)(?<s>[a-z]*)") | [(.n|tonumber), .s]) | .[] | "\(.toptitle)\t\(.topdrucksache // "—")\t\(.topheader)"' session.json
-bundesrat --compact appointments | jq -r '.[] | "\(.startdate // "")\t\(.title)"'
+jq -r '.tops | sort_by(.toptitle // "" | capture("(?<n>\\d+)(?<s>[a-z]*)") | [(.n | tonumber), .s])[] | "\(.toptitle)\t\(.topdrucksache // "—")\t\(.topheader)"' session.json
+jq -r '.tops[].topdrucksache | select(.) | split("; ")[]' session.json | wc -l
+bundesrat --compact appointments > appointments.json
+jq -r 'map(. + {start: ((.startdate // "" | capture("(?<d>\\d{2})\\.(?<m>\\d{2})\\.(?<y>\\d{4}) ?(?<t>[0-9:]*)") | "\(.y)-\(.m)-\(.d) \(.t)") // "")}) | sort_by(.start)[] | "\(.start)\t\(.title)\t\(.stopdate // "")"' appointments.json
 ```
 
-Die erste Anfrage brach mit einem Verbindungsabbruch ab, die Wiederholung klappte. Der Feed
-liefert die TOPs ungeordnet (TOP 5, TOP 10, TOP 37, TOP 2b, …). Deshalb hat der Skill sie vor
-der Ausgabe nach Nummer sortiert. Der Titel lautet noch „Tagesordnung Entwurf" – die
-Tagesordnung ist also ein Entwurf.
+Der Feed liefert die TOPs ungeordnet (TOP 20, TOP 48, TOP 46, TOP 53a, …). Deshalb hat der Skill
+sie vor der Ausgabe nach Nummer und Buchstabe sortiert. Der Titel lautet noch „Tagesordnung
+Entwurf" – die Tagesordnung ist also ein Entwurf. Zwei TOPs haben keine Drucksache (die beiden
+Wahlen zu Beginn der Sitzung); keiner nennt mehr als eine, die 54 Drucksachennummern gehören
+also je zu einem TOP.
 
-**1068. Sitzung des Bundesrates**, Freitag, 25.09.2026, 9:30 Uhr (Entwurf): 95 Punkte, jeder
-mit einer Drucksache.
+**1069. Sitzung des Bundesrates**, Freitag, 16.10.2026, 9:30 Uhr (Entwurf): 56 Punkte,
+54 Drucksachen.
 
 | Art des Punkts | TOPs | Anzahl |
 |---|---|---|
-| Vom Bundestag beschlossene Gesetze („Gesetz …") | 3–12 | 10 |
-| Bundeshaushalt 2027: Haushaltsgesetz, Finanzplan 2026–2030, Haushaltsbegleitgesetz | 2a–2c | 3 |
-| Gesetzentwürfe („Entwurf eines Gesetzes …") | 26–63 | 38 |
-| Entschließungen des Bundesrates | 13–25 | 13 |
-| Verordnungen und Verwaltungsvorschriften | 9b, 74–84 | 12 |
-| EU-Vorlagen und Mitteilungen | 64a–73 | 11 |
-| Wahlen, Benennungen, Verfahren vor dem BVerfG | 1, 85a–89 | 8 |
+| Wahlen (Präsidium, Europakammer, Ausschussvorsitze, Schriftführer) | 1–4 | 4 |
+| Vom Bundestag beschlossene Gesetze („Gesetz …") | 5–8 | 4 |
+| Gesetzentwürfe („Entwurf …") | 9–10, 26–32 | 9 |
+| Entschließungen des Bundesrates | 11–25 | 15 |
+| EU-Vorlagen und Mitteilungen | 33–47 | 15 |
+| Verordnungen | 48–52 | 5 |
+| Benennungen für Beratungsgremien der EU | 53a–53d | 4 |
 
 Einige der Punkte:
-- TOP 4 – Drucksache 491/26: Gesetz zur Einführung eines antragslosen Kindergeldes
-- TOP 5 – Drucksache 493/26: Sportfördergesetz (SpoFöG)
-- TOP 35 – Drucksache 447/26: Entwurf eines Jahressteuergesetzes 2026
-- TOP 39 – Drucksache 453/26: Entwurf eines Gesetzes zur Reform des Nachrichtendienstrechts
-- TOP 62 – Drucksache 476/26: Gesetzentwurf zum Partnerschaftsabkommen EU–Mercosur vom 17.01.2026
-- … 90 weitere
+- TOP 5 – Drucksache 560/26: Erstes Gesetz zur Änderung des Wissenschaftsfreiheitsgesetzes
+- TOP 19 – Drucksache 543/26: Entschließung zum „Recht auf Vergessenwerden" für ehemals an Krebs Erkrankte
+- TOP 26 – Drucksache 505/26: Entwurf eines Startchancen- und Qualitätsentwicklungsgesetzes (SCQEG)
+- TOP 28 – Drucksache 507/26: Entwurf eines Einkommensteuerreformgesetzes 2027
+- TOP 47 – Drucksache 542/26: EU-Verordnungsvorschlag über erschwinglichen Wohnraum
+- … 51 weitere
 
-Ausschusstermine (20 Einträge): 14 Ausschusssitzungen vom 28.09. bis 02.10.2026. Drei davon
-fallen aus: Digitales und Staatsmodernisierung („entfällt") sowie Finanzen und Städtebau
-(„entfällt / Umfrageverfahren", also schriftliches Verfahren). Die nächste Plenarsitzung folgt
-am **16.10.2026, 9:30 Uhr**, die Ausschüsse tagen wieder ab 02.11.2026.
+Ausschusstermine (18 Einträge): Die Umfrage 5/26 des Rechtsausschusses (schriftliches
+Verfahren) lief vom 02.10. bis 06.10.2026, 10:00 Uhr; die Plenarsitzung folgt am 16.10.2026,
+9:30 Uhr. Danach tagen 14 Ausschüsse vom 02.11. bis 06.11.2026; keine Sitzung ist als
+ausgefallen („entfällt") markiert. Außerdem stehen die Jahrestagung der Parlamentarischen
+Versammlung der NATO (20.–23.11.2026) und die nächste Plenarsitzung am **20.11.2026, 9:30 Uhr**
+in der Liste.
 
 Quelle: Bundesrat
 
-Als Nächstes angeboten: die vollständige Liste aller 95 TOPs oder alle Drucksachennummern zum Nachschlagen.
+Als Nächstes angeboten: die vollständige Liste aller 56 TOPs oder alle Drucksachennummern zum Nachschlagen.
 
 ## bundesrat-members
 
@@ -68,6 +72,7 @@ jq -r 'group_by(.party)[] | "\(.[0].party): \(length)"' members.json
 jq -r 'map({b:.brmitglied,m:.mitglied,bv:.bv}) | group_by(.) | .[] | "\(.[0]) \(length)"' members.json
 jq -r '[.[] | select(.mitglied=="true")] | group_by(.state)[] | "\(.[0].state): \(length)"' members.json
 jq -r '[.[] | select(.mitglied=="true")] | group_by(.party)[] | "\(.[0].party): \(length)"' members.json
+bundesrat --compact members --state Thueringen   # exit 2: "Not a Land; expected one of …, Thüringen."
 bundesrat --compact members --state thüringen | jq -r '.[] | "\(.firstname) \(.name)\t\(.party)\t\(.mitglied)\t\(.bv)"'
 ```
 
@@ -76,7 +81,10 @@ Bevollmächtigten der Länder. Eine Zählung nach Partei über alle (CDU 71, SPD
 Kammer verzerren. Deshalb hat der Skill die Statusflags verglichen. Die 69 Einträge mit
 `mitglied == "true"` ergeben pro Land genau die Stimmenverteilung im Bundesrat (je 6 für BW, BY,
 NI, NW; 5 für HE; je 3 für HB, HH, MV, SL; 4 für die übrigen), und darauf beruht die Zählung.
-`brmitglied == "true"` trifft auf 181 Einträge zu, Stellvertretungen eingeschlossen.
+`brmitglied == "true"` trifft auf 181 Einträge zu, Stellvertretungen eingeschlossen; 12 Einträge
+sind nur Bevollmächtigte. Die ASCII-Schreibweise `Thueringen` ist kein Ländername, deshalb hat
+die CLI sie mit der Liste der sechzehn Länder abgelehnt; der Skill hat es mit `thüringen` erneut
+ausgeführt.
 
 Ordentliche Mitglieder (69 Sitze) nach Partei:
 
