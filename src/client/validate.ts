@@ -79,9 +79,11 @@ export const baseUrlWhitespaceProblem: Problem<unknown> = (value) => {
 /**
  * Every rule for a base URL, in order: a non-blank string, no whitespace or control
  * characters (see {@link baseUrlWhitespaceProblem}), a parseable URL, the `http:` or
- * `https:` scheme, and no query or fragment — feed paths are appended to the base
- * URL as a string, so a `?` or `#` would swallow every path (`http://h/#f` requests
- * `/`). The reasons never echo the URL, so a credential in it cannot leak.
+ * `https:` scheme, no query or fragment — feed paths are appended to the base URL as
+ * a string, so a `?` or `#` would swallow every path (`http://h/#f` requests `/`) —
+ * and userinfo that decodes: Node decodes a `user:password@` into the Authorization
+ * header and fails at request time on a `%` that isn't an escape (write a literal
+ * `%` as `%25`). The reasons never echo the URL, so a credential in it cannot leak.
  */
 export const baseUrlProblem: Problem<unknown> = (value) => {
   if (typeof value !== "string") return "Expected a string.";
@@ -96,5 +98,12 @@ export const baseUrlProblem: Problem<unknown> = (value) => {
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return "Only http: and https: base URLs are supported.";
   if (/[?#]/.test(value)) return "A base URL cannot have a query (?) or fragment (#).";
+  for (const part of [url.username, url.password]) {
+    try {
+      decodeURIComponent(part);
+    } catch {
+      return 'The user name or password has a "%" that is not followed by two hex digits; write a literal "%" as %25.';
+    }
+  }
   return undefined;
 };

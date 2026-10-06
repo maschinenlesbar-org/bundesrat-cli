@@ -112,7 +112,9 @@ exported `validateBaseUrl` (rule: `baseUrlProblem`, the same one the CLI's `--ba
 uses). A blank value, surrounding or inner whitespace or control characters (`new URL()`
 would hide them while the engine joins the raw string to each feed path, so
 `"https://h/ "` would request `/%20/iOS/...`), an unparseable URL, a scheme other than
-`http:`/`https:`, and a query or fragment each throw a `BundesratValidationError`
+`http:`/`https:`, a query or fragment, and a `%` in the userinfo that isn't an escape
+(Node would fail to decode it for the Authorization header; write `%25`) each throw a
+`BundesratValidationError`
 (`Invalid baseUrl: <reason>`) — a configuration error, not a `BundesratNetworkError`.
 Only an omitted `baseUrl` selects the default.
 
