@@ -320,6 +320,14 @@ npm test          # builds, then runs `node --test` over dist/test
   `BundesratValidationError`, and the `parity()` helper (`test/helpers.ts`), which sends
   one input through `run()` and through the library on one recording mock transport so
   a test can assert both give the same outcome.
+- **`conformance-*.test.ts`** — the shared checks of the 2026-10-05 fix patterns, the
+  same files as in the other `*-cli` repos with only the adapter block at the top
+  changed: P1 (no base-URL password in any CLI output), P2 (none in a logged client or
+  error), P4 + P19 (base-URL validation; P19 is skipped, no environment variable), P5
+  (`timeoutMs`, `maxResponseBytes`, headers, bodies and errors for any transport), P6
+  (retry backoff and `Retry-After`), P7 (closed pipes and exit codes, on the built bin),
+  P8 + P9 + P13 (declared charset, feed shape, wrong-typed input), P10 (strict filter
+  keys and Länder), P12 (`-o -`).
 
 ## Continuous integration
 

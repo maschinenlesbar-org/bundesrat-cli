@@ -146,7 +146,7 @@ bundesrat members | jq -r '[.[].party] | unique[]'
 |---|---|
 | `0` | success (help/version included); an empty feed (`<iOS><list/></iOS>`) also exits 0 |
 | `1` | a runtime error — including a response that is not a feed: the website's HTML shell, or XML that isn't `<iOS><list>…</list></iOS>` ("Unexpected response shape") |
-| `2` | usage error (bad flag, unknown command, bad `--base-url`) |
+| `2` | usage error (bad flag, unknown command, bad `--base-url`, a `--state` that is not one of the 16 Länder) |
 | `4` | HTTP 404 (not found) |
 | `6` | network / transport failure (DNS, connection, timeout, response size-cap) |
 
