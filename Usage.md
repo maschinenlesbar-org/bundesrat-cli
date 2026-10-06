@@ -15,7 +15,7 @@ bundesrat [global options] <command>
 | `--base-url <url>` | API base URL (only `http:`/`https:`; no query, fragment, whitespace or control characters; a literal `%` in a password is written `%25`) |
 | `--timeout <ms>` | time limit per request in ms, whole response included (0 = no timeout; at most 2147483647) |
 | `--user-agent <ua>` | User-Agent header value |
-| `--max-retries <n>` | retries for transient 429/503 responses (0..10; each waits the server's `Retry-After`, up to 30 s) |
+| `--max-retries <n>` | retries for transient 429/503 responses and reset connections (0..10; a 429/503 waits the server's `Retry-After`, up to 30 s) |
 | `--max-response-bytes <n>` | cap the response body size in bytes (0 = unlimited; default 100 MiB) |
 | `--compact` | print JSON on a single line (for piping to `jq`) |
 | `-o, --output <file>` | write output to a file instead of stdout (`-` = stdout; a blank path is a usage error) |

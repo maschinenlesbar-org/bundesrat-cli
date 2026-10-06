@@ -123,8 +123,9 @@ Use `--compact` for single-line JSON and `-o <file>` to write to a file — both
   shell instead of XML (it may have moved). The CLI already adds the required
   `?view=renderXml` render parameter; if this persists, the upstream feed changed.
 - **Exit `6` / `read ECONNRESET`** — the server dropped the connection. This
-  happens now and then; `--max-retries` retries only `429`/`503` responses, not
-  network errors, so run the command again.
+  happens now and then, and a reset is retried like a `429`/`503` (up to
+  `--max-retries`, default `2`); exit `6` means every try failed. A refused
+  connection, a DNS failure and a timeout are not retried.
 - **Empty `tops` between sittings** — outside an active sitting the agenda feed can
   be sparse: `tops` may be `[]` and `session`'s `title`/`header` may be absent
   (both are optional), so guard for them in scripts.
@@ -145,7 +146,7 @@ Given **before or after** the command, e.g. `bundesrat --compact session`:
 | `--base-url <url>` | API base URL (default `https://www.bundesrat.de`; `http:`/`https:` only, no query, fragment or whitespace; a literal `%` in a password is written `%25`). A `user:password@` in it is sent as Basic auth and shown as `***@` in every message |
 | `--timeout <ms>` | Time limit per request, reading the whole response included (default `30000`; `0` = none; at most `2147483647`) |
 | `--user-agent <ua>` | `User-Agent` header value |
-| `--max-retries <n>` | Retries for transient `429`/`503` responses (0..10, default `2`). Each retry waits the server's `Retry-After` (up to 30 s; a longer one is not retried) or else backs off linearly |
+| `--max-retries <n>` | Retries for transient `429`/`503` responses and reset connections (0..10, default `2`). A `429`/`503` retry waits the server's `Retry-After` (up to 30 s; a longer one is not retried) or else backs off linearly |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
 ## Learn more

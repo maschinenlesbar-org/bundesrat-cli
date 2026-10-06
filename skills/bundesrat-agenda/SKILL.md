@@ -80,7 +80,8 @@ bundesrat appointments \
   in the title).
 - **Cite the source.** Drucksachen are *amtliche Werke* — reference them by number
   with "Quelle: Bundesrat".
-- **A connection reset isn't retried.** The server occasionally drops a connection
-  (`Error: read ECONNRESET`, exit `6`). `--max-retries` covers only HTTP 429/503, so
-  run the command once more before reporting the feed as unavailable.
+- **A connection reset is retried.** The server occasionally drops a connection; the
+  CLI retries it like a 429/503 (up to `--max-retries`, default 2). Only when every try
+  fails does it exit `6` (`Error: read ECONNRESET`); then report the feed as unavailable
+  rather than looping.
 - Members of the Bundesrat → the **bundesrat-members** skill.

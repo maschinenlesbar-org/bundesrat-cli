@@ -95,11 +95,24 @@ new BundesratClient({
 });
 ```
 
-`429`/`503` are retried up to `maxRetries` (`0`–`10` in the CLI). Each retry waits the
-response's `Retry-After` — delay-seconds or an IMF-fixdate HTTP-date, parsed by
+`429`/`503` and reset connections (`ECONNRESET`, `EPIPE`, `ECONNABORTED`, undici's
+`UND_ERR_SOCKET`, anywhere in the error's `cause` chain) are retried up to `maxRetries`
+(`0`–`10` in the CLI); a refused connection, a DNS failure and a timeout are not. Each
+`429`/`503` retry waits the response's `Retry-After` — delay-seconds or an IMF-fixdate HTTP-date, parsed by
 `parseRetryAfter` — or, without a usable one, `retryDelayMs * attempt`. A `Retry-After`
 longer than `MAX_RETRY_AFTER_MS` (30 s) is not retried: the `BundesratApiError` surfaces
 at once.
+
+The engine enforces the transport contract itself, so the limits hold for a custom
+transport (a `fetch` wrapper, a raw `node:http` one) too: every call races a deadline of
+`timeoutMs` and gets an `AbortSignal` (`HttpRequest.signal`, honoured by the default
+transport) that fires then; the body it gets back is checked against `maxResponseBytes`
+("Response exceeded the size limit of N bytes (maxResponseBytes; --max-response-bytes on
+the CLI)"); headers are read from a plain object in any key case, a fetch `Headers` or a
+`Map`; the body may be any ArrayBuffer view (a `Uint8Array` from `fetch`) or an
+`ArrayBuffer`, from any realm, and is decoded by the feed's declared encoding like a
+`Buffer`; a response without a valid status, headers object or byte body is a
+`BundesratNetworkError`. `test/conformance-p5-transport-contract.test.ts` covers it.
 
 The numeric options are validated in the constructor: `timeoutMs` 0..`MAX_TIMEOUT_MS`,
 `maxRetries` 0..`MAX_RETRIES` (10), `retryDelayMs` 0..`MAX_RETRY_AFTER_MS`,
