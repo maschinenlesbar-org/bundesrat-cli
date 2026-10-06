@@ -5,13 +5,17 @@
 // carry the `?view=renderXml` render parameter to return XML rather than the
 // website's HTML shell.
 
-import { MAX_TIMEOUT_MS, nodeHttpTransport, type Transport } from "./http.js";
+import { MAX_TIMEOUT_MS, nodeHttpTransport, type HttpResponse, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
 import { parseXmlDocument, type XmlDocument, type XmlValue } from "./xml.js";
 import {
   BundesratApiError,
+  BundesratError,
+  BundesratNetworkError,
   BundesratParseError,
   BundesratValidationError,
+  credentialsIn,
+  redactCredentials,
 } from "./errors.js";
 import { assertValid, baseUrlProblem, headerNameProblem, headerValueProblem } from "./validate.js";
 
@@ -265,7 +269,12 @@ const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 export class RequestEngine {
-  private readonly baseUrl: string;
+  // A real private field (not TypeScript's `private`): util.inspect, console.log and
+  // JSON.stringify of a client never show it, so a password in the base URL can't be
+  // logged by accident.
+  readonly #baseUrl: string;
+  /** The base URL's userinfo, raw and percent-decoded, for scrubbing server and transport text. */
+  readonly #credentials: string[];
   private readonly transport: Transport;
   private readonly userAgent: string;
   private readonly defaultHeaders: Record<string, string>;
@@ -278,7 +287,14 @@ export class RequestEngine {
   constructor(options: EngineOptions = {}) {
     // The raw value is checked before the trailing-slash strip, so "https://h/ "
     // cannot slip past it; only an omitted baseUrl selects the default.
-    this.baseUrl = validateBaseUrl(options.baseUrl === undefined ? DEFAULT_BASE_URL : options.baseUrl);
+    this.#baseUrl = validateBaseUrl(options.baseUrl === undefined ? DEFAULT_BASE_URL : options.baseUrl);
+    this.#credentials = credentialsIn(this.#baseUrl).flatMap((raw) => {
+      try {
+        return [raw, decodeURIComponent(raw)];
+      } catch {
+        return [raw];
+      }
+    });
     this.transport = options.transport ?? nodeHttpTransport;
     // Only an omitted userAgent selects the default: a blank one is an error, not
     // a silent fallback, and a malformed one fails here rather than at request time.
@@ -297,11 +313,57 @@ export class RequestEngine {
     this.sleep = options.sleep ?? realSleep;
   }
 
+  /**
+   * `text` without the base URL's credentials: server text (an error body that echoes the
+   * request URL) and transport text (fetch's "Request cannot be constructed from a URL that
+   * includes credentials: <url>") can carry them.
+   */
+  private scrub(text: string): string {
+    return this.#credentials.length === 0 ? text : redactCredentials(text, this.#credentials);
+  }
+
+  /**
+   * A transport failure as the `cause` of the error the engine raises: the original when its
+   * text carries no credentials, otherwise a copy with them scrubbed (message, `code` and the
+   * cause chain kept), so logging the error with its causes can't reveal the base URL's
+   * password.
+   */
+  private scrubCause(cause: unknown, depth = 0): unknown {
+    if (this.#credentials.length === 0 || depth > 5) return cause;
+    if (typeof cause === "string") return this.scrub(cause);
+    if (!(cause instanceof Error)) return cause;
+    const inner = this.scrubCause(cause.cause, depth + 1);
+    const message = this.scrub(cause.message);
+    if (message === cause.message && inner === cause.cause && !this.scrub(cause.stack ?? "").includes("***@")) return cause;
+    const copy = new Error(message, inner === undefined ? undefined : { cause: inner });
+    copy.name = cause.name;
+    const code = (cause as { code?: unknown }).code;
+    if (code !== undefined) Object.assign(copy, { code });
+    return copy;
+  }
+
+  /**
+   * What the transport threw, as the error the engine raises. The default transport
+   * rejects with `BundesratNetworkError` only; an injected one may throw anything (a
+   * string, a `TypeError` from fetch). Every failure becomes a `BundesratNetworkError` —
+   * a `BundesratError` a caller and the CLI can rely on — with the base URL's credentials
+   * scrubbed from its message and cause chain; any other `BundesratError` passes through,
+   * and a clean network error stays as it is.
+   */
+  private transportError(cause: unknown): BundesratError {
+    if (cause instanceof BundesratError && !(cause instanceof BundesratNetworkError)) return cause;
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    const message = sanitizeServerText(this.scrub(reason));
+    const scrubbed = this.scrubCause(cause);
+    if (cause instanceof BundesratNetworkError && message === cause.message && scrubbed === cause) return cause;
+    return new BundesratNetworkError(message, { cause: scrubbed });
+  }
+
   /** Build a fully-qualified URL from a path and optional query parameters. */
   buildUrl(path: string, query?: QueryParams): string {
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     const qs = query ? buildQueryString(query) : "";
-    return `${this.baseUrl}${normalizedPath}${qs ? `?${qs}` : ""}`;
+    return `${this.#baseUrl}${normalizedPath}${qs ? `?${qs}` : ""}`;
   }
 
   /**
@@ -319,13 +381,18 @@ export class RequestEngine {
 
     let attempt = 0;
     for (;;) {
-      const response = await this.transport({
-        method: "GET",
-        url,
-        headers,
-        timeoutMs: this.timeoutMs,
-        ...(this.maxResponseBytes > 0 ? { maxResponseBytes: this.maxResponseBytes } : {}),
-      });
+      let response: HttpResponse;
+      try {
+        response = await this.transport({
+          method: "GET",
+          url,
+          headers,
+          timeoutMs: this.timeoutMs,
+          ...(this.maxResponseBytes > 0 ? { maxResponseBytes: this.maxResponseBytes } : {}),
+        });
+      } catch (cause) {
+        throw this.transportError(cause);
+      }
 
       const status = response.status;
       const retryable = status === 429 || status === 503;
@@ -383,7 +450,9 @@ export class RequestEngine {
       // Name the parser's reason (nesting too deep, unterminated tag, no root
       // element): run.ts prints only the message, never the cause.
       const reason = sanitizeServerText(cause instanceof Error ? cause.message : String(cause));
-      throw new BundesratParseError(`Failed to parse XML response from ${path}: ${reason}`, { cause });
+      throw new BundesratParseError(`Failed to parse XML response from ${path}: ${reason}`, {
+        cause: this.scrubCause(cause),
+      });
     }
     // An XHTML page parses as XML; it is still the website, not a feed.
     if (doc.root.toLowerCase() === "html") throw htmlPageError(path);
@@ -391,7 +460,8 @@ export class RequestEngine {
   }
 
   private toApiError(url: string, status: number, body: Buffer): BundesratApiError {
-    const text = body.toString("utf8");
+    // The body is kept on the error (`body`) and may echo the request URL: scrub it.
+    const text = this.scrub(body.toString("utf8"));
     // The Bundesrat serves HTML error pages, not a structured envelope; surface a
     // short, whitespace-collapsed snippet only when it is plain (non-HTML) text.
     const snippet = text.trim().replace(/\s+/g, " ");

@@ -127,6 +127,16 @@ of the value part of `--opt=value`) and redacts every line printed on stdout and
 command '…'`, `too many arguments … got 1: …`). `test/conformance-p1-cli-redaction.test.ts`
 checks ten passwords in seven URL shapes at nine argv positions.
 
+The library keeps them out of what a caller logs, too. The engine holds the base URL in
+a real `#private` field (so `console.log(client)`, `util.inspect` and `JSON.stringify`
+never show it) next to its userinfo, raw and percent-decoded, and scrubs that from
+error bodies (`BundesratApiError.body`/`detail`), transport error text and the `cause`
+chain. `BundesratApiError.url` is the request URL with its userinfo redacted. Whatever
+a custom transport throws (a string, fetch's `TypeError` naming the URL) reaches the
+caller as a `BundesratNetworkError` with the original, scrubbed, as its `cause`.
+`test/conformance-p2-library-redaction.test.ts` checks the client, nine failing
+transports and five rejected base URLs.
+
 `userAgent` and every `defaultHeaders` value are checked there too, with the same rule
 as the CLI's `--user-agent` (`headerValueProblem`, also exported as
 `assertHeaderValue(name, value)`): a blank value, a control character other than tab
