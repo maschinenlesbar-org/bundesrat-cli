@@ -170,7 +170,11 @@ in `client.ts`); copyright editorial/image fields are dropped. The whitelist vou
 for a field's **plain text** only: a whitelisted element that holds markup
 (`<topheader><p>…</p></topheader>`) or is repeated is dropped too, so inline
 editorial HTML never passes as a nested object and every surfaced field is a
-string. The one exception is `topdrucksache` (`REPEATABLE_FIELDS`): a TOP that covers
+string. So is a field whose *text* holds markup — HTML inside CDATA
+(`<title><![CDATA[<div class="abstract">…</div>]]></title>`, the form the feeds use for
+all their editorial content) or escaped tags (`&lt;p&gt;`): the parser keeps CDATA
+verbatim, so this used to pass as the field's text. A lone `<` in prose ("a < b") is not
+a tag and stays. The one exception is `topdrucksache` (`REPEATABLE_FIELDS`): a TOP that covers
 several Drucksachen repeats it, and each occurrence is a reference of its own, so their
 plain texts are joined with `REPEAT_SEPARATOR` (`"; "`) — dropping them made the TOP
 look like a procedural item. Attributes on a text element are ignored and its text is kept.

@@ -92,20 +92,39 @@ export function asArray<T>(value: XmlValue | undefined): T[] {
  * (`<party>A</party><party>B</party>`; `topdrucksache` is joined instead, see
  * {@link REPEATABLE_FIELDS}) gives `undefined`: the allowlist vouches for
  * a field's plain text only, so inline editorial HTML must not pass through as a
- * nested object, and every surfaced field stays the `string` the types promise.
+ * nested object, and every surfaced field stays the `string` the types promise. Text
+ * that holds markup itself (CDATA-wrapped or escaped HTML) gives `undefined` too.
  *
  * Runs of whitespace inside the text (the feed puts a raw newline into some
  * `topheader`s) become one space: these are short one-line labels, and the
  * documented "one line per TOP" recipes rely on that.
  */
 function textOf(value: XmlValue | undefined): string | undefined {
-  if (typeof value === "string") return oneLine(value);
-  if (!isObject(value)) return undefined;
-  for (const key of Object.keys(value)) {
-    if (key !== "#text" && !key.startsWith("@")) return undefined;
+  let text: string;
+  if (typeof value === "string") text = value;
+  else if (!isObject(value)) return undefined;
+  else {
+    for (const key of Object.keys(value)) {
+      if (key !== "#text" && !key.startsWith("@")) return undefined;
+    }
+    const inner = value["#text"];
+    text = typeof inner === "string" ? inner : "";
   }
-  const text = value["#text"];
-  return typeof text === "string" ? oneLine(text) : "";
+  // Markup that arrives as text — CDATA-wrapped HTML, the form the feeds use for all
+  // their editorial content, or escaped tags (`&lt;p&gt;`) — is dropped like element
+  // markup: the parser keeps CDATA verbatim, so `<![CDATA[<div class="abstract">…]]>`
+  // in a whitelisted title used to pass as the title's "text".
+  return hasMarkup(text) ? undefined : oneLine(text);
+}
+
+/**
+ * True when `text` contains an HTML/XML tag (`<p>`, `</div>`, `<a href="…">`, `<br/>`),
+ * a comment or a CDATA opener. A lone `<` in prose ("a < b", "<5 %") is not a tag. The
+ * feeds' factual fields are short labels and references, which never hold one (checked
+ * against the live feeds 2026-10-06: all CDATA is in non-whitelisted fields).
+ */
+function hasMarkup(text: string): boolean {
+  return /<\/?[A-Za-z][A-Za-z0-9:-]*(\s[^<>]*)?\/?>|<!--|<!\[CDATA\[/.test(text);
 }
 
 function oneLine(text: string): string {

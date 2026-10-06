@@ -41,7 +41,7 @@ bundesrat session
 ```
 
 Every field is a plain string. Empty fields are dropped (and so is a field whose
-value isn't plain text, e.g. inline markup), so `linkedtop` appears only when a TOP has a
+value isn't plain text, e.g. inline markup or HTML inside CDATA), so `linkedtop` appears only when a TOP has a
 cross-reference, and a TOP without a Drucksache has no `topdrucksache` key. A TOP that
 covers several Drucksachen lists them all, joined with `"; "` ("Drucksache 343/26;
 Drucksache 344/26"); the recipe below splits them. The

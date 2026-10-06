@@ -182,6 +182,42 @@ test("inline (non-CDATA) editorial HTML in topheader does not pass the allowlist
   assert.deepEqual(JSON.parse(JSON.stringify(s)), { tops: [{ toptitle: "TOP 1" }] });
 });
 
+test("HTML inside CDATA or escaped in a whitelisted field is dropped like element markup (2026-10-05 result 03, bug 1)", async () => {
+  const session =
+    "<iOS><list><title><![CDATA[1070. Sitzung]]></title>" +
+    '<header><![CDATA[<p class="teaser">Redaktioneller Text</p>]]></header>' +
+    "<top><toptitle>TOP 1</toptitle><topheader><![CDATA[<div class=\"abstract\"><p>Langer Text</p></div>]]></topheader></top>" +
+    "<top><toptitle>TOP 2</toptitle><topheader>&lt;b&gt;fett&lt;/b&gt;</topheader></top>" +
+    "<top><toptitle>TOP 3</toptitle><topheader>Grenzwert &lt; 5 % und a<![CDATA[ < ]]>b</topheader></top>" +
+    "<top><toptitle>TOP 4</toptitle><topheader>Text<![CDATA[<br/>]]>mehr</topheader></top>" +
+    "</list></iOS>";
+  let mt = makeMockTransport(() => xmlResponse(session));
+  const s = await new BundesratClient({ transport: mt.transport }).session();
+  assert.deepEqual(JSON.parse(JSON.stringify(s)), {
+    title: "1070. Sitzung",
+    tops: [
+      { toptitle: "TOP 1" },
+      { toptitle: "TOP 2" },
+      { toptitle: "TOP 3", topheader: "Grenzwert < 5 % und a < b" },
+      { toptitle: "TOP 4" },
+    ],
+  });
+  const appointments =
+    "<iOS><list><item><type>Event</type>" +
+    '<title><![CDATA[<div class="abstract"><p>Langer redaktioneller Text des Bundesrates ...</p></div>]]></title>' +
+    "<startdate>04.11.2026 10:30</startdate></item></list></iOS>";
+  mt = makeMockTransport(() => xmlResponse(appointments));
+  assert.deepEqual(JSON.parse(JSON.stringify(await new BundesratClient({ transport: mt.transport }).appointments())), [
+    { type: "Event", startdate: "04.11.2026 10:30" },
+  ]);
+  const members =
+    '<iOS><list><employee><name>A</name><party><![CDATA[<a href="https://evil.example">CDU</a>]]></party><state>Bayern</state></employee></list></iOS>';
+  mt = makeMockTransport(() => xmlResponse(members));
+  assert.deepEqual(JSON.parse(JSON.stringify(await new BundesratClient({ transport: mt.transport }).members())), [
+    { name: "A", state: "Bayern" },
+  ]);
+});
+
 test("a TOP with several Drucksachen lists them all, joined with '; ' (2026-10-05 result 03, bug 2)", async () => {
   const session =
     "<iOS><list><title>1070. Sitzung</title>" +
