@@ -163,7 +163,7 @@ Given **before or after** the command, e.g. `bundesrat --compact session`:
 | `--compact` | Print JSON on a single line instead of pretty-printed |
 | `--log-format <format>` | How errors, warnings and notes are written to stderr: `text` (default; log4j style, `2026-10-09T14:03:12.481Z WARN  [bundesrat.http] …`) or `jsonl` (one JSON object per line: `ts`, `level`, `topic`, `msg`). stdout is not affected |
 | `-o, --output <file>` | Write output to this file instead of stdout (`-` = stdout) |
-| `--base-url <url>` | API base URL (default `https://www.bundesrat.de`; `http:`/`https:` only, no query, fragment or whitespace; a literal `%` in a password is written `%25`). A `user:password@` in it is sent as Basic auth and shown as `***@` in every message |
+| `--base-url <url>` | API base URL (default `https://www.bundesrat.de`; `http:`/`https:` only, no query, fragment or whitespace; a literal `%` in a password is written `%25`). A `user:password@` in it is sent as Basic auth and shown as `***@` in every message; echoed back by a server (the `Basic` value, `user:password`, the password), it is shown as `***` |
 | `--timeout <ms>` | Time limit per request, reading the whole response included (default `30000`; `0` = none; at most `2147483647`). It bounds each attempt; the waits between retries come on top |
 | `--user-agent <ua>` | `User-Agent` header value |
 | `--max-retries <n>` | Retries for transient `429`/`503` responses and reset connections (0..10, default `2`). Each waits 200 ms × attempt, or a `429`/`503`'s `Retry-After` (seconds or HTTP-date) when that is longer; a `Retry-After` above 30 s is not retried, and the error names the requested wait |
