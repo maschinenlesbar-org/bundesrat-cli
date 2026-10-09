@@ -399,3 +399,22 @@ test("commander's output is one record per line, and a run without a command has
   assert.notEqual(await run(["help", "foo"], help.deps), 0);
   assert.match(untimed(help.err[0] ?? ""), /^ERROR \[bundesrat\.cli\] /);
 });
+
+test("the log format is the one commander parsed, where an option's value looks like --log-format (L6)", async () => {
+  const isJsonl = (line: string): boolean => line.startsWith("{");
+  // commander takes "--log-format=jsonl" as the User-Agent: the note is text.
+  const ua = makeCli(() => xmlResponse(fx.membersXml));
+  assert.equal(await run(["--user-agent", "--log-format=jsonl", "members", "--party", "XYZ"], ua.deps), 0);
+  assert.ok(ua.err.length === 1 && !isJsonl(ua.err[0] as string), ua.err.join("\n"));
+  // jsonl asked for, then "--log-format" as the value of --user-agent and of -o: jsonl.
+  const back = makeCli(() => xmlResponse(fx.membersXml));
+  assert.equal(await run(["--log-format", "jsonl", "--user-agent", "--log-format", "members", "--party", "XYZ"], back.deps), 0);
+  assert.ok(back.err.length === 1 && isJsonl(back.err[0] as string), back.err.join("\n"));
+  const output = makeCli(() => xmlResponse(fx.membersXml));
+  assert.equal(await run(["--log-format", "jsonl", "-o", "--log-format", "members"], output.deps), 0);
+  assert.ok(output.err.length === 1 && isJsonl(output.err[0] as string), output.err.join("\n"));
+  // A parse error after such a value is logged in the format commander would have used.
+  const parse = makeCli(() => xmlResponse(fx.membersXml));
+  assert.equal(await run(["--log-format", "jsonl", "--user-agent", "--log-format", "members", "--bogus"], parse.deps), 2);
+  assert.ok(parse.err.length > 0 && parse.err.every(isJsonl), parse.err.join("\n"));
+});
