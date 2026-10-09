@@ -3,9 +3,8 @@
 
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
-import { logOf, type CliDeps } from "./io.js";
+import { OutputError, logOf, type CliDeps } from "./io.js";
 import type { BundesratClientOptions } from "../client/client.js";
-import { BundesratError } from "../client/errors.js";
 import { cleartextProblem, DEFAULT_BASE_URL, isBidiControl } from "../client/engine.js";
 import { baseUrlProblem, headerValueProblem, nonBlankProblem, stateProblem } from "../client/validate.js";
 
@@ -159,11 +158,12 @@ export function renderJson(deps: CliDeps, global: GlobalOptions, value: unknown)
       deps.io.writeFile(global.output, data);
     } catch (err) {
       // A bad --output path (missing directory, a directory, no permission) is a
-      // user error, not an internal fault — surface it as a clean BundesratError
-      // instead of letting the raw fs exception hit the "Unexpected error" path.
-      // Drop the `, open '<path>'` tail since we already name the path ourselves.
+      // user error, not an internal fault — surface it as a clean OutputError (logged
+      // under bundesrat.output) instead of letting the raw fs exception hit the
+      // "Unexpected error" path. Drop the `, open '<path>'` tail since we already name
+      // the path ourselves.
       const reason = err instanceof Error ? err.message.replace(/,\s*open\s+'.*'$/, "") : String(err);
-      throw new BundesratError(`Could not write to ${global.output}: ${reason}`);
+      throw new OutputError(`Could not write to ${global.output}: ${reason}`, { cause: err });
     }
     logOf(deps).info("output", `Wrote ${data.length} bytes to ${global.output}`);
   } else {

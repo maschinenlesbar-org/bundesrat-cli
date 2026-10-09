@@ -169,7 +169,7 @@ test("a --output write failure reports a clean error (exit 1), not 'Unexpected e
   };
   const code = await run(["--output", "/tmp", "members"], deps);
   assert.equal(code, 1);
-  assert.match(err.join("\n"), /Could not write to \/tmp: EISDIR/);
+  assert.match(untimed(err.join("\n")), /^ERROR \[bundesrat\.output\] Could not write to \/tmp: EISDIR/);
   assert.doesNotMatch(err.join("\n"), /Unexpected error/);
   assert.equal(out.length, 0); // nothing leaked to stdout
 });
@@ -417,4 +417,16 @@ test("the log format is the one commander parsed, where an option's value looks 
   const parse = makeCli(() => xmlResponse(fx.membersXml));
   assert.equal(await run(["--log-format", "jsonl", "--user-agent", "--log-format", "members", "--bogus"], parse.deps), 2);
   assert.ok(parse.err.length > 0 && parse.err.every(isJsonl), parse.err.join("\n"));
+});
+
+test("every -o failure is an ERROR record of bundesrat.output, exit 1 (L8)", async () => {
+  for (const thrown of [new Error("ENOENT: no such file or directory, open '/nonexistent/x'"), new Error("EACCES: permission denied, open '/nonexistent/x'"), "not an Error"]) {
+    const cli = makeCli(() => xmlResponse(fx.membersXml));
+    cli.deps.io.writeFile = () => {
+      throw thrown;
+    };
+    assert.equal(await run(["-o", "/nonexistent/x", "members"], cli.deps), 1);
+    assert.match(untimed(cli.err.join("\n")), /^ERROR \[bundesrat\.output\] Could not write to \/nonexistent\/x: /);
+    assert.doesNotMatch(cli.err.join("\n"), /Unexpected error/);
+  }
 });

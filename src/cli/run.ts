@@ -4,7 +4,7 @@
 
 import { CommanderError, type Command } from "commander";
 import { buildProgram, defaultDeps } from "./program.js";
-import { logOf, type CliDeps } from "./io.js";
+import { OutputError, logOf, type CliDeps } from "./io.js";
 import { DEFAULT_LOG_FORMAT, createLogger, logFormatFromArgv, type LogFormat, type Logger } from "./log.js";
 import {
   BundesratApiError,
@@ -269,8 +269,9 @@ export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<
       return EXIT.NETWORK;
     }
     if (err instanceof BundesratError) {
-      // Includes BundesratParseError (e.g. the feed returned the HTML shell).
-      log.error("cli", err.message);
+      // Includes BundesratParseError (e.g. the feed returned the HTML shell); an -o
+      // failure (OutputError) is an output record.
+      log.error(err instanceof OutputError ? "output" : "cli", err.message);
       return EXIT.OTHER;
     }
     log.error("cli", `Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
