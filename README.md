@@ -90,6 +90,21 @@ giving one twice is a usage error (exit `2`) — run the command once per Land i
 Every command prints **JSON to stdout**; diagnostics go to stderr, so piping into
 `jq` stays clean.
 
+Each line on stderr is a **log record**: a timestamp (UTC), a level (`ERROR`, `WARN`,
+`INFO`) and a topic, the program and the area it comes from (`bundesrat.cli` for usage
+errors and notes, `bundesrat.api` for the feed server's answers, `bundesrat.http` for the
+connection, `bundesrat.output` for `-o`). By default it is written log4j style;
+`--log-format jsonl` writes one JSON object per line instead:
+
+```text
+2026-10-09T14:03:12.481Z WARN  [bundesrat.http] requests to mirror.example are sent unencrypted (http:, not https:)
+2026-10-09T14:03:12.902Z ERROR [bundesrat.api] HTTP 404 for GET http://mirror.example/iOS/SharedDocs/2_Mitglieder/mitglieder_table.xml?view=renderXml
+```
+
+```bash
+bundesrat --log-format jsonl members 2>log.jsonl   # {"ts":"…","level":"ERROR","topic":"bundesrat.api","msg":"HTTP 404 …"}
+```
+
 ```bash
 # How many agenda items in the current sitting?
 bundesrat session | jq '.tops | length'
@@ -142,6 +157,7 @@ Given **before or after** the command, e.g. `bundesrat --compact session`:
 | `-V, --version` | Print the version number |
 | `-h, --help` | Show help for the program or a command |
 | `--compact` | Print JSON on a single line instead of pretty-printed |
+| `--log-format <format>` | How errors, warnings and notes are written to stderr: `text` (default; log4j style, `2026-10-09T14:03:12.481Z WARN  [bundesrat.http] …`) or `jsonl` (one JSON object per line: `ts`, `level`, `topic`, `msg`). stdout is not affected |
 | `-o, --output <file>` | Write output to this file instead of stdout (`-` = stdout) |
 | `--base-url <url>` | API base URL (default `https://www.bundesrat.de`; `http:`/`https:` only, no query, fragment or whitespace; a literal `%` in a password is written `%25`). A `user:password@` in it is sent as Basic auth and shown as `***@` in every message |
 | `--timeout <ms>` | Time limit per request, reading the whole response included (default `30000`; `0` = none; at most `2147483647`). It bounds each attempt; the waits between retries come on top |
@@ -150,9 +166,9 @@ Given **before or after** the command, e.g. `bundesrat --compact session`:
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
 A base URL on plain `http:` to a host other than loopback (`localhost`, `127.0.0.0/8`,
-`::1`) works, but the CLI writes one line to stderr before the first request, e.g.
-`warning: requests to mirror.example are sent unencrypted (http:, not https:)`, or
-`warning: the base URL's credentials are sent unencrypted to mirror.example (http:, not https:)`
+`::1`) works, but the CLI writes one `WARN` record of `bundesrat.http` to stderr before the
+first request, e.g. `… WARN  [bundesrat.http] requests to mirror.example are sent unencrypted (http:, not https:)`,
+or `… WARN  [bundesrat.http] the base URL's credentials are sent unencrypted to mirror.example (http:, not https:)`
 when it carries a `user:password@` (never printed). stdout, `-o` files and the exit code
 are unchanged.
 

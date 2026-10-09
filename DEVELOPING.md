@@ -150,7 +150,7 @@ secrets)` (engine, exported) returns one sentence naming the host (`url.host`, n
 userinfo) and what travels unencrypted — the base URL's credentials when it carries
 userinfo — or `undefined` for `https:`, an unparseable URL and loopback hosts
 (`localhost`, `127.0.0.0/8`, `::1`). The CLI's `action()` wrapper (`shared.ts`,
-`warnOnCleartext`) prints it once per run as `warning: <sentence>` on stderr, after the
+`warnOnCleartext`) logs it once per run as a `WARN` record of `bundesrat.http` on stderr, after the
 options are parsed and before the first request; `--help`, `--version` and usage errors
 never get there. `test/conformance-p20-cleartext-warning.test.ts` checks it.
 
@@ -262,7 +262,8 @@ src/
     validate.ts  # the Problem type + assertValid: input rules shared by library and CLI
     client.ts    # BundesratClient — session/members/appointments + open-field projection
   cli/
-    io.ts        # injectable I/O seam (stdout/stderr/file)
+    io.ts        # injectable I/O seam (stdout/stderr/file), the logger and the clock
+    log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
     shared.ts    # option parsers, global-option resolver, JSON renderer
     commands/    # feeds.ts — one command per feed (members has --state/--party)
     program.ts   # assembles the commander program from injectable deps
@@ -306,8 +307,8 @@ functions instead of keeping its own copy. A rule is a pure, exported `Problem`
 throws `BundesratValidationError` with the message `Invalid <name>: <reason>` before
 any request (a constructor throws; a method returning a promise rejects). The CLI's
 commander parsers turn the same reason into a usage error (exit 2), and `run.ts` maps a
-`BundesratValidationError` raised during an action to exit 2 too, printed as
-`Error: <message>`.
+`BundesratValidationError` raised during an action to exit 2 too, logged as an `ERROR`
+record of `bundesrat.cli`.
 
 ## Testing
 
@@ -339,7 +340,8 @@ npm test          # builds, then runs `node --test` over dist/test
   keys and Länder), P12 (`-o -`), P20 (the stderr warning for a plain-`http:` base URL;
   the env-variable and other-secret cases are skipped: no environment variable, no key),
   P21 (the README's relative links: README.md ships to npmjs.com, so a link to a document
-  the `files` allowlist leaves out must be an absolute GitHub URL).
+  the `files` allowlist leaves out must be an absolute GitHub URL), P23 (the log on
+  stderr: record format, `--log-format jsonl`, no secret in either format).
 
 ## Continuous integration
 
@@ -381,3 +383,22 @@ npm run serve                        # http://127.0.0.1:4000/bundesrat-cli/
 Dual-licensed under **[AGPL-3.0-or-later](LICENSE)** or a commercial license —
 see **[LICENSING.md](LICENSING.md)**. This project does **not** accept external
 code contributions; see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+
+## The log on stderr
+
+Every diagnostic line on stderr is a log record (`src/cli/log.ts`): a timestamp, a level
+(`ERROR`, `WARN`, `INFO`) and a topic, `bundesrat.<area>`. `--log-format text` (the default)
+writes it log4j style, `<ISO 8601 UTC> <LEVEL padded to 5> [<topic>] <message>`;
+`--log-format jsonl` writes one JSON object per line with exactly `ts`, `level`, `topic`
+and `msg`. The areas are `cli` (usage errors, commander's messages, unexpected errors, the
+note on an empty `--party` result, a feed that does not parse), `api` (the server's answers,
+and the hint after a 3xx), `http` (the connection, the size-cap hint, the cleartext warning)
+and `output` (`Wrote N bytes` after `-o`). Code logs through `logOf(deps)` and never writes
+diagnostics with `io.err` directly. `run()` builds the logger from argv before commander
+parses it, so commander's own usage errors are records too, and on top of the redacted
+`io.err`, so a secret is kept out of the log in either format. `CliDeps.now` makes the
+timestamps testable. stdout carries data only. Two lines are left raw, both written
+straight to `process.stderr` outside `run()`: the bin shim's `Output error: …`
+(`handleOutputErrors`, when stdout itself fails) and its last-resort `Unexpected error: …`
+when `run()` itself rejects. Conformance test P23 checks all of this, and its body is
+shared across the *-cli repos.

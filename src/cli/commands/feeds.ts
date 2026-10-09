@@ -9,7 +9,7 @@
 // and the Präsidium / next-sitting HTML pages — are intentionally not commands.
 
 import type { Command } from "commander";
-import type { CliDeps } from "../io.js";
+import { logOf, type CliDeps } from "../io.js";
 import type { MemberFilter } from "../../client/client.js";
 import { action, once, parseNonEmpty, parseState, renderJson } from "../shared.js";
 
@@ -54,8 +54,9 @@ export function registerCommands(program: Command, deps: CliDeps): void {
         // The feed can't say "no such party": an empty list is all a typo gets. Say so on
         // stderr (stdout stays the plain `[]`), naming the filter.
         if (members.length === 0 && filter.party !== undefined) {
-          deps.io.err(
-            `Note: no member${filter.state !== undefined ? " of that Land" : ""} has a party containing ` +
+          logOf(deps).info(
+            "cli",
+            `no member${filter.state !== undefined ? " of that Land" : ""} has a party containing ` +
               `${JSON.stringify(filter.party)} (--party matches a substring of the party name).`,
           );
         }

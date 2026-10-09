@@ -6,7 +6,7 @@ import { BundesratError, BundesratValidationError } from "../src/client/errors.j
 import { BundesratClient } from "../src/client/client.js";
 import { run } from "../src/cli/run.js";
 import type { CliDeps } from "../src/cli/io.js";
-import { parity, xmlResponse } from "./helpers.js";
+import { parity, xmlResponse, untimed } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
 const nonBlank: Problem<string> = (v) => (v.trim() === "" ? "Expected a non-empty value." : undefined);
@@ -30,7 +30,7 @@ test("the validation layer is exported from the package root", () => {
   assert.equal(lib.BundesratValidationError, BundesratValidationError);
 });
 
-test("run() maps a BundesratValidationError raised in an action to exit 2, 'Error: <message>'", async () => {
+test("run() maps a BundesratValidationError raised in an action to exit 2 and an ERROR record", async () => {
   const out: string[] = [];
   const err: string[] = [];
   const deps: CliDeps = {
@@ -40,7 +40,7 @@ test("run() maps a BundesratValidationError raised in an action to exit 2, 'Erro
     },
   };
   assert.equal(await run(["members"], deps), 2);
-  assert.deepEqual(err, ["Error: Invalid thing: Expected a non-empty value."]);
+  assert.deepEqual(err.map(untimed), ["ERROR [bundesrat.cli] Invalid thing: Expected a non-empty value."]);
   assert.deepEqual(out, []);
 });
 

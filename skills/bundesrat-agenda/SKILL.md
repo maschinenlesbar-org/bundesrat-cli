@@ -84,6 +84,6 @@ bundesrat appointments \
   with "Quelle: Bundesrat".
 - **A connection reset is retried.** The server occasionally drops a connection; the
   CLI retries it like a 429/503 (up to `--max-retries`, default 2). Only when every try
-  fails does it exit `6` (`Error: read ECONNRESET`); then report the feed as unavailable
+  fails does it exit `6` (an `ERROR [bundesrat.http] read ECONNRESET` record on stderr); then report the feed as unavailable
   rather than looping.
 - Members of the Bundesrat → the **bundesrat-members** skill.

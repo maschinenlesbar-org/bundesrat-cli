@@ -93,6 +93,6 @@ bundesrat members | jq '[.[] | select(.mitglied == "true")] | length'
   by the CLI, so there's nothing to scrape or republish.
 - **A connection reset is retried.** The server occasionally drops a connection; the
   CLI retries it like a 429/503 (up to `--max-retries`, default 2). Only when every try
-  fails does it exit `6` (`Error: read ECONNRESET`); then report the feed as unavailable
+  fails does it exit `6` (an `ERROR [bundesrat.http] read ECONNRESET` record on stderr); then report the feed as unavailable
   rather than looping.
 - The plenary agenda and committee dates → the **bundesrat-agenda** skill.

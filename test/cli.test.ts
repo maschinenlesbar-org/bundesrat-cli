@@ -4,7 +4,7 @@ import { run } from "../src/cli/run.js";
 import { BundesratClient } from "../src/client/client.js";
 import type { CliDeps } from "../src/cli/io.js";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
-import { makeMockTransport, xmlResponse, rawResponse } from "./helpers.js";
+import { makeMockTransport, xmlResponse, rawResponse, untimed } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
 function makeCli(responder: (req: HttpRequest) => HttpResponse) {
@@ -75,7 +75,7 @@ test("members --party that matches nothing prints [] and a note on stderr naming
   const cli = makeCli(() => xmlResponse(fx.membersXml));
   assert.equal(await run(["members", "--party", "Piraten"], cli.deps), 0);
   assert.deepEqual(JSON.parse(cli.out.join("\n")), []);
-  assert.match(cli.err.join("\n"), /^Note: no member has a party containing "Piraten"/);
+  assert.match(untimed(cli.err.join("\n")), /^INFO  \[bundesrat\.cli\] no member has a party containing "Piraten"/);
   const quiet = makeCli(() => xmlResponse(fx.membersXml));
   await run(["members", "--state", "Hamburg"], quiet.deps);
   assert.deepEqual(quiet.err, []);
@@ -114,7 +114,7 @@ test("a server 3xx exits 1 (runtime) with a base-url hint, not usage (2)", async
   const cli = makeCli(() => rawResponse("", "text/html", 302));
   const code = await run(["members"], cli.deps);
   assert.equal(code, 1);
-  assert.match(cli.err.join("\n"), /redirected \(3xx\)|--base-url/);
+  assert.match(untimed(cli.err.join("\n")), /^ERROR \[bundesrat\.api\] .*\nINFO  \[bundesrat\.api\] the server redirected \(3xx\) — check --base-url/);
 });
 
 test("--compact prints single-line JSON", async () => {
@@ -148,7 +148,7 @@ test("--output writes to a file and keeps stdout clean", async () => {
   await run(["--output", "/tmp/out.json", "members"], cli.deps);
   assert.equal(cli.out.length, 0);
   assert.ok(cli.files["/tmp/out.json"]);
-  assert.match(cli.err.join("\n"), /Wrote \d+ bytes/);
+  assert.match(untimed(cli.err.join("\n")), /^INFO  \[bundesrat\.output\] Wrote \d+ bytes to \/tmp\/out\.json$/);
 });
 
 test("a --output write failure reports a clean error (exit 1), not 'Unexpected error'", async () => {
@@ -322,7 +322,7 @@ test("a parse error names the parser's reason", async () => {
   ] as const) {
     const cli = makeCli(() => xmlResponse(body));
     assert.equal(await run(["session"], cli.deps), 1);
-    assert.match(cli.err.join("\n"), /^Error: Failed to parse XML response from \/iOS\/SharedDocs\/3_Plenum\/plenum_aktuelleSitzung_table\.xml: /);
+    assert.match(untimed(cli.err.join("\n")), /^ERROR \[bundesrat\.cli\] Failed to parse XML response from \/iOS\/SharedDocs\/3_Plenum\/plenum_aktuelleSitzung_table\.xml: /);
     assert.match(cli.err.join("\n"), reason);
   }
 });
