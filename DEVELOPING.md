@@ -293,9 +293,11 @@ input, thrown before any request), all extending `BundesratError`. A wrong-typed
 that validation error too, never a raw `TypeError`: a non-object filter or options value
 (`members("Bayern")`, `members(null)`, `new BundesratClient(null)`), a non-array list for
 `filterMembers`, a `transport` or `sleep` that isn't a function. Echoed values and
-server text are cut at 500 characters in messages (`cutForMessage`), a server's error
-text at 200, never inside a surrogate pair (`cutText`), so the message stays well-formed;
-the error's properties keep the full value. `test/conformance-p8-p9-p13-responses-and-errors.test.ts`
+server text are cut at 500 characters in messages (`cutForMessage`,
+`MAX_MESSAGE_VALUE_LENGTH`: an option value, an unexpected root element's name, the
+`--party` value the CLI's note quotes), a server's error text at 200, never inside a
+surrogate pair (`cutText`), so the message stays well-formed and bounded for a library
+caller too; the error's properties keep the full value. `test/conformance-p8-p9-p13-responses-and-errors.test.ts`
 checks the declared charset (P8), the feed's document shape (P9) and twenty-one
 wrong-typed calls (P13).
 
@@ -398,8 +400,9 @@ the message (text) or the whole JSON object (jsonl), which writes CR and LF as `
 every other C0 control but TAB, DEL and C1 as `\u00XX`, and U+2028, U+2029 and the bidi
 controls as `\uXXXX`, so no text that reaches a record, by whatever path, can split it,
 forge another one or steer the terminal. Before that a lone surrogate (half a
-character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`).
-The areas are `cli` (usage errors, commander's messages, unexpected errors, the
+character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`),
+and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
+code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages, unexpected errors, the
 note on an empty `--party` result, a feed that does not parse), `api` (the server's answers,
 and the hint after a 3xx), `http` (the connection, the size-cap hint, the cleartext warning)
 and `output` (`Wrote N bytes` after `-o`). Code logs through `logOf(deps)` and never writes

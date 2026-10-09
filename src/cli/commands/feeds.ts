@@ -11,6 +11,7 @@
 import type { Command } from "commander";
 import { logOf, type CliDeps } from "../io.js";
 import type { MemberFilter } from "../../client/client.js";
+import { cutForMessage } from "../../client/errors.js";
 import { action, once, parseNonEmpty, parseState, renderJson } from "../shared.js";
 
 /** Register a trivial "fetch a feed and render it" command. */
@@ -57,7 +58,7 @@ export function registerCommands(program: Command, deps: CliDeps): void {
           logOf(deps).info(
             "cli",
             `no member${filter.state !== undefined ? " of that Land" : ""} has a party containing ` +
-              `${JSON.stringify(filter.party)} (--party matches a substring of the party name).`,
+              `${JSON.stringify(cutForMessage(filter.party))} (--party matches a substring of the party name).`,
           );
         }
       }),

@@ -19,7 +19,7 @@
 
 import { RequestEngine, type EngineOptions } from "./engine.js";
 import type { XmlObject, XmlValue } from "./xml.js";
-import { BundesratParseError } from "./errors.js";
+import { BundesratParseError, cutForMessage } from "./errors.js";
 import { assertValid, knownKeysProblem, nonBlankProblem, stateProblem } from "./validate.js";
 import type { AgendaItem, Appointment, Member, Session } from "./types.js";
 
@@ -258,7 +258,7 @@ export class BundesratClient {
   private async list(path: string): Promise<XmlObject> {
     const doc = await this.engine.getXmlDocument(path, RENDER_QUERY);
     if (doc.root !== "iOS" || !isObject(doc.value)) {
-      throw shapeError(path, `an <iOS> root element, got <${doc.root}>`);
+      throw shapeError(path, `an <iOS> root element, got <${cutForMessage(doc.root)}>`);
     }
     const list = doc.value["list"];
     if (list === "") return {};

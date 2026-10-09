@@ -18,6 +18,7 @@ import {
   redactUrl,
   toWellFormed,
 } from "../src/client/errors.js";
+import { BundesratClient } from "../src/client/client.js";
 import { makeMockTransport, xmlResponse, rawResponse } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -360,4 +361,10 @@ test("a server detail cut at 200 characters keeps the message well-formed", asyn
       return true;
     });
   }
+});
+
+test("own messages quote a server value at most 500 characters long (L3)", async () => {
+  const root = `r${"x".repeat(5000)}`;
+  const client = new BundesratClient({ transport: async () => xmlResponse(`<${root}><list/></${root}>`) });
+  await assert.rejects(client.appointments(), (err: Error) => err.message.length < 700 && /got <rx+…>/.test(err.message));
 });
