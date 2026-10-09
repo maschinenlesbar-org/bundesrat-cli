@@ -326,6 +326,8 @@ npm test          # builds, then runs `node --test` over dist/test
   `asArray` normalisation — mocked transport.
 - **`cli.test.ts`** — command parsing, the `members` `--state`/`--party` filters,
   `--output`, and exit codes — mocked client.
+- **`log.test.ts`** — the record helpers of `src/cli/log.ts` on their own
+  (`escapeForRecord`, `formatLogRecord`); the CLI-level checks are P23's.
 - **`validate.test.ts`** — `assertValid`, the `run.ts` mapping of
   `BundesratValidationError`, and the `parity()` helper (`test/helpers.ts`), which sends
   one input through `run()` and through the library on one recording mock transport so
@@ -390,7 +392,11 @@ Every diagnostic line on stderr is a log record (`src/cli/log.ts`): a timestamp,
 (`ERROR`, `WARN`, `INFO`) and a topic, `bundesrat.<area>`. `--log-format text` (the default)
 writes it log4j style, `<ISO 8601 UTC> <LEVEL padded to 5> [<topic>] <message>`;
 `--log-format jsonl` writes one JSON object per line with exactly `ts`, `level`, `topic`
-and `msg`. The areas are `cli` (usage errors, commander's messages, unexpected errors, the
+and `msg`. A record is always one line: `formatLogRecord` runs `escapeForRecord` over
+the message (text) or the whole JSON object (jsonl), which writes CR and LF as `\r`/`\n`,
+every other C0 control but TAB, DEL and C1 as `\u00XX`, and U+2028, U+2029 and the bidi
+controls as `\uXXXX`, so no text that reaches a record, by whatever path, can split it,
+forge another one or steer the terminal. The areas are `cli` (usage errors, commander's messages, unexpected errors, the
 note on an empty `--party` result, a feed that does not parse), `api` (the server's answers,
 and the hint after a 3xx), `http` (the connection, the size-cap hint, the cleartext warning)
 and `output` (`Wrote N bytes` after `-o`). Code logs through `logOf(deps)` and never writes

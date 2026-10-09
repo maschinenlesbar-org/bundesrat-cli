@@ -94,7 +94,10 @@ Each line on stderr is a **log record**: a timestamp (UTC), a level (`ERROR`, `W
 `INFO`) and a topic, the program and the area it comes from (`bundesrat.cli` for usage
 errors and notes, `bundesrat.api` for the feed server's answers, `bundesrat.http` for the
 connection, `bundesrat.output` for `-o`). By default it is written log4j style;
-`--log-format jsonl` writes one JSON object per line instead:
+`--log-format jsonl` writes one JSON object per line instead. A record is always one line:
+a line break, a control character or a bidi control in a message (a server's text, a value
+you typed) is written as an escape (`\n`, `\u001b`, `\u202e`), so it can neither split a
+record nor forge another one, nor steer the terminal:
 
 ```text
 2026-10-09T14:03:12.481Z WARN  [bundesrat.http] requests to mirror.example are sent unencrypted (http:, not https:)
