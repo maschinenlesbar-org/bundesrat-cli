@@ -283,7 +283,9 @@ src/
 **Closed pipes.** The bin shim installs `handleOutputErrors()` (`io.ts`) before `run()`:
 an EPIPE on stdout (`| head`, a `jq` that exits early) exits 0 quietly; an EPIPE on
 stderr is ignored, so a failed run keeps its own exit code (`2>&1 | true` must not turn
-a usage error into 0); any other output error exits 1.
+a usage error into 0); any other stdout write error is an ERROR record of
+`bundesrat.output` (`Could not write to stdout: …`, in the format argv asks for:
+`processLogger`) and exits 1.
 `test/conformance-p7-pipes-exit-codes.test.ts` runs the built bin for both.
 
 **Two seams make the whole thing testable in-process (no subprocesses):**
@@ -427,8 +429,9 @@ record (`writeCommanderErr`). The log is built with the run's redaction
 (`withRedactedOutput`), which replaces a secret in the message only, before it
 is escaped: the frame is never touched, and a secret is kept out of the log in either
 format. `CliDeps.now` makes the
-timestamps testable. stdout carries data only. Two lines are left raw, both written
-straight to `process.stderr` outside `run()`: the bin shim's `Output error: …`
-(`handleOutputErrors`, when stdout itself fails) and its last-resort `Unexpected error: …`
-when `run()` itself rejects. Conformance test P23 checks all of this, and its body is
+timestamps testable. stdout carries data only. What happens outside `run()`, in the bin
+shim, is logged too, through `processLogger(argv)` (the format argv asks for, the run's
+redaction): a stdout write error (`handleOutputErrors`) as an ERROR of `bundesrat.output`,
+and the last-resort `Unexpected error: …` when `run()` itself rejects as an ERROR of
+`bundesrat.cli`. Conformance test P23 checks all of this, and its body is
 shared across the *-cli repos.
