@@ -377,3 +377,25 @@ test("an a:b@c argument (a User-Agent, an -o path) is neither a credential in th
   assert.deepEqual(credentialsIn("run:2026-10-09@x"), []);
   assert.deepEqual(credentialsIn("https://alice:pw@host"), ["alice:pw"]);
 });
+
+test("commander's output is one record per line, and a run without a command has an ERROR (L5)", async () => {
+  // Options but no command: commander shows the help as an error.
+  const none = makeCli(() => xmlResponse(fx.membersXml));
+  assert.equal(await run(["--compact"], none.deps), 2);
+  const lines = none.err.map(untimed);
+  assert.equal(lines[0], "ERROR [bundesrat.cli] missing command: `bundesrat <subcommand>`");
+  assert.ok(lines.slice(1).every((line) => line.startsWith("INFO  [bundesrat.cli] ") && !line.includes("\\n")), lines.join("\n"));
+  assert.ok(lines.some((line) => line === "INFO  [bundesrat.cli] Usage: bundesrat [options] [command]"), lines.join("\n"));
+
+  // An option typo: the suggestion is part of the ERROR, the help one INFO record per line.
+  const typo = makeCli(() => xmlResponse(fx.membersXml));
+  assert.equal(await run(["members", "--stat", "Bayern"], typo.deps), 2);
+  const typoLines = typo.err.map(untimed);
+  assert.equal(typoLines[0], "ERROR [bundesrat.cli] unknown option '--stat' (Did you mean --state?)");
+  assert.ok(typoLines.slice(1).every((line) => line.startsWith("INFO  [bundesrat.cli] ") && !line.includes("\\n")), typoLines.join("\n"));
+
+  // An unknown help topic is an ERROR too.
+  const help = makeCli(() => xmlResponse(fx.membersXml));
+  assert.notEqual(await run(["help", "foo"], help.deps), 0);
+  assert.match(untimed(help.err[0] ?? ""), /^ERROR \[bundesrat\.cli\] /);
+});
