@@ -28,6 +28,7 @@ import {
   echoedCredentialForms,
   redactSecrets,
   redactCredentials,
+  redactUrl,
 } from "./errors.js";
 import { assertValid, baseUrlProblem, headerNameProblem, headerValueProblem, knownKeysProblem } from "./validate.js";
 
@@ -42,6 +43,7 @@ export const ENGINE_OPTION_KEYS = [
   "retryDelayMs",
   "maxResponseBytes",
   "sleep",
+  "onRetry",
 ] as const;
 
 export const DEFAULT_BASE_URL = "https://www.bundesrat.de";
@@ -110,6 +112,25 @@ export interface EngineOptions {
   maxResponseBytes?: number;
   /** Injectable sleep, primarily for deterministic tests. */
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Called once per retry, right before the backoff sleep, for each retried 429/503
+   * and reset connection; never when there is no retry. A throw is swallowed.
+   */
+  onRetry?: (event: RetryEvent) => void;
+}
+
+/** What `EngineOptions.onRetry` is told about one retry. */
+export interface RetryEvent {
+  /** Which retry this is, counting from 1. */
+  retry: number;
+  /** The most retries this request may make (`maxRetries`). */
+  maxRetries: number;
+  /** How long the engine waits before sending the request again. */
+  delayMs: number;
+  /** The HTTP status that caused the retry; absent for a reset connection. */
+  status?: number;
+  /** The URL being retried, userinfo redacted. */
+  url: string;
 }
 
 const DEFAULT_MAX_RESPONSE_BYTES = 100 * 1024 * 1024;
@@ -449,6 +470,7 @@ export class RequestEngine {
   private readonly retryDelayMs: number;
   private readonly maxResponseBytes: number;
   private readonly sleep: (ms: number) => Promise<void>;
+  private readonly onRetry: ((event: RetryEvent) => void) | undefined;
 
   constructor(options: EngineOptions = {}) {
     // A misspelled option (`timeout`, `maxRetry`) was ignored and its default used.
@@ -482,6 +504,24 @@ export class RequestEngine {
       Number.MAX_SAFE_INTEGER,
     );
     this.sleep = functionOption("sleep", options.sleep, realSleep);
+    this.onRetry =
+      options.onRetry === undefined ? undefined : functionOption("onRetry", options.onRetry, () => {});
+  }
+
+  /** Tell `onRetry` about a retry, then wait. A throwing callback never breaks the request. */
+  private async backOff(attempt: number, delayMs: number, url: string, status?: number): Promise<void> {
+    try {
+      this.onRetry?.({
+        retry: attempt,
+        maxRetries: this.maxRetries,
+        delayMs,
+        ...(status !== undefined ? { status } : {}),
+        url: redactUrl(url),
+      });
+    } catch {
+      // a logging hook is no reason to fail the request
+    }
+    await this.sleep(delayMs);
   }
 
   /**
@@ -594,7 +634,7 @@ export class RequestEngine {
         // or absent upstream should not be asked again at once.
         if (hasTransientCode(cause) && attempt < this.maxRetries) {
           attempt += 1;
-          await this.sleep(this.retryDelayMs * attempt);
+          await this.backOff(attempt, this.retryDelayMs * attempt, url);
           continue;
         }
         throw this.transportError(cause);
@@ -626,7 +666,7 @@ export class RequestEngine {
         if (retryAfter === undefined || retryAfter <= MAX_RETRY_AFTER_MS) {
           attempt += 1;
           const backoff = this.retryDelayMs * attempt;
-          await this.sleep(retryAfter === undefined ? backoff : Math.max(retryAfter, backoff));
+          await this.backOff(attempt, retryAfter === undefined ? backoff : Math.max(retryAfter, backoff), url, status);
           continue;
         }
       }

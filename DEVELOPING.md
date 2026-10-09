@@ -106,6 +106,13 @@ than `MAX_RETRY_AFTER_MS` (30 s) is not retried: the `BundesratApiError` surface
 once, names the requested wait and carries it as `retryAfterMs`.
 `test/conformance-p6-retry-policy.test.ts` checks both.
 
+Each retry is announced: the engine option `onRetry(event: RetryEvent)` (exported type:
+`{ retry` (1-based), `maxRetries`, `delayMs`, `status?` (absent for a reset), `url` (userinfo
+redacted) `}`) is called once per retry right before the sleep, never when there is none, and
+a throw in it is swallowed. The CLI's `action()` sets it to log one `WARN` record of
+`bundesrat.http`, `HTTP 503 from <host>: retry 1 of 3 in 2 s` (`retryMessage`; host only, whole
+seconds, ms under 1 s). Tests: `test/retry-hook.test.ts`, `test/retry-log.test.ts`.
+
 The engine enforces the transport contract itself, so the limits hold for a custom
 transport (a `fetch` wrapper, a raw `node:http` one) too: every call races a deadline of
 `timeoutMs` and gets an `AbortSignal` (`HttpRequest.signal`, honoured by the default
