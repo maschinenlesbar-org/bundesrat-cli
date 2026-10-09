@@ -13,7 +13,10 @@ import {
   BundesratApiError,
   BundesratParseError,
   BundesratValidationError,
+  cutForMessage,
+  cutText,
   redactUrl,
+  toWellFormed,
 } from "../src/client/errors.js";
 import { makeMockTransport, xmlResponse, rawResponse } from "./helpers.js";
 import * as fx from "./fixtures.js";
@@ -337,4 +340,24 @@ test("an unknown Content-Type charset is a parse error", async () => {
     () => new RequestEngine({ transport: mt.transport }).getXml("/f.xml"),
     (err) => err instanceof BundesratParseError && /Unsupported response charset "x-bogus"/.test(err.message),
   );
+});
+
+test("cutText never cuts inside a surrogate pair; toWellFormed replaces half a character", () => {
+  assert.equal(cutText("ab\u{1f600}cd", 3), "ab");
+  assert.equal(cutText("ab\u{1f600}cd", 4), "ab\u{1f600}");
+  assert.equal(cutText("short", 10), "short");
+  assert.equal(toWellFormed("a\ud83d b\ude00 \u{1f600}"), "a\ufffd b\ufffd \u{1f600}");
+  // cutForMessage (500) uses it too.
+  assert.equal(toWellFormed(cutForMessage("a" + "\u{1f600}".repeat(400))), cutForMessage("a" + "\u{1f600}".repeat(400)));
+});
+
+test("a server detail cut at 200 characters keeps the message well-formed", async () => {
+  for (const detail of ["\u{1f600}".repeat(300), "a" + "\u{1f600}".repeat(300)]) {
+    const e = new RequestEngine({ maxRetries: 0, transport: async () => rawResponse(detail, "text/plain", 500) });
+    await assert.rejects(e.getXml("/x"), (err: Error) => {
+      assert.equal(toWellFormed(err.message), err.message);
+      assert.match(err.message, /…$/);
+      return true;
+    });
+  }
 });

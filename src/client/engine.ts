@@ -24,6 +24,7 @@ import {
   BundesratValidationError,
   credentialsIn,
   cutForMessage,
+  cutText,
   redactCredentials,
 } from "./errors.js";
 import { assertValid, baseUrlProblem, headerNameProblem, headerValueProblem, knownKeysProblem } from "./validate.js";
@@ -409,7 +410,7 @@ function decodeXml(body: Buffer, contentType: string, path: string): string {
     decoder = new TextDecoder(charset);
   } catch {
     throw new BundesratParseError(
-      `Unsupported response charset "${sanitizeServerText(charset).slice(0, 100)}" from ${path}.`,
+      `Unsupported response charset "${cutText(sanitizeServerText(charset), 100)}" from ${path}.`,
     );
   }
   return decoder.decode(body);
@@ -682,7 +683,7 @@ export class RequestEngine {
     let detail =
       snippet.length > 0 && !snippet.startsWith("<")
         ? snippet.length > 200
-          ? `${snippet.slice(0, 200)}…`
+          ? `${cutText(snippet, 200)}…`
           : snippet
         : undefined;
     // `detail` came from the response body and lands in an Error.message printed
