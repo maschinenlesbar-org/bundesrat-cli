@@ -6,6 +6,7 @@ import type { CliDeps } from "../src/cli/io.js";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
 import { makeMockTransport, xmlResponse, rawResponse, untimed } from "./helpers.js";
 import * as fx from "./fixtures.js";
+import { credentialsIn } from "../src/client/errors.js";
 
 function makeCli(responder: (req: HttpRequest) => HttpResponse) {
   const out: string[] = [];
@@ -362,4 +363,17 @@ test("the --party note quotes the value at most 500 characters long (L3)", async
   const record = cli.err.find((line) => line.includes("no member has a party containing")) ?? "";
   assert.match(record, /containing "Q{500}…" \(--party/);
   assert.ok(record.length < 700, `${record.length}`);
+});
+
+test("an a:b@c argument (a User-Agent, an -o path) is neither a credential in the log nor rewritten in the JSON on stdout (L14)", async () => {
+  const xml = fx.appointmentsXml.replace("Sitzung des Vermittlungsausschusses", "run:2026-10-09@x");
+  const cli = makeCli(() => xmlResponse(xml));
+  assert.equal(await run(["--user-agent", "run:2026-10-09@x", "appointments"], cli.deps), 0);
+  assert.match(cli.out.join("\n"), /"title": "run:2026-10-09@x"/);
+  const written = makeCli(() => xmlResponse(xml));
+  assert.equal(await run(["-o", "run:2026-10-09@x.json", "appointments"], written.deps), 0);
+  assert.match(untimed(written.err.join("\n")), /^INFO  \[bundesrat\.output\] Wrote \d+ bytes to run:2026-10-09@x\.json$/);
+  assert.match(written.files["run:2026-10-09@x.json"]?.toString() ?? "", /"title": "run:2026-10-09@x"/);
+  assert.deepEqual(credentialsIn("run:2026-10-09@x"), []);
+  assert.deepEqual(credentialsIn("https://alice:pw@host"), ["alice:pw"]);
 });
