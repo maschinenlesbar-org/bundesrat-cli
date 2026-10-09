@@ -105,6 +105,16 @@ urheberrechtlich geschützt. Siehe [DATA_LICENSE.md](DATA_LICENSE.md).
 `1` Sonstiges (inkl. einer Nicht-XML-Antwort bzw. HTML-Hülle). Siehe
 [Usage.md](Usage.md#exit-codes).
 
+**Log-Eintrag (log record).** Jede Diagnosezeile, die die CLI nach stderr schreibt: ein
+Zeitstempel, eine Stufe (`ERROR`, `WARN`, `INFO`) und ein Thema `bundesrat.<Bereich>`, als
+Text (im Stil von log4j) oder mit `--log-format jsonl` als ein JSON-Objekt pro Zeile. Die
+Bereiche: `cli` (Bedienfehler, Meldungen von commander, unerwartete Fehler, der Hinweis
+bei leerem `--party`-Ergebnis), `api` (die Antworten des Feed-Servers: ein Fehlerstatus
+und eine fehlerhafte Antwort — ein Feed, der sich nicht parsen lässt, die HTML-Hülle, die
+falsche Form, ein leerer Body), `http` (die Verbindung, die Klartext-Warnung) und `output`
+(die `-o`-Datei, Schreibfehler auf stdout). Ein Eintrag ist immer eine Zeile; Steuerzeichen
+darin werden maskiert.
+
 **`--state` vs. `--party`.** `--state` nennt eines der **sechzehn Länder** und passt
 **exakt** darauf (ohne Beachtung der Groß-/Kleinschreibung); jeder andere Wert
 (`Thueringen`, `Bay`) ist ein Bedienfehler, der die sechzehn Namen aufzählt. `--party`

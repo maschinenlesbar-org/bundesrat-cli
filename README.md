@@ -92,7 +92,7 @@ Every command prints **JSON to stdout**; diagnostics go to stderr, so piping int
 
 Each line on stderr is a **log record**: a timestamp (UTC), a level (`ERROR`, `WARN`,
 `INFO`) and a topic, the program and the area it comes from (`bundesrat.cli` for usage
-errors and notes, `bundesrat.api` for the feed server's answers, `bundesrat.http` for the
+errors and notes, `bundesrat.api` for the feed server's answers, a malformed one included, `bundesrat.http` for the
 connection, `bundesrat.output` for `-o` and a failed write to stdout). By default it is written log4j style;
 `--log-format jsonl` writes one JSON object per line instead. A record is always one line:
 a line break, a control character or a bidi control in a message (a server's text, a value

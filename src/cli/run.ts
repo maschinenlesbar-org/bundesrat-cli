@@ -10,6 +10,7 @@ import {
   BundesratApiError,
   BundesratError,
   BundesratNetworkError,
+  BundesratParseError,
   BundesratValidationError,
   credentialsIn,
   echoedCredentialForms,
@@ -200,6 +201,18 @@ export function processLogger(argv: readonly string[]): Logger {
   });
 }
 
+/**
+ * The log area of a `BundesratError` that is neither an API, network nor usage error: a
+ * malformed answer (`api`: a feed that does not parse, the HTML shell, the wrong
+ * shape, an empty body, an unknown charset — the server's answer as much as an error
+ * status is), the `-o` file (`output`), else `cli`.
+ */
+function areaOf(err: BundesratError): string {
+  if (err instanceof BundesratParseError) return "api";
+  if (err instanceof OutputError) return "output";
+  return "cli";
+}
+
 export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<number> {
   // The log replaces the secrets of the run in every message, in either format.
   deps = withRedactedOutput(deps, argv);
@@ -269,9 +282,9 @@ export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<
       return EXIT.NETWORK;
     }
     if (err instanceof BundesratError) {
-      // Includes BundesratParseError (e.g. the feed returned the HTML shell); an -o
-      // failure (OutputError) is an output record.
-      log.error(err instanceof OutputError ? "output" : "cli", err.message);
+      // A BundesratParseError (e.g. the feed returned the HTML shell) is an api record,
+      // an -o failure (OutputError) an output record.
+      log.error(areaOf(err), err.message);
       return EXIT.OTHER;
     }
     log.error("cli", `Unexpected error: ${err instanceof Error ? err.message : String(err)}`);

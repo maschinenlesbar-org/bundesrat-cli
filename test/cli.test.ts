@@ -323,7 +323,7 @@ test("a parse error names the parser's reason", async () => {
   ] as const) {
     const cli = makeCli(() => xmlResponse(body));
     assert.equal(await run(["session"], cli.deps), 1);
-    assert.match(untimed(cli.err.join("\n")), /^ERROR \[bundesrat\.cli\] Failed to parse XML response from \/iOS\/SharedDocs\/3_Plenum\/plenum_aktuelleSitzung_table\.xml: /);
+    assert.match(untimed(cli.err.join("\n")), /^ERROR \[bundesrat\.api\] Failed to parse XML response from \/iOS\/SharedDocs\/3_Plenum\/plenum_aktuelleSitzung_table\.xml: /);
     assert.match(cli.err.join("\n"), reason);
   }
 });
