@@ -49,14 +49,14 @@ parameter is easy to miss — this was confirmed by probing the live endpoints.
 
 ```bash
 npm install
-npm run build        # compiles TypeScript to dist/
+npm run build        # compiles every workspace (tsc -b) to its dist/
 ```
 
 Run the locally built CLI without a global install:
 
 ```bash
-node dist/src/cli/index.js --help
-# or, after `npm link`:
+node apps/cli/dist/src/cli/index.js --help    # or: npm start -- --help
+# or, after `npm link --workspace apps/cli`:
 bundesrat --help
 ```
 
@@ -104,14 +104,14 @@ when that is longer. **Retries never burst:** the backoff is the floor, so `Retr
 or a date in the past no longer sends the retries back to back. A `Retry-After` longer
 than `MAX_RETRY_AFTER_MS` (30 s) is not retried: the `BundesratApiError` surfaces at
 once, names the requested wait and carries it as `retryAfterMs`.
-`test/conformance-p6-retry-policy.test.ts` checks both.
+`apps/cli/test/conformance-p6-retry-policy.test.ts` checks both.
 
 Each retry is announced: the engine option `onRetry(event: RetryEvent)` (exported type:
 `{ retry` (1-based), `maxRetries`, `delayMs`, `status?` (absent for a reset), `url` (userinfo
 redacted) `}`) is called once per retry right before the sleep, never when there is none, and
 a throw in it is swallowed. The CLI's `action()` sets it to log one `WARN` record of
 `bundesrat.http`, `HTTP 503 from <host>: retry 1 of 3 in 2 s` (`retryMessage`; host only, whole
-seconds, ms under 1 s). Tests: `test/retry-hook.test.ts`, `test/retry-log.test.ts`.
+seconds, ms under 1 s). Tests: `packages/client/test/retry-hook.test.ts`, `apps/cli/test/retry-log.test.ts`.
 
 The engine enforces the transport contract itself, so the limits hold for a custom
 transport (a `fetch` wrapper, a raw `node:http` one) too: every call races a deadline of
@@ -122,7 +122,7 @@ the CLI)"); headers are read from a plain object in any key case, a fetch `Heade
 `Map`; the body may be any ArrayBuffer view (a `Uint8Array` from `fetch`) or an
 `ArrayBuffer`, from any realm, and is decoded by the feed's declared encoding like a
 `Buffer`; a response without a valid status, headers object or byte body is a
-`BundesratNetworkError`. `test/conformance-p5-transport-contract.test.ts` covers it.
+`BundesratNetworkError`. `apps/cli/test/conformance-p5-transport-contract.test.ts` covers it.
 
 The numeric options are validated in the constructor: `timeoutMs` 0..`MAX_TIMEOUT_MS`,
 `maxRetries` 0..`MAX_RETRIES` (10), `retryDelayMs` 0..`MAX_RETRY_AFTER_MS`,
@@ -157,7 +157,7 @@ alone (4 characters or more) on stderr only, since it may well occur in the data
 log replaces them in each record's *message*, before the record is cut and escaped, and
 writes it to the raw stderr: the frame (time, level, topic) is never touched, and a
 password with DEL, C1 or bidi characters is matched in its raw form.
-`test/conformance-p1-cli-redaction.test.ts` checks ten passwords in seven URL shapes at
+`apps/cli/test/conformance-p1-cli-redaction.test.ts` checks ten passwords in seven URL shapes at
 nine argv positions (the schemeless shape as the `--base-url` value only).
 
 A plain-`http:` base URL gets a warning, not a refusal. `cleartextProblem(baseUrl,
@@ -167,7 +167,7 @@ userinfo — or `undefined` for `https:`, an unparseable URL and loopback hosts
 (`localhost`, `127.0.0.0/8`, `::1`). The CLI's `action()` wrapper (`shared.ts`,
 `warnOnCleartext`) logs it once per run as a `WARN` record of `bundesrat.http` on stderr, after the
 options are parsed and before the first request; `--help`, `--version` and usage errors
-never get there. `test/conformance-p20-cleartext-warning.test.ts` checks it.
+never get there. `apps/cli/test/conformance-p20-cleartext-warning.test.ts` checks it.
 
 The library keeps them out of what a caller logs, too. The engine holds the base URL in
 a real `#private` field (so `console.log(client)`, `util.inspect` and `JSON.stringify`
@@ -177,7 +177,7 @@ from 4 characters: `echoedCredentialForms`), and scrubs them from error bodies
 (`BundesratApiError.body`/`detail`), transport error text and the `cause` chain. `BundesratApiError.url` is the request URL with its userinfo redacted. Whatever
 a custom transport throws (a string, fetch's `TypeError` naming the URL) reaches the
 caller as a `BundesratNetworkError` with the original, scrubbed, as its `cause`.
-`test/conformance-p2-library-redaction.test.ts` checks the client, nine failing
+`apps/cli/test/conformance-p2-library-redaction.test.ts` checks the client, nine failing
 transports and five rejected base URLs.
 
 `userAgent` and every `defaultHeaders` value are checked there too, with the same rule
@@ -226,7 +226,7 @@ key used to be ignored and all 193 members came back. So is an unknown client op
 (`timeout` for `timeoutMs`; the known ones are `ENGINE_OPTION_KEYS`). The same rule is
 exported as the pure `filterMembers(list, filter)`. The CLI's `--state` uses the same
 `stateProblem`, and an empty `--party` result gets a note on stderr, since the feed can't
-tell "no such party" from "nobody". `test/conformance-p10-strict-filters.test.ts` checks
+tell "no such party" from "nobody". `apps/cli/test/conformance-p10-strict-filters.test.ts` checks
 unknown keys, unknown Länder, arrays and NaN, and repeated `--state`/`--party` flags.
 
 The wholly-editorial feeds (news, BundesratKOMPAKT, Stimmverteilung, Präsidium,
@@ -235,7 +235,7 @@ copyright-protected editorial text or images, not open data (DATA_LICENSE.md).
 
 ## The XML parser
 
-[`parseXml`](src/client/xml.ts) turns a feed document into a plain JS value:
+[`parseXml`](packages/client/src/xml.ts) turns a feed document into a plain JS value:
 
 - a leaf element → its (entity-decoded, trimmed) text;
 - **CDATA content is kept verbatim** — not entity-decoded, not re-parsed (the
@@ -256,7 +256,7 @@ encoding become U+FFFD.
 
 It is deliberately **not** a general-purpose parser (no namespaces, DTDs, or full
 mixed-content reconstruction) — just enough for these shallow feeds, and exercised
-hard in [`test/xml.test.ts`](test/xml.test.ts).
+hard in [`packages/client/test/xml.test.ts`](packages/client/test/xml.test.ts).
 
 The tokenizer is a single forward scan that finds every terminator with `indexOf`,
 so parsing time is linear in the body size. An unterminated comment, CDATA section,
@@ -266,9 +266,46 @@ is nesting deeper than 512 levels. (A regex tokenizer once retried each untermin
 
 ## Architecture
 
+The repository is an **npm workspace** with two folders: `apps/` holds the programs it
+publishes, `packages/` the libraries they are built from.
+
 ```
-src/
-  client/
+package.json         # private workspace manifest: no version, never packed
+apps/cli/            # @maschinenlesbar.org/bundesrat-cli — the published package
+  package.json       # its version, bin, files, bundleDependencies
+  src/index.ts       # library entry: re-exports @maschinenlesbar.org/bundesrat-client
+  src/cli/           # the CLI (below)
+  test/              # CLI tests and every conformance-*.test.ts
+packages/client/     # @maschinenlesbar.org/bundesrat-client — private, bundled into the CLI
+  src/               # the API client (below)
+  test/              # tests that only touch the client, + the transport helpers and fixtures
+tools/pack/          # prepack/postpack: bundle the client and commander into the tarball
+tools/bump.mjs       # version bump + commit + tag (npm run bump)
+tsconfig.docs.json   # TypeDoc only: the package entry, with the client read from its sources
+```
+
+- **The client is its own package** so a later MCP app can share it with the CLI. It is
+  never published on its own: `apps/cli`'s `prepack` copies it (and commander) into the
+  app's `node_modules`, and `bundleDependencies` ships it inside the tarball. The library
+  entry re-exports the client's `"."`, so `import { BundesratClient } from
+  "@maschinenlesbar.org/bundesrat-cli"` is unchanged.
+- **The client's exports:** `"."` is the public library surface (`src/index.ts`);
+  `"./internal/*"` maps to any module (`…/bundesrat-client/internal/engine`) for what the
+  CLI needs beyond that; `"./test/*"` reaches the client's test helpers and fixtures from
+  the CLI's tests (not bundled). Only `"."` is part of the library.
+- **Dependencies point one way:** the app depends on the client, the client on nothing
+  in the workspace.
+- **The version lives in `apps/cli/package.json`.** The root has none; a plain
+  `npm version` at the root is refused. Release with `npm run bump -- <patch|minor|major>`,
+  which bumps the app, commits (the bare version as the message) and tags `vX.Y.Z`.
+- **TypeScript:** `tsconfig.base.json` holds the compiler options; every workspace has a
+  `tsconfig.json` (`src/`) and a `tsconfig.test.json` (`test/`), and the root
+  `tsconfig.json`/`tsconfig.test.json` reference them, built with `tsc -b`.
+
+The client (`packages/client/src/`) and the CLI (`apps/cli/src/`):
+
+```
+packages/client/src/
     xml.ts       # dependency-free XML parser + entity decoder
     types.ts     # Member / AgendaItem / Session / Appointment (open fields only)
     query.ts     # dependency-free query-string builder
@@ -277,7 +314,8 @@ src/
     errors.ts    # BundesratError / …ApiError / …NetworkError / …ValidationError / …ParseError
     validate.ts  # the Problem type + assertValid: input rules shared by library and CLI
     client.ts    # BundesratClient — session/members/appointments + open-field projection
-  cli/
+    index.ts     # the client's public surface (the library entry re-exports it)
+apps/cli/src/cli/
     io.ts        # injectable I/O seam (stdout/stderr/file), the logger and the clock
     log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
     shared.ts    # option parsers, global-option resolver, JSON renderer
@@ -293,7 +331,7 @@ stderr is ignored, so a failed run keeps its own exit code (`2>&1 | true` must n
 a usage error into 0); any other stdout write error is an ERROR record of
 `bundesrat.output` (`Could not write to stdout: …`, in the format argv asks for:
 `processLogger`) and exits 1.
-`test/conformance-p7-pipes-exit-codes.test.ts` runs the built bin for both.
+`apps/cli/test/conformance-p7-pipes-exit-codes.test.ts` runs the built bin for both.
 
 **Two seams make the whole thing testable in-process (no subprocesses):**
 `Transport` (the single HTTP function; tests inject a mock returning canned XML)
@@ -302,7 +340,7 @@ instead of calling `process.exit`).
 
 ### Error types
 
-[`errors.ts`](src/client/errors.ts): `BundesratApiError` (non-2xx, carries
+[`errors.ts`](packages/client/src/errors.ts): `BundesratApiError` (non-2xx, carries
 `status`/`detail`, with `isRetryable`/`isNotFound`), `BundesratNetworkError`
 (transport failure/timeout, and the default transport's per-hop scheme check; a bad
 configured `baseUrl` is a `BundesratValidationError` instead), `BundesratParseError` (the body was not a feed — usually
@@ -315,7 +353,7 @@ server text are cut at 500 characters in messages (`cutForMessage`,
 `MAX_MESSAGE_VALUE_LENGTH`: an option value, an unexpected root element's name, the
 `--party` value the CLI's note quotes), a server's error text at 200, never inside a
 surrogate pair (`cutText`), so the message stays well-formed and bounded for a library
-caller too; the error's properties keep the full value. `test/conformance-p8-p9-p13-responses-and-errors.test.ts`
+caller too; the error's properties keep the full value. `apps/cli/test/conformance-p8-p9-p13-responses-and-errors.test.ts`
 checks the declared charset (P8), the feed's document shape (P9) and twenty-one
 wrong-typed calls (P13).
 
@@ -323,7 +361,7 @@ wrong-typed calls (P13).
 
 The library owns every rule about what a request may contain; the CLI calls the same
 functions instead of keeping its own copy. A rule is a pure, exported `Problem`
-([`validate.ts`](src/client/validate.ts)): it returns the reason a value is invalid, or
+([`validate.ts`](packages/client/src/validate.ts)): it returns the reason a value is invalid, or
 `undefined`. The library enforces it with `assertValid(name, value, problem)`, which
 throws `BundesratValidationError` with the message `Invalid <name>: <reason>` before
 any request (a constructor throws; a method returning a promise rejects). The CLI's
@@ -334,8 +372,15 @@ record of `bundesrat.cli`.
 ## Testing
 
 ```bash
-npm test          # builds, then runs `node --test` over dist/test
+npm test          # builds, then runs `node --test` over each workspace's dist/test
+npm run coverage  # the same tests in one run, with a coverage report
+node --test apps/cli/dist/test/cli.test.js   # one file, after a build
 ```
+
+The client's tests are in `packages/client/test/` (`xml`, `query`, `http`, `engine`,
+`client`, `retry-hook`), with the transport helpers (`helpers.ts`, which
+`apps/cli/test/helpers.ts` re-exports next to the CLI's own helpers) and the canned feeds
+(`fixtures.ts`); everything that drives the CLI is in `apps/cli/test/`.
 
 - **`xml.test.ts`** — the XML parser: CDATA verbatim, entity decoding,
   repeated→array, single→scalar, attributes, empty/self-closing, real feed shapes.
@@ -347,13 +392,13 @@ npm test          # builds, then runs `node --test` over dist/test
   `asArray` normalisation — mocked transport.
 - **`cli.test.ts`** — command parsing, the `members` `--state`/`--party` filters,
   `--output`, and exit codes — mocked client.
-- **`log.test.ts`** — the record helpers of `src/cli/log.ts` on their own
+- **`log.test.ts`** — the record helpers of `apps/cli/src/cli/log.ts` on their own
   (`escapeForRecord`, `formatLogRecord`, `installWarningLog`); the CLI-level checks are
   P23's.
 - **`io.test.ts`** — `handleOutputErrors` and `stderrAfterStdout` with fake streams: a
   closed pipe, a stdout write error as a record, a record held behind stdout's backlog.
 - **`validate.test.ts`** — `assertValid`, the `run.ts` mapping of
-  `BundesratValidationError`, and the `parity()` helper (`test/helpers.ts`), which sends
+  `BundesratValidationError`, and the `parity()` helper (`apps/cli/test/helpers.ts`), which sends
   one input through `run()` and through the library on one recording mock transport so
   a test can assert both give the same outcome.
 - **`conformance-*.test.ts`** — the shared checks of the 2026-10-05 fix patterns, the
@@ -373,10 +418,13 @@ npm test          # builds, then runs `node --test` over dist/test
 
 GitHub Actions workflows under `.github/workflows/`:
 
-- **ci.yml** — type-check, build and test on Node 22/24 for every push and PR.
-- **release.yml** — on a `v*` tag: verify the tag matches `package.json`, test,
-  `npm pack`, and create a GitHub Release with the tarball.
-- **publish.yml** — manual dispatch from the release tag (`gh workflow run publish.yml --ref vX.Y.Z`; the version is the tag's): publish to npm via OIDC **Trusted
+- **ci.yml** — type-check, build and test on Node 22/24 for every push and PR; then pack the
+  real tarball, check the pack left nothing behind, install it globally with the registry out
+  of reach and run the bin.
+- **release.yml** — on a `v*` tag (made by `npm run bump`): verify the tag matches
+  `apps/cli/package.json`, test, write the SBOMs (scoped to the `apps/cli` workspace), then
+  `npm pack --workspace apps/cli`, and create a GitHub Release with the tarball.
+- **publish.yml** — manual dispatch from the release tag (`gh workflow run publish.yml --ref vX.Y.Z`; the version is the tag's): `npm publish --workspace apps/cli` via OIDC **Trusted
   Publishing** (no stored `NPM_TOKEN`) with provenance.
 - **docs.yml** — build the project website (`site/`, English and German) with the TypeDoc API docs
   under `/api/`, and deploy both to GitHub Pages on each `v*` tag.
@@ -393,7 +441,9 @@ and [Fylgja](https://fylgja.dev/) CSS, and deployed by `docs.yml` together with 
 reference under `/api/`. Its content comes from this repository: the README intro and quick
 start, the command tree of the built CLI (`site/scripts/cli-reference.mjs`), `Usage.md`,
 `GLOSSARY.md` and its German version `GLOSSARY.de.md`, the skills, and the skill examples in
-`EXAMPLE.md` and `EXAMPLE.de.md`. The only repo-specific files are `site/_config.yml` and
+`EXAMPLE.md` and `EXAMPLE.de.md`. The only repo-specific files are `site/_config.yml` (which
+also says where the published manifest and the built program are: `manifest:
+apps/cli/package.json`, `program: apps/cli/dist/src/cli/program.js`) and
 `site/_data/project.yml` (the German intro and the access requirements); the rest of `site/` is
 identical in every maschinenlesbar.org CLI, so change it in all of them together. When the
 README intro changes, update the German intro in `site/_data/project.yml`.
@@ -412,7 +462,7 @@ code contributions; see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ## The log on stderr
 
-Every diagnostic line on stderr is a log record (`src/cli/log.ts`): a timestamp, a level
+Every diagnostic line on stderr is a log record (`apps/cli/src/cli/log.ts`): a timestamp, a level
 (`ERROR`, `WARN`, `INFO`) and a topic, `bundesrat.<area>`. `--log-format text` (the default)
 writes it log4j style, `<ISO 8601 UTC> <LEVEL padded to 5> [<topic>] <message>`;
 `--log-format jsonl` writes one JSON object per line with exactly `ts`, `level`, `topic`
