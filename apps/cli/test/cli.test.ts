@@ -483,3 +483,10 @@ test("a subcommand's value option does not swallow the program's --log-format, i
   assert.ok(cli.err.length > 0 && cli.err.every((line) => line.startsWith("{")), cli.err.join("\n"));
   assert.match((JSON.parse(cli.err[0] ?? "") as Record<string, unknown>)["msg"] as string, /--party <name>' argument missing/);
 });
+
+test("the npm description names what the CLI shows, not the Stimmverteilung it leaves out (B8)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { description: string };
+  assert.doesNotMatch(pkg.description, /vote|stimmverteilung/i);
+  for (const shown of ["agenda", "members", "committee dates"]) assert.ok(pkg.description.includes(shown), shown);
+});
