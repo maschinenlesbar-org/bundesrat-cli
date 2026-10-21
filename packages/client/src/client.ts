@@ -183,9 +183,9 @@ export interface MemberFilter {
    * Only members of this Land: one of the sixteen `LAENDER`, ignoring case, Unicode form
    * and surrounding whitespace. Any other value is a BundesratValidationError.
    */
-  state?: string;
+  state?: string | undefined;
   /** Only members whose party contains this text, ignoring case, Unicode form and surrounding whitespace. */
-  party?: string;
+  party?: string | undefined;
 }
 
 /** Case- and normalisation-insensitive form of a filter value or a field. */

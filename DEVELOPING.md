@@ -124,6 +124,10 @@ the CLI)"); headers are read from a plain object in any key case, a fetch `Heade
 `Buffer`; a response without a valid status, headers object or byte body is a
 `BundesratNetworkError`. `apps/cli/test/conformance-p5-transport-contract.test.ts` covers it.
 
+Every option (and every `MemberFilter` key) is typed `?: T | undefined`, and `undefined` means
+the same as leaving it out, so a consumer compiled with `exactOptionalPropertyTypes` can pass
+`{ baseUrl: process.env.BUNDESRAT_BASE_URL }` (`packages/client/test/types.test.ts`).
+
 The numeric options are validated in the constructor: `timeoutMs` 0..`MAX_TIMEOUT_MS`,
 `maxRetries` 0..`MAX_RETRIES` (10), `retryDelayMs` 0..`MAX_RETRY_AFTER_MS`,
 `maxResponseBytes` 0..`Number.MAX_SAFE_INTEGER`, integers only. Anything else (NaN,
@@ -381,7 +385,7 @@ node --test apps/cli/dist/test/cli.test.js   # one file, after a build
 ```
 
 The client's tests are in `packages/client/test/` (`xml`, `query`, `http`, `engine`,
-`client`, `retry-hook`), with the transport helpers (`helpers.ts`, which
+`client`, `retry-hook`, `types`), with the transport helpers (`helpers.ts`, which
 `apps/cli/test/helpers.ts` re-exports next to the CLI's own helpers) and the canned feeds
 (`fixtures.ts`); everything that drives the CLI is in `apps/cli/test/`.
 
