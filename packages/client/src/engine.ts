@@ -433,7 +433,7 @@ function looksLikeHtml(text: string): boolean {
  * than mojibake. (Bytes invalid in the declared encoding become U+FFFD, as everywhere in
  * the WHATWG decoders.)
  */
-function decodeXml(body: Buffer, contentType: string, path: string): { text: string; replaced: number } {
+function decodeXml(body: Buffer, contentType: string, request: string): { text: string; replaced: number } {
   let charset: string | undefined;
   if (body[0] === 0xef && body[1] === 0xbb && body[2] === 0xbf) charset = "utf-8";
   else if (body[0] === 0xff && body[1] === 0xfe) charset = "utf-16le";
@@ -445,9 +445,7 @@ function decodeXml(body: Buffer, contentType: string, path: string): { text: str
   try {
     decoder = new TextDecoder(charset, { fatal: true });
   } catch {
-    throw new BundesratParseError(
-      `Unsupported response charset "${cutText(sanitizeServerText(charset), 100)}" from ${path}.`,
-    );
+    throw new BundesratParseError(`${request}: unsupported response charset "${cutText(sanitizeServerText(charset), 100)}".`);
   }
   try {
     return { text: decoder.decode(body), replaced: 0 };
@@ -476,9 +474,9 @@ function countChar(text: string, code: number): number {
   return n;
 }
 
-function htmlPageError(path: string): BundesratParseError {
+function htmlPageError(request: string): BundesratParseError {
   return new BundesratParseError(
-    `Expected XML from ${path} but received an HTML page — the feed may have moved, ` +
+    `${request}: expected XML but received an HTML page — the feed may have moved, ` +
       "or the request lost its ?view=renderXml parameter.",
   );
 }
@@ -659,6 +657,16 @@ export class RequestEngine {
   }
 
   /**
+   * The request URL as error messages show it: absolute (so a message names the host that gave
+   * a bad answer, which matters with a custom base URL), userinfo redacted and cut at
+   * MAX_MESSAGE_VALUE_LENGTH characters. Every error about an answer starts with
+   * `GET <this>: `, like a network error's `GET <this> failed: `.
+   */
+  describeUrl(path: string, query?: QueryParams): string {
+    return cutForMessage(redactUrl(this.buildUrl(path, query)));
+  }
+
+  /**
    * Perform a GET with Accept negotiation and transient-error retries. Redirects
    * are NOT followed — a 3xx surfaces as an error (the canonical host answers
    * directly).
@@ -755,14 +763,13 @@ export class RequestEngine {
   /** Like {@link getXml}, but also returns the root element's name. */
   async getXmlDocument(path: string, query?: QueryParams): Promise<XmlDocument> {
     const res = await this.request(path, query);
-    const { text, replaced: badBytes } = decodeXml(res.data, res.contentType, path);
-    if (looksLikeHtml(text)) throw htmlPageError(path);
+    const request = `GET ${this.describeUrl(path, query)}`;
+    const { text, replaced: badBytes } = decodeXml(res.data, res.contentType, request);
+    if (looksLikeHtml(text)) throw htmlPageError(request);
     // An empty body is not malformed XML — surface it as "empty" rather than the
     // generic parse-failure message so the cause is obvious.
     if (text.trim().length === 0) {
-      throw new BundesratParseError(
-        `Empty response from ${path} — the feed returned no content (expected XML).`,
-      );
+      throw new BundesratParseError(`${request}: empty response — the feed returned no content (expected XML).`);
     }
     let doc: XmlDocument;
     try {
@@ -771,19 +778,19 @@ export class RequestEngine {
       // Name the parser's reason (nesting too deep, unterminated tag, no root
       // element): run.ts prints only the message, never the cause.
       const reason = cutForMessage(sanitizeServerText(cause instanceof Error ? cause.message : String(cause)));
-      throw new BundesratParseError(`Failed to parse XML response from ${path}: ${reason}`, {
+      throw new BundesratParseError(`${request}: the answer is not valid XML: ${reason}`, {
         cause: this.scrubCause(cause),
       });
     }
     // An XHTML page parses as XML; it is still the website, not a feed.
-    if (doc.root.toLowerCase() === "html") throw htmlPageError(path);
+    if (doc.root.toLowerCase() === "html") throw htmlPageError(request);
     // The text is never changed silently: bytes invalid in the encoding and references to a
     // lone surrogate became U+FFFD, so the result is well-formed; one bad character never
     // sinks a whole answer.
     const replaced = badBytes + doc.replaced;
     if (replaced > 0) {
       this.warn(
-        `GET ${cutForMessage(redactUrl(this.buildUrl(path, query)))}: ${replaced} ${replaced === 1 ? "character" : "characters"} ` +
+        `${request}: ${replaced} ${replaced === 1 ? "character" : "characters"} ` +
           `of the answer ${replaced === 1 ? "was" : "were"} not valid text (invalid bytes or a lone surrogate) and replaced with U+FFFD.`,
       );
     }

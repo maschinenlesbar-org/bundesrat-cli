@@ -55,12 +55,12 @@ test("getXml rejects the HTML shell with a helpful BundesratParseError", async (
   );
 });
 
-test("getXml on an empty body reports 'Empty response', not a parse failure", async () => {
+test("getXml on an empty body reports 'empty response', not a parse failure", async () => {
   const mt = makeMockTransport(() => rawResponse("   ", "application/xml"));
   const e = new RequestEngine({ transport: mt.transport });
   await assert.rejects(
     () => e.getXml("/x", { view: "renderXml" }),
-    (err) => err instanceof BundesratParseError && /Empty response/.test(err.message),
+    (err) => err instanceof BundesratParseError && /: empty response/.test(err.message),
   );
 });
 
@@ -125,7 +125,7 @@ test("a pathologically deep body surfaces as BundesratParseError, not a raw erro
   const e = new RequestEngine({ transport: mt.transport });
   await assert.rejects(
     () => e.getXml("/x", { view: "renderXml" }),
-    (err) => err instanceof BundesratParseError && /Failed to parse XML/.test(err.message),
+    (err) => err instanceof BundesratParseError && /: the answer is not valid XML: /.test(err.message),
   );
 });
 
@@ -340,7 +340,7 @@ test("an unknown Content-Type charset is a parse error", async () => {
   const mt = makeMockTransport(() => rawResponse("<iOS><list/></iOS>", "application/xml; charset=x-bogus"));
   await assert.rejects(
     () => new RequestEngine({ transport: mt.transport }).getXml("/f.xml"),
-    (err) => err instanceof BundesratParseError && /Unsupported response charset "x-bogus"/.test(err.message),
+    (err) => err instanceof BundesratParseError && /: unsupported response charset "x-bogus"/.test(err.message),
   );
 });
 
@@ -457,4 +457,30 @@ test("text that is not valid is replaced with U+FFFD and reported through onWarn
   const throwing = new RequestEngine({ onWarning: () => { throw new Error("hook"); }, transport: makeMockTransport(() => xmlResponse("<a>&#xD800;</a>")).transport });
   assert.equal(await throwing.getXml("/x"), "�");
   assert.throws(() => new RequestEngine({ onWarning: "log" as unknown as () => void }), BundesratValidationError);
+});
+
+test("an answer error names the request: method and URL, userinfo redacted (D9)", async () => {
+  const answers: Array<[string, () => ReturnType<typeof rawResponse>]> = [
+    ["the answer is not valid XML: ", () => rawResponse("<iOS><list>", "application/xml")],
+    ["expected XML but received an HTML page", () => rawResponse("<!doctype html><html></html>", "text/html")],
+    ["empty response", () => rawResponse(" ", "application/xml")],
+    ["unsupported response charset", () => rawResponse("<a/>", "application/xml; charset=x-bogus")],
+  ];
+  const base = new URL("https://www.bundesrat.de");
+  base.username = "alice";
+  base.password = "s3cret";
+  for (const [what, respond] of answers) {
+    const e = new RequestEngine({ baseUrl: base.href, transport: makeMockTransport(respond).transport });
+    await assert.rejects(e.getXml("/feed.xml", { view: "renderXml" }), (err: unknown) => {
+      assert.ok(err instanceof BundesratParseError, what);
+      assert.ok(err.message.startsWith(`GET ${base.protocol}//***@${base.host}/feed.xml?view=renderXml: `), err.message);
+      assert.ok(err.message.includes(what), err.message);
+      assert.ok(!err.message.includes("s3cret"), err.message);
+      return true;
+    });
+  }
+  // The client's shape errors too.
+  const c = new BundesratClient({ transport: makeMockTransport(() => xmlResponse("<error/>")).transport });
+  await assert.rejects(c.session(), (err: Error) =>
+    err.message === "GET https://www.bundesrat.de/iOS/SharedDocs/3_Plenum/plenum_aktuelleSitzung_table.xml?view=renderXml: unexpected response shape: expected an <iOS> root element, got <error>.");
 });

@@ -235,7 +235,7 @@ test("an XML error envelope is exit 1, not an empty success", async () => {
   const cli = makeCli(() => xmlResponse("<?xml version=\"1.0\"?><error><message>Internal CMS error</message></error>"));
   assert.equal(await run(["--compact", "appointments"], cli.deps), 1);
   assert.deepEqual(cli.out, []);
-  assert.match(cli.err.join("\n"), /Unexpected response shape .*expected an <iOS> root element, got <error>/);
+  assert.match(cli.err.join("\n"), /unexpected response shape: expected an <iOS> root element, got <error>/);
 });
 
 test("a --base-url with a query, a fragment or surrounding whitespace is a usage error", async () => {
@@ -333,7 +333,7 @@ test("a parse error names the parser's reason", async () => {
   ] as const) {
     const cli = makeCli(() => xmlResponse(body));
     assert.equal(await run(["session"], cli.deps), 1);
-    assert.match(untimed(cli.err.join("\n")), /^ERROR \[bundesrat\.api\] Failed to parse XML response from \/iOS\/SharedDocs\/3_Plenum\/plenum_aktuelleSitzung_table\.xml: /);
+    assert.match(untimed(cli.err.join("\n")), /^ERROR \[bundesrat\.api\] GET https:\/\/www\.bundesrat\.de\/iOS\/SharedDocs\/3_Plenum\/plenum_aktuelleSitzung_table\.xml\?view=renderXml: the answer is not valid XML: /);
     assert.match(cli.err.join("\n"), reason);
   }
 });

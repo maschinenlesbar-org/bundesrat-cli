@@ -120,7 +120,7 @@ test("a document that is not <iOS><list>…</list></iOS> is a BundesratParseErro
       c.session(),
       (err: unknown) =>
         err instanceof BundesratParseError &&
-        err.message.startsWith(`Unexpected response shape from ${FEEDS.session}: `) &&
+        err.message.startsWith(`GET https://www.bundesrat.de${FEEDS.session}?view=renderXml: unexpected response shape: `) &&
         message.test(err.message),
       body,
     );
@@ -283,7 +283,7 @@ test("the XML declaration's encoding is honoured (a Latin-1 feed is not mojibake
   const unknown = makeMockTransport(() => xmlResponse('<?xml version="1.0" encoding="x-klingon"?><iOS><list/></iOS>'));
   await assert.rejects(
     new BundesratClient({ transport: unknown.transport }).members(),
-    (err: unknown) => err instanceof BundesratParseError && /Unsupported response charset "x-klingon" from /.test(err.message),
+    (err: unknown) => err instanceof BundesratParseError && /: unsupported response charset "x-klingon"\./.test(err.message),
   );
 });
 

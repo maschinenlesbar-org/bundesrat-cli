@@ -40,7 +40,7 @@ engine detects the `<!doctype html>` / `<html>` (also behind an XML declaration 
 comment, and an XHTML `<html>` root) and throws a `BundesratParseError` with a
 plain-language message rather than a cryptic parse failure. Any other XML that is not
 `<iOS>` with exactly one `<list>` (an XML error envelope, a bare `<list>`, no `<list>`)
-is a `BundesratParseError` too ("Unexpected response shape from <path>: expected …"),
+is a `BundesratParseError` too ("GET <url>: unexpected response shape: expected …"),
 so a broken feed never reads as an empty one; a real empty feed is `<iOS><list/></iOS>`. The upstream
 [bund.dev spec](https://bundesrat.api.bund.dev) documents the paths but the render
 parameter is easy to miss — this was confirmed by probing the live endpoints.
@@ -132,7 +132,12 @@ Every `BundesratNetworkError` names the request it belongs to: a timeout, the si
 refused connection, a DNS failure and a reset read `GET <url> failed: <reason>` (userinfo
 redacted, e.g. `GET https://www.bundesrat.de/iOS/…/mitglieder_table.xml?view=renderXml failed:
 connect ECONNREFUSED 127.0.0.1:443`), with the transport's original error, scrubbed, as the
-`cause`; the CLI logs that message as an ERROR record of `bundesrat.http` (exit 6).
+`cause`; the CLI logs that message as an ERROR record of `bundesrat.http` (exit 6). Every
+error about an answer names it too, as `GET <url>: <reason>` (`describeUrl`: userinfo redacted,
+cut at 500 characters): the HTML shell (`expected XML but received an HTML page`), an empty
+body, an unknown charset, XML that does not parse (`the answer is not valid XML: <reason>`) and
+the wrong shape (`unexpected response shape: expected …`), so a mirror given with
+`--base-url` is identifiable; the CLI logs it as an ERROR record of `bundesrat.api` (exit 1).
 
 Every option (and every `MemberFilter` key) is typed `?: T | undefined`, and `undefined` means
 the same as leaving it out, so a consumer compiled with `exactOptionalPropertyTypes` can pass

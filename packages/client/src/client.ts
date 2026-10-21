@@ -170,8 +170,9 @@ function isObject(value: XmlValue | undefined): value is XmlObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function shapeError(path: string, expected: string): BundesratParseError {
-  return new BundesratParseError(`Unexpected response shape from ${path}: expected ${expected}.`);
+/** `request` is the request the answer belongs to, as error messages name it (`GET <url>`). */
+function shapeError(request: string, expected: string): BundesratParseError {
+  return new BundesratParseError(`${request}: unexpected response shape: expected ${expected}.`);
 }
 
 /**
@@ -261,12 +262,13 @@ export class BundesratClient {
    */
   private async list(path: string): Promise<XmlObject> {
     const doc = await this.engine.getXmlDocument(path, RENDER_QUERY);
+    const request = `GET ${this.engine.describeUrl(path, RENDER_QUERY)}`;
     if (doc.root !== "iOS" || !isObject(doc.value)) {
-      throw shapeError(path, `an <iOS> root element, got <${cutForMessage(doc.root)}>`);
+      throw shapeError(request, `an <iOS> root element, got <${cutForMessage(doc.root)}>`);
     }
     const list = doc.value["list"];
     if (list === "") return {};
-    if (!isObject(list)) throw shapeError(path, "exactly one <list> element under <iOS>");
+    if (!isObject(list)) throw shapeError(request, "exactly one <list> element under <iOS>");
     return list;
   }
 

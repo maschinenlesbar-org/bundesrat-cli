@@ -135,7 +135,7 @@ is written in place, without `--force`.
 | `2` | Bad usage / invalid argument (nothing was sent) |
 | `4` | Not found (`404` from the server) |
 | `6` | Network / transport failure (DNS, connection, timeout, size cap) |
-| `1` | Any other error — including a response that is not a feed: the website's HTML shell, or XML that isn't `<iOS><list>…</list></iOS>` ("Unexpected response shape") |
+| `1` | Any other error — including a response that is not a feed: the website's HTML shell, or XML that isn't `<iOS><list>…</list></iOS>` ("GET <url>: unexpected response shape: …") |
 
 ## Troubleshooting
 
