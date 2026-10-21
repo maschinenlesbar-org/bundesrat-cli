@@ -239,9 +239,14 @@ rule `stateProblem`) and matches it exactly, `party` a substring of the party na
 compared case-insensitively after both sides — the filter value and the member's field —
 are put in one canonical form (`normalizeText`, exported: trimmed, NFC; inner whitespace
 kept), and a member without the field never matches. A key the filter doesn't have (`State`, `states`, a `__proto__` key
-from `JSON.parse`), a state that is not a Land (`Thueringen`, `Bay`), and a blank or
-non-string value each reject with `BundesratValidationError` before any request
-(`Invalid filter: Unknown key "State"; expected one of state, party.`) — the misspelled
+from `JSON.parse`), a state that is not a Land (`Thueringen`, `Bay`), a non-string value,
+and a value that could only match nothing each reject with `BundesratValidationError` before
+any request. `state` is a token (`tokenProblem`, exported: not blank, not only invisible
+characters or combining marks, no lone surrogate, no control or format character at all);
+`party` is a text (`textProblem`, exported: the same, but TAB/LF/CR and ZWJ/ZWNJ allowed);
+both quote the value with `quoteValue`, so `\u200b` shows. The kit's `normalizeToken`,
+`splitList` and `listProblem` are exported too (this CLI has no list option). For a key
+(`Invalid filter: Unknown key "State"; expected one of state, party.`): the misspelled
 key used to be ignored and all 193 members came back. So is an unknown client option
 (`timeout` for `timeoutMs`; the known ones are `ENGINE_OPTION_KEYS`). The same rule is
 exported as the pure `filterMembers(list, filter)`. The CLI's `--state` uses the same
@@ -504,9 +509,10 @@ The client's tests are in `packages/client/test/` (`xml`, `query`, `http`, `engi
   the `files` allowlist leaves out must be an absolute GitHub URL), P23 (the log on
   stderr: record format, `--log-format jsonl`, no secret in either format), P24 (the input
   corpus: every text filter and path id canonicalised or refused — empty here, since
-  `--state`/`--party` filter client-side and the feeds have fixed paths; `normalizeText` is
-  checked in `client.test.ts`), P25 (the response corpus: an inexact number is an error — the
-  number cases are skipped, the feeds are XML text; the empty answer runs), P26 (`-o` never
+  `--state`/`--party` filter client-side and the feeds have fixed paths; its refusal corpus
+  runs through both in `parity.test.ts`, `normalizeText` is checked in `client.test.ts`), P25
+  (the response corpus: an inexact number is an error — the number cases are skipped, the
+  feeds are XML text; the empty and the malformed answer run, each naming the request), P26 (`-o` never
   loses a file: a write cut short under `ulimit -f`, also on a redirected stdout, an existing
   file without `--force`, a missing directory, `/dev/null`, a FIFO and `/dev/stdout` written in
   place, a dangling link with `--force`, a 255-byte name, a signal mid-write), P27 (a big or odd

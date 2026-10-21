@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BundesratClient } from "@maschinenlesbar.org/bundesrat-client/internal/client";
 import { BundesratValidationError } from "@maschinenlesbar.org/bundesrat-client/internal/errors";
-import { parity, xmlResponse } from "./helpers.js";
+import { kitParity, parity, xmlResponse } from "./helpers.js";
 import * as fx from "@maschinenlesbar.org/bundesrat-client/test/fixtures";
 
 const names = (rows: unknown): string[] => (rows as Array<{ name: string }>).map((r) => r.name);
@@ -174,4 +174,48 @@ test("base URL: a valid one with a path prefix gives the identical request", asy
     cli.requests[0]!.url,
     "https://mirror.example/br/iOS/SharedDocs/2_Mitglieder/mitglieder_table.xml?view=renderXml",
   );
+});
+
+// ---- 2026-10-21, D8 and D10: P24's corpus through the client-side filters ----
+// P24 reads the value back from the request, and --state / --party filter the list the feed
+// returns: no value is sent. So its corpus runs here, on the members the feed returned.
+
+/** Values every filter refuses (P24's REFUSED): blank, only invisible characters or combining marks, a lone surrogate, a control or format character. */
+const REFUSED = [
+  "", " ", "\u00a0", "\n\t", "\u3000", "\u200b", "\u00ad", "\u200d", "\ufeff", "\u0301\u0308", " \u200b ",
+  "a\u200bb", "M\u00fcl\u00adler", "\u202eabc", "a\u0000b", "a\u001bb", "a\u0085b", "\ud800", "a\udc00b", "x\ud83d",
+];
+const INVISIBLE = /[\p{Cc}\p{Cf}]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/u;
+
+test("members filter: --state and --party refuse a blank, invisible, control or half character on both sides, showing it escaped (D8, D10)", async () => {
+  for (const option of ["state", "party"] as const) {
+    for (const value of REFUSED) {
+      const label = `--${option} ${JSON.stringify(value)}`;
+      const o = await kitParity(["members", `--${option}`, value], (transport) => new BundesratClient({ transport }).members({ [option]: value }), () => xmlResponse(fx.membersParityXml));
+      assert.equal(o.cli.code, 2, `${label}: CLI exit ${o.cli.code}`);
+      assert.deepEqual(o.cli.requests, [], label);
+      assert.equal(o.lib.ok, false, `${label}: the library resolved`);
+      assert.deepEqual(o.lib.requests, [], label);
+      assert.match(o.lib.error?.name ?? "", /ValidationError$/, label);
+      const blank = value.replace(/[\s\p{Cc}\p{Cf}\p{M}]/gu, "") === "";
+      const ch = INVISIBLE.exec(value.trim())?.[0];
+      if (blank || ch === undefined) {
+        assert.match(o.lib.error?.message ?? "", /Expected a non-empty value\./, label);
+        continue;
+      }
+      const escape = `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`;
+      assert.ok(o.cli.err.toLowerCase().includes(escape), `${label}: ${o.cli.err}`);
+      assert.ok(!o.cli.err.includes(ch), `${label}: the CLI's refusal shows the character raw`);
+      assert.ok((o.lib.error?.message ?? "").toLowerCase().includes(escape), `${label}: ${o.lib.error?.message}`);
+    }
+  }
+});
+
+test("members filter: a --party text with joiners, emoji or inner whitespace is accepted alike on both sides (D8)", async () => {
+  for (const value of ["Gr\u00fcne", "Gru\u0308ne", "  cdu  ", "a\u200db", "\ud83d\ude00", "a  b", "x".repeat(5000)]) {
+    const o = await kitParity(["--compact", "members", "--party", value], (transport) => new BundesratClient({ transport }).members({ party: value }), () => xmlResponse(fx.membersParityXml));
+    assert.equal(o.cli.code, 0, `${JSON.stringify(value.slice(0, 20))}: ${o.cli.err}`);
+    assert.equal(o.lib.ok, true, JSON.stringify(value.slice(0, 20)));
+    assert.deepEqual(JSON.parse(o.cli.out), o.lib.value);
+  }
 });

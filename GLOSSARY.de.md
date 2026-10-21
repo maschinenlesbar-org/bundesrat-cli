@@ -122,7 +122,12 @@ darin werden maskiert.
 passt auf eine **Teilzeichenkette** des Parteinamens (ebenfalls ohne Beachtung der
 Groß-/Kleinschreibung), sodass `grüne` „BÜNDNIS 90/DIE GRÜNEN“ findet; passt sie auf
 niemanden, kommt `[]` mit einem Hinweis auf stderr. Beide ignorieren umgebende Leerzeichen und die
-Unicode-Form (ein zerlegter Umlaut passt auch), und ein leerer Wert ist ein Bedienfehler.
+Unicode-Form (ein zerlegter Umlaut passt auch). Ein leerer Wert, einer nur aus unsichtbaren
+Zeichen (ein Leerzeichen ohne Breite, ein bedingter Trennstrich) oder kombinierenden Zeichen,
+und einer mit einem Steuerzeichen, einem unsichtbaren Formatzeichen oder einem halben Zeichen
+(ein einzelnes Surrogat) sind Bedienfehler; das Zeichen wird maskiert gezeigt
+(`"a\u200bb" contains an invisible character (U+200B)`), denn mitkopiert könnte es nur auf
+nichts passen. `--party` erlaubt die Verbinder ZWJ/ZWNJ, die manche Schriften und Emoji brauchen.
 Angewendet werden sie von der Bibliothek, nachdem die vollständige Mitgliederliste
 abgerufen wurde: `members({ state, party })`, oder `filterMembers(liste, { state, party })`
 auf einer bereits abgerufenen Liste.

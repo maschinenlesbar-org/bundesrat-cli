@@ -20,7 +20,7 @@
 import { RequestEngine, type EngineOptions } from "./engine.js";
 import type { XmlObject, XmlValue } from "./xml.js";
 import { BundesratParseError, cutForMessage } from "./errors.js";
-import { assertValid, knownKeysProblem, nonBlankProblem, normalizeText, stateProblem } from "./validate.js";
+import { assertValid, knownKeysProblem, normalizeText, stateProblem, textProblem } from "./validate.js";
 import type { AgendaItem, Appointment, Member, Session } from "./types.js";
 
 /** The feed paths (relative to the base URL). All are GET + `?view=renderXml`. */
@@ -203,14 +203,16 @@ const MEMBER_FILTER_KEYS = ["state", "party"] as const;
 /**
  * Check a {@link MemberFilter}: a plain object with no keys but `state` and `party`
  * (a misspelled `State` used to be ignored, returning everyone); `state` one of the
- * sixteen Länder, `party` a non-blank string. Anything else throws a
+ * sixteen Länder (a token: no invisible, control or half character), `party` a text filter
+ * ({@link textProblem}: not blank or only invisible, no control, format or half character,
+ * ZWJ/ZWNJ allowed). Anything else throws a
  * {@link BundesratValidationError}. `undefined` means "no filter".
  */
 function assertMemberFilter(filter: MemberFilter | undefined): MemberFilter {
   if (filter === undefined) return {};
   const f = assertValid("filter", filter, knownKeysProblem(MEMBER_FILTER_KEYS)) as MemberFilter;
   if (f.state !== undefined) assertValid("state", f.state, stateProblem);
-  if (f.party !== undefined) assertValid("party", f.party, nonBlankProblem);
+  if (f.party !== undefined) assertValid("party", f.party, textProblem);
   return f;
 }
 

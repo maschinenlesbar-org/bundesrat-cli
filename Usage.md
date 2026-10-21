@@ -111,7 +111,10 @@ bundesrat members | jq -r '[.[] | select(.mitglied == "true")] | group_by(.party
 
 Filtering is client-side, so an unmatched `--party` returns `[]` (not the full list),
 with a note on stderr. A `--state` that is not one of the 16 Länder (`Thueringen`, `Bay`)
-is a usage error (exit `2`) that lists them.
+is a usage error (exit `2`) that lists them. A blank `--state` or `--party`, one of only
+invisible characters, and one holding a control character, an invisible format character (a
+zero-width space, a soft hyphen, a bidi control; `--party` allows ZWJ/ZWNJ) or half of a
+character are usage errors too, the character shown escaped (`\u200b`).
 
 ## `appointments` — committee dates (Termine)
 

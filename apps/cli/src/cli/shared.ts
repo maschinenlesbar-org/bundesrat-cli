@@ -7,7 +7,7 @@ import { logOf, type CliDeps } from "./io.js";
 import { checkOutputTarget } from "./output.js";
 import type { BundesratClientOptions } from "@maschinenlesbar.org/bundesrat-client/internal/client";
 import { cleartextProblem, DEFAULT_BASE_URL, type RetryEvent } from "@maschinenlesbar.org/bundesrat-client/internal/engine";
-import { baseUrlProblem, headerValueProblem, nonBlankProblem, stateProblem } from "@maschinenlesbar.org/bundesrat-client/internal/validate";
+import { baseUrlProblem, headerValueProblem, stateProblem, textProblem } from "@maschinenlesbar.org/bundesrat-client/internal/validate";
 
 /**
  * commander value-parser: a plain base-10 non-negative integer.
@@ -37,9 +37,14 @@ export function parseBoundedInt(min: number, max: number): (value: string) => nu
   };
 }
 
-/** commander value-parser: a non-empty (after trimming) string — the library's nonBlankProblem. */
-export function parseNonEmpty(value: string): string {
-  const problem = nonBlankProblem(value);
+/**
+ * commander value-parser for a text filter (`members --party`): the library's `textProblem` rule
+ * (not blank or only invisible characters, no control, format or half character; ZWJ/ZWNJ
+ * allowed), as a usage error before any request. The library compares the value in its
+ * canonical form (`normalizeText`), so the CLI passes it on as typed.
+ */
+export function parseText(value: string): string {
+  const problem = textProblem(value);
   if (problem !== undefined) throw new InvalidArgumentError(problem);
   return value;
 }

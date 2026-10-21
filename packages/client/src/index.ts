@@ -25,9 +25,14 @@ export {
   headerValueProblem,
   foldLand,
   knownKeysProblem,
+  listProblem,
   nonBlankProblem,
   normalizeText,
+  normalizeToken,
+  splitList,
   stateProblem,
+  textProblem,
+  tokenProblem,
 } from "./validate.js";
 export { LAENDER } from "./enums.js";
 export type { Land } from "./enums.js";

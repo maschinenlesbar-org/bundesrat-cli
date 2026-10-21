@@ -115,6 +115,11 @@ it **exactly** (case-insensitive); any other value (`Thueringen`, `Bay`) is a us
 error that lists the sixteen names. `--party` matches a **substring** of the party
 name (case-insensitive), so `grüne` finds "BÜNDNIS 90/DIE GRÜNEN"; one that matches
 nobody gives `[]` and a note on stderr. Both ignore surrounding whitespace and Unicode
-form (a decomposed umlaut matches), and a blank value is a usage error. The library applies
+form (a decomposed umlaut matches). A blank value, one of only invisible characters (a
+zero-width space, a soft hyphen) or combining marks, and one holding a control character, an
+invisible format character or half of a character (a lone surrogate) are usage errors, with
+the character shown escaped (`"a\u200bb" contains an invisible character (U+200B)`): pasted
+along, it could only match nothing. `--party` allows the joiners ZWJ/ZWNJ that some scripts and
+emoji need. The library applies
 them, after fetching the full members list: `members({ state, party })`, or
 `filterMembers(list, { state, party })` on a list already fetched.
