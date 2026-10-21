@@ -370,7 +370,11 @@ an EPIPE on stdout (`| head`, a `jq` that exits early) exits 0 quietly; an EPIPE
 stderr is ignored, so a failed run keeps its own exit code (`2>&1 | true` must not turn
 a usage error into 0); any other stdout write error is an ERROR record of
 `bundesrat.output` (`Could not write to stdout: …`, in the format argv asks for:
-`processLogger`) and exits 1.
+`processLogger`) and exits 1. stdout redirected to a regular file (`> out.json`) is written
+with every byte checked (`stdoutWriter`, `defaultIO.out`): Node's stream ignored a short write,
+so a file-size limit or a full disk cut the output with exit 0 and nothing on stderr; now
+EFBIG or ENOSPC is that ERROR record and exit 1, never exit 0. Pipes and terminals go
+through the stream as before.
 `apps/cli/test/conformance-p7-pipes-exit-codes.test.ts` runs the built bin for both.
 
 **Two seams make the whole thing testable in-process (no subprocesses):**
