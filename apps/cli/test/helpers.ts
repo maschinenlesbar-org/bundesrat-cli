@@ -59,11 +59,14 @@ export async function parity(
     io: {
       out: (s) => out.push(s),
       err: (s) => err.push(s),
-      writeFile: () => {
+    },
+    createClient: (opts) => defaultDeps.createClient({ ...opts, transport: mt.transport }),
+    files: {
+      state: () => "absent",
+      write: () => {
         throw new Error("parity(): the CLI tried to write a file");
       },
     },
-    createClient: (opts) => defaultDeps.createClient({ ...opts, transport: mt.transport }),
   };
   const code = await run(argv, deps);
   const cliRequests = mt.calls.slice();

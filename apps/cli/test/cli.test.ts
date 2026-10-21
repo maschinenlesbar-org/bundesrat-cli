@@ -1,5 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { run } from "../src/cli/run.js";
 import { BundesratClient } from "@maschinenlesbar.org/bundesrat-client/internal/client";
 import type { CliDeps } from "../src/cli/io.js";
@@ -17,11 +20,15 @@ function makeCli(responder: (req: HttpRequest) => HttpResponse) {
     io: {
       out: (s) => out.push(s),
       err: (s) => err.push(s),
-      writeFile: (p, d) => {
+    },
+    createClient: (opts) => new BundesratClient({ ...opts, transport: mt.transport }),
+    // An in-memory file system for -o: every path is free.
+    files: {
+      state: () => "absent",
+      write: (p, d) => {
         files[p] = d;
       },
     },
-    createClient: (opts) => new BundesratClient({ ...opts, transport: mt.transport }),
   };
   return { deps, out, err, mt, files };
 }
@@ -157,19 +164,18 @@ test("a --output write failure reports a clean error (exit 1), not 'Unexpected e
   const err: string[] = [];
   const mt = makeMockTransport(() => xmlResponse(fx.membersXml));
   const deps: CliDeps = {
-    io: {
-      out: (s) => out.push(s),
-      err: (s) => err.push(s),
-      writeFile: () => {
-        const e = new Error("EISDIR: illegal operation on a directory, open '/tmp'");
-        throw e;
+    io: { out: (s) => out.push(s), err: (s) => err.push(s) },
+    createClient: (opts) => new BundesratClient({ ...opts, transport: mt.transport }),
+    files: {
+      state: () => "absent",
+      write: () => {
+        throw new Error('Could not write to "/tmp/x": EISDIR: illegal operation on a directory');
       },
     },
-    createClient: (opts) => new BundesratClient({ ...opts, transport: mt.transport }),
   };
-  const code = await run(["--output", "/tmp", "members"], deps);
+  const code = await run(["--output", "/tmp/x", "members"], deps);
   assert.equal(code, 1);
-  assert.match(untimed(err.join("\n")), /^ERROR \[bundesrat\.output\] Could not write to \/tmp: EISDIR/);
+  assert.match(untimed(err.join("\n")), /^ERROR \[bundesrat\.output\] Could not write to "\/tmp\/x": EISDIR/);
   assert.doesNotMatch(err.join("\n"), /Unexpected error/);
   assert.equal(out.length, 0); // nothing leaked to stdout
 });
@@ -436,27 +442,36 @@ test("the log format is the one commander parsed, where an option's value looks 
 });
 
 test("every -o failure is an ERROR record of bundesrat.output, exit 1 (L8)", async () => {
-  for (const thrown of [new Error("ENOENT: no such file or directory, open '/nonexistent/x'"), new Error("EACCES: permission denied, open '/nonexistent/x'"), "not an Error"]) {
-    const cli = makeCli(() => xmlResponse(fx.membersXml));
-    cli.deps.io.writeFile = () => {
-      throw thrown;
-    };
-    assert.equal(await run(["-o", "/nonexistent/x", "members"], cli.deps), 1);
-    assert.match(untimed(cli.err.join("\n")), /^ERROR \[bundesrat\.output\] Could not write to \/nonexistent\/x: /);
-    assert.doesNotMatch(cli.err.join("\n"), /Unexpected error/);
+  const dir = mkdtempSync(join(tmpdir(), "bundesrat-l8-"));
+  const locked = join(dir, "locked");
+  mkdirSync(locked, 0o500);
+  try {
+    const cases: Array<[string, RegExp]> = [[join(dir, "missing", "x"), /ENOENT/]];
+    // root writes anywhere; the permission case needs an ordinary user.
+    if (process.getuid?.() !== 0) cases.push([join(locked, "x"), /EACCES/]);
+    for (const [path, reason] of cases) {
+      const cli = makeCli(() => xmlResponse(fx.membersXml));
+      delete cli.deps.files;
+      assert.equal(await run(["-o", path, "members"], cli.deps), 1, path);
+      const text = untimed(cli.err.join("\n"));
+      assert.match(text, /^ERROR \[bundesrat\.output\] Could not write to ".*x": /, path);
+      assert.match(text, reason, path);
+      assert.doesNotMatch(text, /Unexpected error/);
+    }
+  } finally {
+    chmodSync(locked, 0o700);
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
 test("the -o failure drops Node's \", open '<path>'\" tail also when the path holds a line break", async () => {
-  for (const path of ["/nonexistent\nZZ/x", "/nonexistent ZZ/x", "/nonexistent\rZZ/x", "/nonexistent/x"]) {
+  for (const path of ["/nonexistent\nZZ/x", "/nonexistent ZZ/x", "/nonexistent\rZZ/x", "/nonexistent/x"]) {
     const cli = makeCli(() => xmlResponse(fx.membersXml));
-    cli.deps.io.writeFile = (p) => {
-      throw Object.assign(new Error(`ENOENT: no such file or directory, open '${p}'`), { code: "ENOENT" });
-    };
+    delete cli.deps.files;
     assert.equal(await run(["-o", path, "members"], cli.deps), 1);
     assert.equal(cli.err.length, 1, cli.err.join("\n"));
     const msg = untimed(cli.err[0] as string);
-    assert.match(msg, /^ERROR \[bundesrat\.output\] Could not write to \/nonexistent.*: ENOENT: no such file or directory$/);
+    assert.match(msg, /^ERROR \[bundesrat\.output\] Could not write to "\/nonexistent.*": ENOENT: no such file or directory$/);
     assert.doesNotMatch(msg, /open '/);
   }
 });

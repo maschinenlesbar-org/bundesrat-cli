@@ -83,7 +83,8 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
       parseLogFormat,
     )
     .option("--compact", "print JSON on a single line instead of pretty-printed")
-    .option("-o, --output <file>", "write output to this file instead of stdout (- = stdout)", parseOutputPath)
+    .option("-o, --output <file>", "write the JSON to this file instead of stdout (- = stdout); an existing file needs --force", parseOutputPath)
+    .option("--force", "with -o, overwrite the file if it exists")
     .showHelpAfterError()
     // Global options work before or after the command, so list them in each
     // command's --help too. Set before registerCommands: subcommands copy it.

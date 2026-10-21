@@ -34,7 +34,8 @@ test("run() maps a BundesratValidationError raised in an action to exit 2 and an
   const out: string[] = [];
   const err: string[] = [];
   const deps: CliDeps = {
-    io: { out: (s) => out.push(s), err: (s) => err.push(s), writeFile: () => {} },
+    io: { out: (s) => out.push(s), err: (s) => err.push(s) },
+    files: { state: () => "absent", write: () => {} },
     createClient: () => {
       throw new BundesratValidationError("Invalid thing: Expected a non-empty value.");
     },

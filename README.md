@@ -121,7 +121,9 @@ bundesrat members | jq -r '[.[] | select(.mitglied == "true")] | group_by(.party
 ```
 
 Use `--compact` for single-line JSON and `-o <file>` to write to a file — both are
-**global options** that work before or after the command.
+**global options** that work before or after the command. `-o` never overwrites an existing
+file unless `--force` is given, and a write cut short (a full disk) leaves the old file as it
+was: the result goes to a temporary file beside it first.
 
 **Exit codes** make the CLI easy to use in scripts:
 
@@ -164,7 +166,8 @@ takes a value takes one: giving it twice (`--timeout 1000 --timeout 0`) is a usa
 | `-h, --help` | Show help for the program or a command |
 | `--compact` | Print JSON on a single line instead of pretty-printed |
 | `--log-format <format>` | How errors, warnings and notes are written to stderr: `text` (default; log4j style, `2026-10-09T14:03:12.481Z WARN  [bundesrat.http] …`) or `jsonl` (one JSON object per line: `ts`, `level`, `topic`, `msg`). stdout is not affected |
-| `-o, --output <file>` | Write output to this file instead of stdout (`-` = stdout) |
+| `-o, --output <file>` | Write output to this file instead of stdout (`-` = stdout). An existing file (a dangling link too) or a directory is a usage error (exit `2`) before any request; the write is atomic (a temporary file beside it, renamed over it), so a write cut short leaves the old file as it was and no half-written file |
+| `--force` | With `-o`, overwrite an existing file (keeping its mode; through a symlink, the file it points at). Without `-o` a usage error |
 | `--base-url <url>` | API base URL (default `https://www.bundesrat.de`; `http:`/`https:` only, no query, fragment or whitespace; a literal `%` in a password is written `%25`). A `user:password@` in it is sent as Basic auth and shown as `***@` in every message; echoed back by a server (the `Basic` value, `user:password`, the password), it is shown as `***` |
 | `--timeout <ms>` | Time limit per request, reading the whole response included (default `30000`; `0` = none; at most `2147483647`). It bounds each attempt; the waits between retries come on top |
 | `--user-agent <ua>` | `User-Agent` header value |

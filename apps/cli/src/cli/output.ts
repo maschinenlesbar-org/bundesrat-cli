@@ -1,10 +1,11 @@
 // The output sink: everything the CLI writes as data, to stdout or to the `-o` file. One
 // place for the rules the maschinenlesbar.org CLIs learned one bug at a time: terminal
-// controls escaped, a deep or huge answer printed (or refused) cleanly.
+// controls escaped, a deep or huge answer printed (or refused) cleanly, `-o` never
+// overwriting a file by accident and never leaving half a file behind.
 
-import { BundesratError } from "@maschinenlesbar.org/bundesrat-client/internal/errors";
+import { BundesratError, BundesratValidationError } from "@maschinenlesbar.org/bundesrat-client/internal/errors";
 import { isBidiControl } from "@maschinenlesbar.org/bundesrat-client/internal/engine";
-import { logOf, type CliDeps } from "./io.js";
+import { isDirectoryMessage, logOf, nodeFiles, refuseOverwrite, type CliDeps } from "./io.js";
 import { InvalidArgumentError } from "commander";
 import { nonBlankProblem } from "@maschinenlesbar.org/bundesrat-client/internal/validate";
 
@@ -30,6 +31,29 @@ export function parseOutputPath(value: string): string {
 export interface OutputOptions {
   compact?: boolean | undefined;
   output?: string | undefined;
+  force?: boolean | undefined;
+}
+
+/**
+ * Check `-o` before any request, so a refused target costs none: `--force` without `-o`, a
+ * directory, and an existing path (a dangling link too) without `--force` are usage errors
+ * (exit 2). `-o -` is stdout. The write checks again: a file that appears during the request
+ * is not overwritten either (an OutputError then).
+ */
+export function checkOutputTarget(deps: CliDeps, options: OutputOptions): void {
+  if (options.force === true && options.output === undefined) {
+    throw new BundesratValidationError("--force needs --output (it only allows overwriting the -o file).");
+  }
+  const path = fileOf(options);
+  if (path === undefined) return;
+  const state = (deps.files ?? nodeFiles).state(path);
+  if (state === "directory") throw new BundesratValidationError(isDirectoryMessage(path));
+  if (state === "exists" && options.force !== true) throw new BundesratValidationError(refuseOverwrite(path));
+}
+
+/** The `-o` file, or undefined for stdout (no `-o`, or `-o -`). */
+function fileOf(options: OutputOptions): string | undefined {
+  return options.output === undefined || options.output === "-" ? undefined : options.output;
 }
 
 /**
@@ -54,29 +78,25 @@ export function escapeControlChars(json: string): string {
 }
 
 /**
- * Render a JSON value, pretty by default and compact with --compact. Writes to the
- * file given by --output (with a short stderr confirmation so stdout stays clean
- * for piping), or to stdout otherwise — also for `--output -`.
+ * Write a JSON result: pretty by default, compact with `--compact`, to stdout or to the `-o`
+ * file (with an INFO record of `bundesrat.output` saying how many bytes went where, so stdout
+ * stays clean for a pipe). The file holds exactly what stdout would show, plus a newline, and
+ * is written atomically (`OutputFiles.write`): a write cut short leaves the old file as it was.
  */
-export function renderJson(deps: CliDeps, global: OutputOptions, value: unknown): void {
-  const text = escapeControlChars(stringifyJson(value, global.compact === true));
-  if (global.output !== undefined && global.output !== "-") {
-    const data = Buffer.from(text + "\n", "utf8");
-    try {
-      deps.io.writeFile(global.output, data);
-    } catch (err) {
-      // A bad --output path (missing directory, a directory, no permission) is a
-      // user error, not an internal fault — surface it as a clean OutputError (logged
-      // under bundesrat.output) instead of letting the raw fs exception hit the
-      // "Unexpected error" path. Drop the `, open '<path>'` tail since we already name
-      // the path ourselves; the `s` flag lets it span a path with a line break in it.
-      const reason = err instanceof Error ? err.message.replace(/,\s*open\s+'.*'$/s, "") : String(err);
-      throw new OutputError(`Could not write to ${global.output}: ${reason}`, { cause: err });
-    }
-    logOf(deps).info("output", `Wrote ${data.length} bytes to ${global.output}`);
-  } else {
-    deps.io.out(text);
+export function renderJson(deps: CliDeps, options: OutputOptions, value: unknown): void {
+  const text = escapeControlChars(stringifyJson(value, options.compact === true));
+  const path = fileOf(options);
+  if (path === undefined) return deps.io.out(text);
+  const data = Buffer.from(`${text}\n`, "utf8");
+  try {
+    (deps.files ?? nodeFiles).write(path, data, options.force === true);
+  } catch (cause) {
+    // A bad -o path (a missing directory, no permission, a full disk, a file that appeared
+    // meanwhile) is the user's or the system's, not an internal fault: a clean OutputError
+    // (bundesrat.output), never the "Unexpected error" path.
+    throw new OutputError(cause instanceof Error ? cause.message : String(cause), { cause });
   }
+  logOf(deps).info("output", `Wrote ${data.length} bytes to ${path}`);
 }
 
 /**

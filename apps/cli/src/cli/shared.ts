@@ -4,6 +4,7 @@
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import { logOf, type CliDeps } from "./io.js";
+import { checkOutputTarget } from "./output.js";
 import type { BundesratClientOptions } from "@maschinenlesbar.org/bundesrat-client/internal/client";
 import { cleartextProblem, DEFAULT_BASE_URL, type RetryEvent } from "@maschinenlesbar.org/bundesrat-client/internal/engine";
 import { baseUrlProblem, headerValueProblem, nonBlankProblem, stateProblem } from "@maschinenlesbar.org/bundesrat-client/internal/validate";
@@ -86,6 +87,7 @@ export interface GlobalOptions {
   maxResponseBytes?: number;
   compact?: boolean;
   output?: string;
+  force?: boolean;
 }
 
 /** Translate resolved global CLI options into client options. */
@@ -146,6 +148,8 @@ export function action(
     const command = args[args.length - 1] as Command;
     const positionals = args.slice(0, Math.max(0, args.length - 2)) as string[];
     const global = command.optsWithGlobals() as GlobalOptions;
+    // A refused -o target is a usage error before anything else happens.
+    checkOutputTarget(deps, global);
     warnOnCleartext(deps, global);
     const options = toEngineOptions(global);
     options.onRetry = (event) => logOf(deps).warn("http", retryMessage(event));

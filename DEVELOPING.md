@@ -330,7 +330,7 @@ packages/client/src/
     client.ts    # BundesratClient — session/members/appointments + open-field projection
     index.ts     # the client's public surface (the library entry re-exports it)
 apps/cli/src/cli/
-    io.ts        # injectable I/O seam (stdout/stderr/file), the logger and the clock
+    io.ts        # injectable I/O seam (stdout/stderr, the -o file: OutputFiles), the logger and the clock
     log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
     shared.ts    # option parsers, global-option resolver
     output.ts    # the output sink: JSON rendering (escapes, deep/huge answers) and -o
@@ -348,6 +348,19 @@ exceeded". `--compact` takes V8's fast path unless the answer holds a string or 
 characters or more (`holdsHugeString`): on Node 26 the fast path aborts the process on a
 ~250 MB string, while it is also the only path that prints very deep nesting there.
 `apps/cli/test/output.test.ts` pins the path with a mocked `JSON.stringify`.
+
+**`-o` integrity** (`output.ts`, `checkOutputTarget`; the file seam `OutputFiles` in `io.ts`,
+`nodeFiles` for the real file system, `CliDeps.files` for tests). Before any request,
+`--force` without `-o`, a directory and an existing path (a dangling link too) without
+`--force` are usage errors (exit 2); `-o -` is stdout. The write is atomic: without `--force`
+the name is claimed with an exclusive create (a file that appears during the request is not
+overwritten either: an `OutputError`, exit 1), the data goes to a temporary file beside the
+target and is renamed over it, an existing file's mode is kept, and `--force` writes through a
+symlink to the file it points at. On failure no temporary file and no claimed name is left
+(`Could not write to "<path>": <reason>`, an ERROR record of `bundesrat.output`). Not kept:
+the owner and hard links of a replaced file; a directory that isn't writable refuses `-o`.
+`apps/cli/test/output.test.ts` and `conformance-p26-output-integrity` (a write cut short under
+`ulimit -f`) check it.
 
 **Closed pipes.** The bin shim installs `handleOutputErrors()` (`io.ts`) before `run()`:
 an EPIPE on stdout (`| head`, a `jq` that exits early) exits 0 quietly; an EPIPE on
