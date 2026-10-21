@@ -40,7 +40,7 @@ The CLI drops empty fields, so a field with no value is **missing**, never `""`.
 ```bash
 # The full agenda, one line per item, in TOP order (the feed lists them out of order)
 bundesrat session \
-  | jq -r '.tops | sort_by(.toptitle // "" | capture("(?<n>\\d+)(?<s>[a-z]*)") | [(.n | tonumber), .s])[] | "\(.toptitle)\t\(.topdrucksache // "—")\t\(.topheader)"'
+  | jq -r '.tops | sort_by(.toptitle // "" | (capture("(?<n>\\d*)\\s*(?<s>[a-z]*)$") // {n: "", s: ""}) | [(if .n == "" then -1 else (.n | tonumber) end), .s])[] | "\(.toptitle)\t\(.topdrucksache // "—")\t\(.topheader)"'
 
 # When and what: title, date, and number of items
 bundesrat session | jq '{title, header, items: (.tops | length)}'
@@ -64,7 +64,8 @@ bundesrat appointments \
   on `"; "` to count or cite them one by one.
 - **TOPs come out of order.** The feed lists them as e.g. TOP 31, TOP 24, TOP 81,
   TOP 40. Sort by the number and letter suffix (recipe above) before presenting the
-  agenda; a plain string sort puts "TOP 10" before "TOP 2".
+  agenda; a plain string sort puts "TOP 10" before "TOP 2". A TOP without a number
+  (`TOP a`, `TOP b`; the official agenda page doesn't list them) sorts first, by its letter.
 - **Appointment dates are German-format strings** — `startdate` is
   `"25.09.2026 09:30"` or date-only `"22.09.2026"` (DD.MM.YYYY[ HH:MM]), which
   doesn't sort as text; convert as in the recipe (the time is optional there).

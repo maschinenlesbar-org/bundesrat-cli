@@ -58,12 +58,13 @@ cross-reference, and a TOP without a Drucksache has no `topdrucksache` key. A TO
 covers several Drucksachen lists them all, joined with `"; "` ("Drucksache 343/26;
 Drucksache 344/26"); the recipe below splits them. The
 feed lists the TOPs **out of order** (e.g. TOP 31, TOP 24, TOP 81), so sort them
-by number and letter suffix before printing an agenda.
+by number and letter suffix before printing an agenda. A TOP without a number (`TOP a`,
+`TOP b`, which the official agenda page doesn't list) sorts first, by its letter.
 
 ```bash
 # Just the agenda, one line per TOP, in TOP order
 bundesrat session \
-  | jq -r '.tops | sort_by(.toptitle // "" | capture("(?<n>\\d+)(?<s>[a-z]*)") | [(.n | tonumber), .s])[] | "\(.toptitle)\t\(.topdrucksache // "—")\t\(.topheader)"'
+  | jq -r '.tops | sort_by(.toptitle // "" | (capture("(?<n>\\d*)\\s*(?<s>[a-z]*)$") // {n: "", s: ""}) | [(if .n == "" then -1 else (.n | tonumber) end), .s])[] | "\(.toptitle)\t\(.topdrucksache // "—")\t\(.topheader)"'
 
 # How many agenda items?
 bundesrat session | jq '.tops | length'

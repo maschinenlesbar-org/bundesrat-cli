@@ -515,3 +515,22 @@ test("the skills quote the network-error record as the CLI writes it (B4)", asyn
     assert.match(record, pattern, `${skill} quotes ${quoted}`);
   }
 });
+
+// Runs jq as a process (when it is installed): 30 s instead of the suite's 5 s.
+test("the documented agenda sort puts every TOP in a defined order, letter-only TOPs too (B7)", { timeout: 30_000 }, async (t) => {
+  const { execFileSync } = await import("node:child_process");
+  const { readFileSync } = await import("node:fs");
+  try {
+    execFileSync("jq", ["--version"]);
+  } catch {
+    return t.skip("jq is not installed");
+  }
+  const session = { tops: [{ toptitle: "TOP b" }, { toptitle: "TOP a" }, { toptitle: "TOP 10" }, { toptitle: "TOP 2a" }, { toptitle: "TOP 2" }, { toptitle: "TOP 1" }] };
+  for (const doc of ["skills/bundesrat-agenda/SKILL.md", "Usage.md"]) {
+    const text = readFileSync(new URL(`../../../../${doc}`, import.meta.url), "utf8");
+    const recipe = /jq -r '(\.tops \| sort_by\(\.toptitle[^']*)'/.exec(text)?.[1];
+    assert.ok(recipe !== undefined, `${doc}: no agenda sort recipe`);
+    const lines = execFileSync("jq", ["-r", recipe], { input: JSON.stringify(session), encoding: "utf8" }).trim().split("\n");
+    assert.deepEqual(lines.map((line) => line.split("\t")[0]), ["TOP a", "TOP b", "TOP 1", "TOP 2", "TOP 2a", "TOP 10"], doc);
+  }
+});
