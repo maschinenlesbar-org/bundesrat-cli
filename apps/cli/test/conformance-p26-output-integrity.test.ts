@@ -22,14 +22,11 @@ const BIN = fileURLToPath(new URL("../src/cli/index.js", import.meta.url));
 const outputArgv = (base: string, file: string, force: boolean): string[] => [
   "--base-url", base, "--max-retries", "0", "-o", file, ...(force ? ["--force"] : []), "members",
 ];
-/**
- * An answer of about 600 kB for that command: the members feed with 10,000 members. The mock
- * serves `JSON.stringify(bigBody())`, so the feed arrives as a JSON string; the XML parser takes
- * its two quotes for text outside the root element (the feed holds no quote, backslash or
- * control character that would be escaped).
- */
-const bigBody = (): unknown =>
-  `<iOS><list>${Array.from({ length: 10000 }, (_, i) => `<employee><name>a${i}</name><state>Bayern</state></employee>`).join("")}</list></iOS>`;
+/** An answer of about 600 kB for that command, as the server sends it: the members feed (XML) with 10,000 members. */
+const bigAnswer = (): { body: string; contentType: string } => ({
+  body: `<iOS><list>${Array.from({ length: 10000 }, (_, i) => `<employee><name>a${i}</name><state>Bayern</state></employee>`).join("")}</list></iOS>`,
+  contentType: "application/xml;charset=utf-8",
+});
 /** The log program, as in `ERROR [<bin>.output]`. */
 const PROGRAM = "bundesrat";
 /** The exit code of a usage error in this repo (commander's default is 1; most repos use 2). */
@@ -54,12 +51,12 @@ function runLimited(argv: string[]): Promise<{ code: number; stderr: string }> {
 }
 
 async function withServer(body: (base: string, requests: () => number) => Promise<void>): Promise<void> {
-  const answer = JSON.stringify(bigBody());
+  const answer = bigAnswer();
   let count = 0;
   const server = http.createServer((_req, res) => {
     count += 1;
-    res.setHeader("content-type", "application/json");
-    res.end(answer);
+    res.setHeader("content-type", answer.contentType);
+    res.end(answer.body);
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   try {
