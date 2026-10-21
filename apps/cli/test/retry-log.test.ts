@@ -20,7 +20,7 @@ async function exercise(extra: string[], failures: number, retryAfter?: string, 
       : { status: 200, headers: { "content-type": "application/xml" }, body: Buffer.from(fx.sessionXml) };
   const deps: CliDeps = {
     io: { out: (s) => out.push(s), err: (s) => err.push(s) },
-    files: { state: () => "absent", write: () => {} },
+    files: { state: () => "absent", parentProblem: () => undefined, write: () => {} },
     
     now: () => new Date("2026-01-02T03:04:05.678Z"),
     createClient: (opts) =>

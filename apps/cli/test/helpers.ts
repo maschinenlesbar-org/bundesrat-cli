@@ -63,6 +63,7 @@ export async function parity(
     createClient: (opts) => defaultDeps.createClient({ ...opts, transport: mt.transport }),
     files: {
       state: () => "absent",
+      parentProblem: () => undefined,
       write: () => {
         throw new Error("parity(): the CLI tried to write a file");
       },

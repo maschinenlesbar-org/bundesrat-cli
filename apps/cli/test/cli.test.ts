@@ -27,6 +27,7 @@ function makeCli(responder: (req: HttpRequest) => HttpResponse) {
     // An in-memory file system for -o: every path is free.
     files: {
       state: () => "absent",
+      parentProblem: () => undefined,
       write: (p, d) => {
         files[p] = d;
       },
@@ -170,6 +171,7 @@ test("a --output write failure reports a clean error (exit 1), not 'Unexpected e
     createClient: (opts) => new BundesratClient({ ...opts, transport: mt.transport }),
     files: {
       state: () => "absent",
+      parentProblem: () => undefined,
       write: () => {
         throw new Error('Could not write to "/tmp/x": EISDIR: illegal operation on a directory');
       },
@@ -443,37 +445,50 @@ test("the log format is the one commander parsed, where an option's value looks 
   assert.ok(parse.err.length > 0 && parse.err.every(isJsonl), parse.err.join("\n"));
 });
 
-test("every -o failure is an ERROR record of bundesrat.output, exit 1 (L8)", async () => {
+test("every -o failure is an ERROR record: before the request of bundesrat.cli (exit 2), after it of bundesrat.output (exit 1) (L8, D5)", async () => {
   const dir = mkdtempSync(join(tmpdir(), "bundesrat-l8-"));
   const locked = join(dir, "locked");
   mkdirSync(locked, 0o500);
   try {
-    const cases: Array<[string, RegExp]> = [[join(dir, "missing", "x"), /ENOENT/]];
+    // A directory that is missing or can't take the file is refused before any request (D5).
+    const cases: Array<[string, RegExp]> = [[join(dir, "missing", "x"), /the directory ".*missing" does not exist\./]];
     // root writes anywhere; the permission case needs an ordinary user.
-    if (process.getuid?.() !== 0) cases.push([join(locked, "x"), /EACCES/]);
+    if (process.getuid?.() !== 0) cases.push([join(locked, "x"), /no permission to create files in ".*locked"\./]);
     for (const [path, reason] of cases) {
       const cli = makeCli(() => xmlResponse(fx.membersXml));
       delete cli.deps.files;
-      assert.equal(await run(["-o", path, "members"], cli.deps), 1, path);
+      assert.equal(await run(["-o", path, "members"], cli.deps), 2, path);
+      assert.equal(cli.mt.calls.length, 0, `${path}: a request was sent`);
       const text = untimed(cli.err.join("\n"));
-      assert.match(text, /^ERROR \[bundesrat\.output\] Could not write to ".*x": /, path);
+      assert.match(text, /^ERROR \[bundesrat\.cli\] Cannot write to ".*x": /, path);
       assert.match(text, reason, path);
-      assert.doesNotMatch(text, /Unexpected error/);
     }
+    // A directory that goes away during the request: the write fails afterwards.
+    const gone = join(dir, "gone");
+    mkdirSync(gone);
+    const cli = makeCli(() => {
+      rmSync(gone, { recursive: true });
+      return xmlResponse(fx.membersXml);
+    });
+    delete cli.deps.files;
+    assert.equal(await run(["-o", join(gone, "x"), "members"], cli.deps), 1);
+    const text = untimed(cli.err.join("\n"));
+    assert.match(text, /^ERROR \[bundesrat\.output\] Could not write to ".*x": ENOENT/);
+    assert.doesNotMatch(text, /Unexpected error/);
   } finally {
     chmodSync(locked, 0o700);
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("the -o failure drops Node's \", open '<path>'\" tail also when the path holds a line break", async () => {
+test("an -o refusal names the user's path, never Node's \", open '<path>'\" tail, also when the path holds a line break", async () => {
   for (const path of ["/nonexistent\nZZ/x", "/nonexistent ZZ/x", "/nonexistent\rZZ/x", "/nonexistent/x"]) {
     const cli = makeCli(() => xmlResponse(fx.membersXml));
     delete cli.deps.files;
-    assert.equal(await run(["-o", path, "members"], cli.deps), 1);
+    assert.equal(await run(["-o", path, "members"], cli.deps), 2);
     assert.equal(cli.err.length, 1, cli.err.join("\n"));
     const msg = untimed(cli.err[0] as string);
-    assert.match(msg, /^ERROR \[bundesrat\.output\] Could not write to "\/nonexistent.*": ENOENT: no such file or directory$/);
+    assert.match(msg, /^ERROR \[bundesrat\.cli\] Cannot write to "\/nonexistent.*": the directory "\/nonexistent.*" does not exist\.$/);
     assert.doesNotMatch(msg, /open '/);
   }
 });

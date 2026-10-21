@@ -36,9 +36,11 @@ export interface OutputOptions {
 
 /**
  * Check `-o` before any request, so a refused target costs none: `--force` without `-o`, a
- * directory, and an existing path (a dangling link too) without `--force` are usage errors
- * (exit 2). `-o -` is stdout. The write checks again: a file that appears during the request
- * is not overwritten either (an OutputError then).
+ * directory, an existing path (a dangling link too) without `--force`, and a file whose directory
+ * is missing or not writable are usage errors (exit 2). A stream (`/dev/null`, a FIFO,
+ * `/dev/stdout`, `>(…)`) needs no `--force`: it is written in place, and nothing in it can be
+ * lost. `-o -` is stdout. The write checks again: a file that appears during the request is not
+ * overwritten either (an OutputError then).
  */
 export function checkOutputTarget(deps: CliDeps, options: OutputOptions): void {
   if (options.force === true && options.output === undefined) {
@@ -46,9 +48,13 @@ export function checkOutputTarget(deps: CliDeps, options: OutputOptions): void {
   }
   const path = fileOf(options);
   if (path === undefined) return;
-  const state = (deps.files ?? nodeFiles).state(path);
+  const files = deps.files ?? nodeFiles;
+  const state = files.state(path);
   if (state === "directory") throw new BundesratValidationError(isDirectoryMessage(path));
+  if (state === "stream") return;
   if (state === "exists" && options.force !== true) throw new BundesratValidationError(refuseOverwrite(path));
+  const problem = files.parentProblem(path, options.force === true);
+  if (problem !== undefined) throw new BundesratValidationError(problem);
 }
 
 /** The `-o` file, or undefined for stdout (no `-o`, or `-o -`). */

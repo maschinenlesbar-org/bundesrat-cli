@@ -122,8 +122,10 @@ bundesrat members | jq -r '[.[] | select(.mitglied == "true")] | group_by(.party
 
 Use `--compact` for single-line JSON and `-o <file>` to write to a file — both are
 **global options** that work before or after the command. `-o` never overwrites an existing
-file unless `--force` is given, and a write cut short (a full disk) leaves the old file as it
-was: the result goes to a temporary file beside it first.
+file unless `--force` is given, and a write cut short (a full disk) or interrupted (Ctrl-C)
+leaves the old file as it was: the result goes to a temporary file beside it first. A device,
+a FIFO or the shell's own descriptor (`-o /dev/null`, `-o /dev/stdout`, `-o >(gzip > x.gz)`)
+is written in place, without `--force`.
 
 **Exit codes** make the CLI easy to use in scripts:
 
@@ -166,8 +168,8 @@ takes a value takes one: giving it twice (`--timeout 1000 --timeout 0`) is a usa
 | `-h, --help` | Show help for the program or a command |
 | `--compact` | Print JSON on a single line instead of pretty-printed |
 | `--log-format <format>` | How errors, warnings and notes are written to stderr: `text` (default; log4j style, `2026-10-09T14:03:12.481Z WARN  [bundesrat.http] …`) or `jsonl` (one JSON object per line: `ts`, `level`, `topic`, `msg`). stdout is not affected |
-| `-o, --output <file>` | Write output to this file instead of stdout (`-` = stdout). An existing file (a dangling link too) or a directory is a usage error (exit `2`) before any request; the write is atomic (a temporary file beside it, renamed over it), so a write cut short leaves the old file as it was and no half-written file |
-| `--force` | With `-o`, overwrite an existing file (keeping its mode; through a symlink, the file it points at). Without `-o` a usage error |
+| `-o, --output <file>` | Write the JSON to this file instead of stdout (`-` = stdout), with an INFO record saying how many bytes went where. An existing file (a dangling link too) is refused before any request (exit `2`) unless `--force` is given; a directory, and a file whose directory is missing or not writable, are refused either way. The file is written beside the target and renamed over it when complete, so a write cut short (a full disk) or interrupted (Ctrl-C, `SIGTERM`, `SIGHUP`: exit `130`, `143`, `129`) leaves the old file as it was and no half-written or temporary one. A device, a FIFO or the shell's own descriptor (`/dev/null`, `/dev/stdout`, `>(gzip > x.gz)`) is written in place, without `--force` |
+| `--force` | With `-o`, overwrite the file if it exists (through a symlink, to the file it points at, which is created if the link dangles; keeping the file's mode); without `-o` a usage error |
 | `--base-url <url>` | API base URL (default `https://www.bundesrat.de`; `http:`/`https:` only, no query, fragment or whitespace; a literal `%` in a password is written `%25`). A `user:password@` in it is sent as Basic auth and shown as `***@` in every message; echoed back by a server (the `Basic` value, `user:password`, the password), it is shown as `***` |
 | `--timeout <ms>` | Time limit per request, reading the whole response included (default `30000`; `0` = none; at most `2147483647`). It bounds each attempt; the waits between retries come on top |
 | `--user-agent <ua>` | `User-Agent` header value |

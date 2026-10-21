@@ -49,7 +49,7 @@ function makeDeps(
   return {
     io: { out: io.out, err: io.err },
     // The -o file seam: every path is free, and a write is recorded.
-    files: { state: () => "absent", write: (path, data) => io.writeFile(path, data) },
+    files: { state: () => "absent", parentProblem: () => undefined, write: (path, data) => io.writeFile(path, data) },
     createClient: (opts) => new Client({ ...opts, transport }),
   };
 }

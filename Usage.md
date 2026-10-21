@@ -22,8 +22,8 @@ usage error (exit 2, `--timeout may be given only once.`), never "the last one w
 | `--max-response-bytes <n>` | cap the response body size in bytes (0 = unlimited; default 100 MiB) |
 | `--compact` | print JSON on a single line (for piping to `jq`) |
 | `--log-format <format>` | How errors, warnings and notes are written to stderr: `text` (default; log4j style, `2026-10-09T14:03:12.481Z WARN  [bundesrat.http] …`) or `jsonl` (one JSON object per line: `ts`, `level`, `topic`, `msg`). stdout is not affected |
-| `-o, --output <file>` | write output to a file instead of stdout (`-` = stdout; a blank path, a directory and an existing file are usage errors, before any request); written atomically, so a write cut short leaves the old file as it was |
-| `--force` | with `-o`, overwrite an existing file (its mode kept; through a symlink, the file it points at); without `-o` a usage error |
+| `-o, --output <file>` | write output to a file instead of stdout (`-` = stdout; a blank path, a directory, an existing file without `--force` and a file whose directory is missing or not writable are usage errors, before any request); the file is replaced only once complete, and an interrupted run leaves no half-written or temporary file. A device, a FIFO or `/dev/stdout` is written in place, without `--force` |
+| `--force` | with `-o`, overwrite the file if it exists (its mode kept; through a symlink, creating the file it points at); without `-o` a usage error |
 | `-V, --version` / `-h, --help` | version / help |
 
 A base URL on plain `http:` to a host other than loopback (`localhost`, `127.0.0.0/8`,

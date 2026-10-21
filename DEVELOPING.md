@@ -354,16 +354,27 @@ characters or more (`holdsHugeString`): on Node 26 the fast path aborts the proc
 
 **`-o` integrity** (`output.ts`, `checkOutputTarget`; the file seam `OutputFiles` in `io.ts`,
 `nodeFiles` for the real file system, `CliDeps.files` for tests). Before any request,
-`--force` without `-o`, a directory and an existing path (a dangling link too) without
-`--force` are usage errors (exit 2); `-o -` is stdout. The write is atomic: without `--force`
-the name is claimed with an exclusive create (a file that appears during the request is not
-overwritten either: an `OutputError`, exit 1), the data goes to a temporary file beside the
-target and is renamed over it, an existing file's mode is kept, and `--force` writes through a
-symlink to the file it points at. On failure no temporary file and no claimed name is left
-(`Could not write to "<path>": <reason>`, an ERROR record of `bundesrat.output`). Not kept:
-the owner and hard links of a replaced file; a directory that isn't writable refuses `-o`.
+`--force` without `-o`, a directory, an existing path (a dangling link too) without `--force`,
+and a file whose directory is missing, not a directory or not writable (`parentProblem`:
+`Cannot write to "<path>": the directory "<dir>" does not exist.`, also through `--force`'s
+links, and a link loop) are usage errors (exit 2); `-o -` is stdout. A stream
+(`nodeFiles.state` → `"stream"`: a character device, a FIFO, a socket, `/dev/stdout`,
+`/dev/stderr`, `/dev/fd/N`, `/proc/self/fd/N`) is written in place, opened for appending, with
+no claim, no temporary file and no `--force` needed: 0.6.0 refused `/dev/null` as an existing
+file, failed after the request on `/dev/stdout` and `>(…)`, and replaced a FIFO with a regular
+file. A file is written atomically: without `--force` the name is claimed with an exclusive
+create (a file that appears during the request is not overwritten either: an `OutputError`,
+exit 1), the data goes to a temporary file beside the target (`.<name>.<pid>-<random>.tmp`,
+the name shortened to stay within NAME_MAX, so a valid name of up to 255 bytes is written) and
+is renamed over it, an existing file's mode is kept, and `--force` writes through a symlink to
+the file it points at, creating it when the link dangles (the link stays). SIGINT, SIGTERM and
+SIGHUP during a file write remove the claim and the temporary file, then exit 130, 143 or 129.
+On failure no temporary file and no claimed name is left (`Could not write to "<path>":
+<reason>`, an ERROR record of `bundesrat.output`; Node's `, open '<path>'` tail, which named
+the temporary file, is dropped). Not kept: the owner and hard links of a replaced file.
 `apps/cli/test/output.test.ts` and `conformance-p26-output-integrity` (a write cut short under
-`ulimit -f`) check it.
+`ulimit -f`, also on a redirected stdout; `/dev/null`, a FIFO and `/dev/stdout`; a missing
+directory; a dangling link; a 255-byte name; a signal mid-write) check it.
 
 **Closed pipes.** The bin shim installs `handleOutputErrors()` (`io.ts`) before `run()`:
 an EPIPE on stdout (`| head`, a `jq` that exits early) exits 0 quietly; an EPIPE on
@@ -461,7 +472,9 @@ The client's tests are in `packages/client/test/` (`xml`, `query`, `http`, `engi
   `--state`/`--party` filter client-side and the feeds have fixed paths; `normalizeText` is
   checked in `client.test.ts`), P25 (the response corpus: an inexact number is an error — the
   number cases are skipped, the feeds are XML text; the empty answer runs), P26 (`-o` never
-  loses a file: a write cut short under `ulimit -f`, an existing file without `--force`).
+  loses a file: a write cut short under `ulimit -f`, also on a redirected stdout, an existing
+  file without `--force`, a missing directory, `/dev/null`, a FIFO and `/dev/stdout` written in
+  place, a dangling link with `--force`, a 255-byte name, a signal mid-write).
 
 ## Continuous integration
 
