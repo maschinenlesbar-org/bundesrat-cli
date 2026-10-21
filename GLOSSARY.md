@@ -27,14 +27,16 @@ so filter on `mitglied == "true"` to get the 69 members.
 
 **Plenarsitzung / session (`session`).** A plenary sitting of the Bundesrat. It
 meets roughly every 3–4 weeks (~10 times a year). `session` returns the
-current/next sitting with its agenda.
+current/next sitting with its agenda: `title`, `sitzung` (the sitting's number, e.g. "1069"),
+`header` (its date and time) and `stand` (the date the agenda is as of).
 
 **Tagesordnung / agenda.** The list of items a sitting will decide. `session`
 returns it as `tops`.
 
 **TOP (Tagesordnungspunkt) — `top` / `tops`.** A single agenda item. Each carries
 `toptitle` (e.g. "TOP 67"), `topheader` (a short factual label), `topdrucksache`
-(the associated document number) and `linkedtop` (a cross-reference). Empty fields
+(the associated document number), `linkedtop` (a cross-reference) and `topurl` (the item's
+link on the agenda page on bundesrat.de). Empty fields
 are dropped, so `linkedtop` appears only when set. The feed lists the TOPs out of
 numerical order. The feed's HTML description (`topdetail`) is editorial content and
 is not surfaced.

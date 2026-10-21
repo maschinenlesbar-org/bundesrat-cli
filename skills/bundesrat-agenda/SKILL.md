@@ -29,7 +29,7 @@ This skill also filters JSON with `jq`. **Validate it too** — run `command -v 
 ## Commands
 
 ```bash
-bundesrat session       # current sitting: { title, header, tops: [ {toptitle, topdrucksache, topheader, linkedtop?} ] }
+bundesrat session       # current sitting: { title, sitzung?, header, stand?, tops: [ {toptitle, topdrucksache, topheader, linkedtop?, topurl?} ] }
 bundesrat appointments  # committee dates (Termine): [ {type, id, url, title, startdate, stopdate?} ]
 ```
 

@@ -363,3 +363,28 @@ test("a refusal quotes the value visibly: format and control characters escaped,
   }
   assert.throws(() => new BundesratClient({ timeoutMs: "1‮0" as unknown as number }), (err: Error) => err.message.includes("\\u202e") && !err.message.includes("‮"));
 });
+
+test("session surfaces the feed's factual sitzung, stand and each TOP's topurl (B6)", async () => {
+  const xml = `<iOS version="1.0"><list>
+    <title>1069. Sitzung des Bundesrates | Tagesordnung Entwurf</title>
+    <sitzung>1069</sitzung>
+    <header>am Freitag, dem 16. Oktober 2026, 9:30 Uhr</header>
+    <stand>16.10.2026</stand>
+    <top><toptitle>TOP b</toptitle><topurl>https://www.bundesrat.de/SharedDocs/TO/1069/tagesordnung-1069.html#top-b</topurl>
+      <topdrucksache>Drucksache 529/26</topdrucksache><topheader>Kulturhauptstädte</topheader><linkedtop></linkedtop>
+      <topdetail></topdetail><detailImgDates></detailImgDates></top>
+  </list></iOS>`;
+  const c = new BundesratClient({ transport: makeMockTransport(() => xmlResponse(xml)).transport });
+  const session = await c.session();
+  assert.deepEqual(Object.keys(session), ["title", "sitzung", "header", "stand", "tops"]);
+  assert.equal(session.sitzung, "1069");
+  assert.equal(session.stand, "16.10.2026");
+  assert.deepEqual(session.tops, [
+    {
+      toptitle: "TOP b",
+      topdrucksache: "Drucksache 529/26",
+      topheader: "Kulturhauptstädte",
+      topurl: "https://www.bundesrat.de/SharedDocs/TO/1069/tagesordnung-1069.html#top-b",
+    },
+  ]);
+});

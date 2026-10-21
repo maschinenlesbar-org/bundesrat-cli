@@ -28,14 +28,16 @@ die 69 Mitglieder zu erhalten.
 
 **Plenarsitzung (`session`).** Eine Plenarsitzung des Bundesrates. Er tagt etwa alle
 3–4 Wochen (rund 10-mal im Jahr). `session` liefert die aktuelle bzw. nächste Sitzung
-mit ihrer Tagesordnung.
+mit ihrer Tagesordnung: `title`, `sitzung` (die Nummer der Sitzung, z. B. „1069“), `header`
+(Datum und Uhrzeit) und `stand` (das Datum, auf dem die Tagesordnung steht).
 
 **Tagesordnung.** Die Liste der Punkte, über die eine Sitzung entscheidet. `session`
 liefert sie als `tops`.
 
 **TOP (Tagesordnungspunkt) – `top` / `tops`.** Ein einzelner Punkt der Tagesordnung. Jeder
 enthält `toptitle` (z. B. „TOP 67“), `topheader` (eine kurze sachliche Bezeichnung),
-`topdrucksache` (die zugehörige Drucksachennummer) und `linkedtop` (einen Querverweis).
+`topdrucksache` (die zugehörige Drucksachennummer), `linkedtop` (einen Querverweis) und
+`topurl` (den Link auf den Punkt auf der Tagesordnungsseite von bundesrat.de).
 Leere Felder entfallen, `linkedtop` erscheint also nur, wenn es gesetzt ist. Der Feed führt
 die TOPs nicht in numerischer Reihenfolge. Die HTML-Beschreibung des Feeds (`topdetail`)
 ist redaktioneller Inhalt und wird nicht ausgegeben.

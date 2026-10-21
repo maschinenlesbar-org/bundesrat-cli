@@ -67,7 +67,7 @@ import { BundesratClient, BundesratParseError, filterMembers } from "@maschinenl
 
 const client = new BundesratClient();
 
-const session = await client.session();     // { title, header, tops: [...] }
+const session = await client.session();     // { title, sitzung, header, stand, tops: [...] }
 console.log(session.title, session.tops.length);
 for (const top of session.tops) console.log(top.toptitle, top.topdrucksache);
 
@@ -229,7 +229,7 @@ look like a procedural item. Attributes on a text element are ignored and its te
 
 | Method | Feed | Returns |
 |---|---|---|
-| `session()` | current plenary sitting | `{ title?, header?, tops: AgendaItem[] }` |
+| `session()` | current plenary sitting | `{ title?, sitzung?, header?, stand?, tops: AgendaItem[] }` (TOPs with `topurl`) |
 | `members(filter?)` | members | `Member[]` (name, party, Land, status flags, url) |
 | `appointments()` | Termine | `Appointment[]` (title, dates, url) |
 

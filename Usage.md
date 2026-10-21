@@ -44,15 +44,19 @@ bundesrat session
 
 ```json
 {
-  "title": "1067. Sitzung des Bundesrates | Tagesordnung Entwurf",
-  "header": "am Freitag, dem 10. Juli 2026, 9:30 Uhr",
+  "title": "1069. Sitzung des Bundesrates | Tagesordnung Entwurf",
+  "sitzung": "1069",
+  "header": "am Freitag, dem 16. Oktober 2026, 9:30 Uhr",
+  "stand": "16.10.2026",
   "tops": [
-    { "toptitle": "TOP 67", "topdrucksache": "Drucksache 371/26", "topheader": "…" }
+    { "toptitle": "TOP 7", "topdrucksache": "Drucksache 562/26", "topheader": "…",
+      "topurl": "https://www.bundesrat.de/SharedDocs/TO/1069/tagesordnung-1069.html#top-7" }
   ]
 }
 ```
 
-Every field is a plain string. Empty fields are dropped (and so is a field whose
+`sitzung` is the sitting's number, `stand` the date the agenda is as of, and `topurl` the
+item's link on the agenda page. Every field is a plain string. Empty fields are dropped (and so is a field whose
 value isn't plain text, e.g. inline markup or HTML inside CDATA), so `linkedtop` appears only when a TOP has a
 cross-reference, and a TOP without a Drucksache has no `topdrucksache` key. A TOP that
 covers several Drucksachen lists them all, joined with `"; "` ("Drucksache 343/26;
@@ -77,7 +81,7 @@ bundesrat session | jq -r '.tops[].topdrucksache | select(.) | split("; ")[]'
 > content and is **not** surfaced — only the factual TOP number, Drucksache and
 > short header. See [DATA_LICENSE.md](DATA_LICENSE.md).
 
-> Between sittings the agenda feed can be sparse: `title` and `header` are optional
+> Between sittings the agenda feed can be sparse: `title`, `sitzung`, `header` and `stand` are optional
 > and may be **absent**, and `tops` may be `[]`. Guard for them in scripts
 > (`.title // "—"`).
 

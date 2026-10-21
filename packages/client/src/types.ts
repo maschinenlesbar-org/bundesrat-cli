@@ -56,14 +56,20 @@ export interface AgendaItem {
   topheader?: string;
   /** A cross-referenced TOP, when the item is linked to another. */
   linkedtop?: string;
+  /** Link to the item on the sitting's agenda page on bundesrat.de (a reference, not content). */
+  topurl?: string;
 }
 
 /** A plenary session with its agenda (from the current-session feed). */
 export interface Session {
   /** e.g. "1067. Sitzung des Bundesrates | Tagesordnung Entwurf". */
   title?: string;
+  /** The sitting's number, e.g. "1069". */
+  sitzung?: string;
   /** e.g. "am Freitag, dem 10. Juli 2026, 9:30 Uhr". */
   header?: string;
+  /** The date the agenda is as of (German format), e.g. "16.10.2026". */
+  stand?: string;
   /** The agenda items (Tagesordnungspunkte). */
   tops: AgendaItem[];
 }

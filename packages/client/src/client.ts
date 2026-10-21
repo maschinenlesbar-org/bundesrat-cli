@@ -39,8 +39,10 @@ const RENDER_QUERY = { view: "renderXml" } as const;
 // MAINTENANCE: this is a fixed allowlist, so a *new* field the upstream feed starts
 // serving is dropped silently — including a genuinely factual one (a member's office,
 // an event location, …). When the feeds change, revisit these lists rather than
-// assuming new fields flow through. (Confirmed against the live feeds 2026-07-06: no
-// factual field is currently lost; everything dropped is editorial/HTML/image.)
+// assuming new fields flow through. (Checked against the live feeds 2026-10-21: the session
+// feed's `sitzung`, `stand` and `topurl` had appeared and are surfaced now; everything else
+// dropped is editorial/HTML/image: `topdetail`, `detail1–3`, `imagePath`, `imageDate`,
+// `imgDates`, `detailImgDates`, the appointments' CDATA `description`.)
 const MEMBER_FIELDS = [
   "honorificTitle",
   "firstname",
@@ -53,7 +55,9 @@ const MEMBER_FIELDS = [
   "designiert",
   "url",
 ] as const;
-const TOP_FIELDS = ["toptitle", "topdrucksache", "topheader", "linkedtop"] as const;
+const TOP_FIELDS = ["toptitle", "topdrucksache", "topheader", "linkedtop", "topurl"] as const;
+/** The sitting's own fields, at the list level of the session feed. */
+const SESSION_FIELDS = ["title", "sitzung", "header", "stand"] as const;
 /**
  * Whitelisted fields that may repeat: every occurrence is a reference of its own (a TOP
  * that covers two Drucksachen lists two `<topdrucksache>`s), so the plain texts are joined
@@ -289,17 +293,16 @@ export class BundesratClient {
   }
 
   /**
-   * The current plenary session with its agenda items (TOP numbers and their
-   * Drucksachen — the latter *amtliche Werke* under § 5 UrhG).
+   * The current plenary session — its title, number (`sitzung`), date line (`header`) and
+   * the agenda's as-of date (`stand`) — with its agenda items (TOP numbers, their Drucksachen
+   * — *amtliche Werke* under § 5 UrhG — and links).
    */
   async session(): Promise<Session> {
     const list = await this.list(FEEDS.session);
     // The same plain-text rule as every TOP field (pick): text with attributes is
     // kept; markup, a repeat or an empty value leaves the key out.
-    const { title, header } = pick<{ title?: string; header?: string }>(list, ["title", "header"]);
     return {
-      ...(title !== undefined ? { title } : {}),
-      ...(header !== undefined ? { header } : {}),
+      ...pick<Omit<Session, "tops">>(list, SESSION_FIELDS),
       tops: asArray<XmlValue>(list["top"]).map((t) => pick<AgendaItem>(t, TOP_FIELDS)),
     };
   }
