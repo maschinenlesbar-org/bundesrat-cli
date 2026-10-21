@@ -124,6 +124,12 @@ the CLI)"); headers are read from a plain object in any key case, a fetch `Heade
 `Buffer`; a response without a valid status, headers object or byte body is a
 `BundesratNetworkError`. `apps/cli/test/conformance-p5-transport-contract.test.ts` covers it.
 
+Every `BundesratNetworkError` names the request it belongs to: a timeout, the size cap, a
+refused connection, a DNS failure and a reset read `GET <url> failed: <reason>` (userinfo
+redacted, e.g. `GET https://www.bundesrat.de/iOS/…/mitglieder_table.xml?view=renderXml failed:
+connect ECONNREFUSED 127.0.0.1:443`), with the transport's original error, scrubbed, as the
+`cause`; the CLI logs that message as an ERROR record of `bundesrat.http` (exit 6).
+
 Every option (and every `MemberFilter` key) is typed `?: T | undefined`, and `undefined` means
 the same as leaving it out, so a consumer compiled with `exactOptionalPropertyTypes` can pass
 `{ baseUrl: process.env.BUNDESRAT_BASE_URL }` (`packages/client/test/types.test.ts`).

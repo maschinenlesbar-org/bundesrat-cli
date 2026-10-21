@@ -11,6 +11,7 @@ import {
 import { baseUrlProblem, headerValueProblem } from "../src/validate.js";
 import {
   BundesratApiError,
+  BundesratNetworkError,
   BundesratParseError,
   BundesratValidationError,
   cutForMessage,
@@ -383,4 +384,26 @@ test("credentials a server echoes are scrubbed from the error: Basic, user:passw
     for (const form of [basic, "alice:pa ss-pw", "pa ss-pw"]) assert.ok(!err.body.includes(form), err.body);
     return true;
   });
+});
+
+test("a timeout, the size cap, a refused connection and a DNS failure name the request (K3)", async () => {
+  const url = "GET https://***@feeds.example/iOS/SharedDocs/2_Mitglieder/mitglieder_table.xml?view=renderXml failed: ";
+  const thrown = (message: string, code: string): Error => Object.assign(new Error(message), { code });
+  const cases: Array<[string, Partial<EngineOptions>, string]> = [
+    ["refused", { transport: async () => { throw thrown("connect ECONNREFUSED 127.0.0.1:1", "ECONNREFUSED"); } }, "connect ECONNREFUSED 127.0.0.1:1"],
+    ["DNS", { transport: async () => { throw thrown("getaddrinfo ENOTFOUND feeds.example", "ENOTFOUND"); } }, "getaddrinfo ENOTFOUND feeds.example"],
+    ["reset", { transport: async () => { throw thrown("socket hang up", "ECONNRESET"); }, maxRetries: 0 }, "socket hang up"],
+    ["timeout", { transport: () => new Promise(() => {}), timeoutMs: 20 }, "Request exceeded the 20ms deadline"],
+    ["size cap", { transport: async () => xmlResponse("<iOS><list/></iOS>"), maxResponseBytes: 5 }, "Response exceeded the size limit"],
+  ];
+  for (const [label, options, reason] of cases) {
+    const client = new BundesratClient({ baseUrl: "https://user:pa55word@feeds.example", ...options });
+    await assert.rejects(client.members(), (err: unknown) => {
+      assert.ok(err instanceof BundesratNetworkError, `${label}: ${String(err)}`);
+      assert.ok(err.message.startsWith(url + reason), `${label}: ${err.message}`);
+      assert.doesNotMatch(err.message, /pa55word/, label);
+      if (label !== "size cap") assert.ok(err.cause instanceof Error, `${label}: the original is the cause`);
+      return true;
+    });
+  }
 });

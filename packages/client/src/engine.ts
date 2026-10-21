@@ -446,6 +446,11 @@ function htmlPageError(path: string): BundesratParseError {
   );
 }
 
+/** `GET <url> failed: `, the start of a network error's message: the request URL, userinfo redacted, cut. */
+function requestFailed(url: string): string {
+  return `GET ${cutForMessage(redactUrl(url))} failed: `;
+}
+
 const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -557,17 +562,18 @@ export class RequestEngine {
    * What the transport threw, as the error the engine raises. The default transport
    * rejects with `BundesratNetworkError` only; an injected one may throw anything (a
    * string, a `TypeError` from fetch). Every failure becomes a `BundesratNetworkError` —
-   * a `BundesratError` a caller and the CLI can rely on — with the base URL's credentials
-   * scrubbed from its message and cause chain; any other `BundesratError` passes through,
-   * and a clean network error stays as it is.
+   * a `BundesratError` a caller and the CLI can rely on — that names the request
+   * (`GET <url> failed: <reason>`, userinfo redacted: a timeout, a refused connection or a
+   * DNS failure said only `connect ECONNREFUSED 127.0.0.1:1`, not which call failed), with
+   * the base URL's credentials scrubbed from its message and the original, scrubbed, as
+   * its cause. Any other `BundesratError` passes through.
    */
-  private transportError(cause: unknown): BundesratError {
+  private transportError(cause: unknown, url: string): BundesratError {
     if (cause instanceof BundesratError && !(cause instanceof BundesratNetworkError)) return cause;
     const reason = cause instanceof Error ? cause.message : String(cause);
-    const message = cutForMessage(sanitizeServerText(this.scrub(reason)));
-    const scrubbed = this.scrubCause(cause);
-    if (cause instanceof BundesratNetworkError && message === cause.message && scrubbed === cause) return cause;
-    return new BundesratNetworkError(message, { cause: scrubbed });
+    return new BundesratNetworkError(`${requestFailed(url)}${cutForMessage(sanitizeServerText(this.scrub(reason)))}`, {
+      cause: this.scrubCause(cause),
+    });
   }
 
   /**
@@ -637,14 +643,14 @@ export class RequestEngine {
           await this.backOff(attempt, this.retryDelayMs * attempt, url);
           continue;
         }
-        throw this.transportError(cause);
+        throw this.transportError(cause, url);
       }
 
       // An injected transport may resolve with anything; a malformed HttpResponse would
       // otherwise surface below as a raw TypeError, outside the error contract.
       const invalid = responseProblem(response);
       if (invalid !== undefined) {
-        throw new BundesratNetworkError(`The transport returned an invalid response (${invalid}).`);
+        throw new BundesratNetworkError(`${requestFailed(url)}the transport returned an invalid response (${invalid}).`);
       }
       const status = response.status;
       const responseHeaders = plainHeaders(response.headers);
@@ -653,7 +659,7 @@ export class RequestEngine {
       // The size cap holds whatever the transport did: the default one aborts early, a custom
       // one may have read everything.
       if (this.maxResponseBytes > 0 && body.byteLength > this.maxResponseBytes) {
-        throw new BundesratNetworkError(sizeLimitMessage(this.maxResponseBytes));
+        throw new BundesratNetworkError(`${requestFailed(url)}${sizeLimitMessage(this.maxResponseBytes)}`);
       }
       const retryable = status === 429 || status === 503;
       const retryAfter = retryable ? parseRetryAfter(responseHeaders["retry-after"]) : undefined;
