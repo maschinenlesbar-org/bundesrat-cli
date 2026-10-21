@@ -449,7 +449,12 @@ The client's tests are in `packages/client/test/` (`xml`, `query`, `http`, `engi
   the env-variable and other-secret cases are skipped: no environment variable, no key),
   P21 (the README's relative links: README.md ships to npmjs.com, so a link to a document
   the `files` allowlist leaves out must be an absolute GitHub URL), P23 (the log on
-  stderr: record format, `--log-format jsonl`, no secret in either format).
+  stderr: record format, `--log-format jsonl`, no secret in either format), P24 (the input
+  corpus: every text filter and path id canonicalised or refused — empty here, since
+  `--state`/`--party` filter client-side and the feeds have fixed paths; `normalizeText` is
+  checked in `client.test.ts`), P25 (the response corpus: an inexact number is an error — the
+  number cases are skipped, the feeds are XML text; the empty answer runs), P26 (`-o` never
+  loses a file: a write cut short under `ulimit -f`, an existing file without `--force`).
 
 ## Continuous integration
 
