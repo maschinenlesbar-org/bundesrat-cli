@@ -279,7 +279,11 @@ the result is well-formed text `jq` reads, and the engine option `onWarning` is 
 naming the request: `GET <url>: 2 characters of the answer were not valid text (invalid bytes
 or a lone surrogate) and replaced with U+FFFD.` The CLI logs it as a `WARN` record of
 `bundesrat.api`. One bad character never sinks a whole answer. A reference past U+10FFFF is
-left as text.
+left as text. A body too large to become one string (512 MB and more, possible only with
+`maxResponseBytes: 0` or `--max-response-bytes 0`) is a `BundesratParseError`, `GET <url>: the
+answer is too large to read as text (N bytes; the longest string is 536870888 characters).`,
+not a plain `Error` ("Unexpected error" in the CLI); an error status with such a body keeps its
+`BundesratApiError`, without the body.
 
 It is deliberately **not** a general-purpose parser (no namespaces, DTDs, or full
 mixed-content reconstruction) — just enough for these shallow feeds, and exercised

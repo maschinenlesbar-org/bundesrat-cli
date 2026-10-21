@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { TextDecoder } from "node:util";
 import assert from "node:assert/strict";
 import {
   MAX_RETRY_AFTER_MS,
@@ -483,4 +484,33 @@ test("an answer error names the request: method and URL, userinfo redacted (D9)"
   const c = new BundesratClient({ transport: makeMockTransport(() => xmlResponse("<error/>")).transport });
   await assert.rejects(c.session(), (err: Error) =>
     err.message === "GET https://www.bundesrat.de/iOS/SharedDocs/3_Plenum/plenum_aktuelleSitzung_table.xml?view=renderXml: unexpected response shape: expected an <iOS> root element, got <error>.");
+});
+
+test("an answer longer than V8's longest string is a BundesratParseError naming the request, not a plain Error (B5)", async (t) => {
+  // A real one needs a body of 512 MB and more (possible with maxResponseBytes 0): V8's own
+  // error is stood in for, for the body marked by its length.
+  const huge = Buffer.from("<iOS><list/></iOS>  ");
+  const tooLong = Object.assign(new Error("Cannot create a string longer than 0x1fffffe8 characters"), { code: "ERR_STRING_TOO_LONG" });
+  const decode = TextDecoder.prototype.decode;
+  t.mock.method(TextDecoder.prototype, "decode", function (this: InstanceType<typeof TextDecoder>, input?: Uint8Array, options?: { stream?: boolean }) {
+    if (input !== undefined && input.byteLength === huge.length) throw tooLong;
+    return decode.call(this, input, options);
+  });
+  const toString = Buffer.prototype.toString;
+  t.mock.method(Buffer.prototype, "toString", function (this: Buffer, ...args: Parameters<Buffer["toString"]>) {
+    if (this.length === huge.length && args[0] === "utf8") throw tooLong;
+    return toString.apply(this, args);
+  });
+  const e = new RequestEngine({ maxResponseBytes: 0, transport: makeMockTransport(() => rawResponse(huge, "application/xml")).transport });
+  await assert.rejects(e.getXml("/feed.xml", { view: "renderXml" }), (err: unknown) => {
+    assert.ok(err instanceof BundesratParseError, String(err));
+    assert.equal(
+      err.message,
+      `GET https://www.bundesrat.de/feed.xml?view=renderXml: the answer is too large to read as text (${huge.length} bytes; the longest string is 536870888 characters).`,
+    );
+    return true;
+  });
+  // An error status with such a body is still the API error, without the unreadable body.
+  const failing = new RequestEngine({ maxResponseBytes: 0, transport: makeMockTransport(() => rawResponse(huge, "text/plain", 500)).transport });
+  await assert.rejects(failing.getXml("/feed.xml"), (err: unknown) => err instanceof BundesratApiError && err.status === 500 && err.body === "");
 });
