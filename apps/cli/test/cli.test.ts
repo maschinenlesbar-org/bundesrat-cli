@@ -4,6 +4,8 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run } from "../src/cli/run.js";
+import { buildProgram } from "../src/cli/program.js";
+import { forbidRepeatedOptions } from "../src/cli/shared.js";
 import { BundesratClient } from "@maschinenlesbar.org/bundesrat-client/internal/client";
 import type { CliDeps } from "../src/cli/io.js";
 import type { HttpRequest, HttpResponse } from "@maschinenlesbar.org/bundesrat-client/internal/http";
@@ -532,5 +534,46 @@ test("the documented agenda sort puts every TOP in a defined order, letter-only 
     assert.ok(recipe !== undefined, `${doc}: no agenda sort recipe`);
     const lines = execFileSync("jq", ["-r", recipe], { input: JSON.stringify(session), encoding: "utf8" }).trim().split("\n");
     assert.deepEqual(lines.map((line) => line.split("\t")[0]), ["TOP a", "TOP b", "TOP 1", "TOP 2", "TOP 2a", "TOP 10"], doc);
+  }
+});
+
+test("a boolean that can be switched both ways may be given only once: optional value, or --x / --no-x (T11)", async () => {
+  // commander calls no value parser for a bare `--is-open`, so `--is-open false --is-open` turned
+  // into true without a word (fragdenstaat-cli); `--x --no-x` keeps the last one the same way.
+  // This CLI declares no such option today; the guard is the kit's, checked on a test command.
+  const build = () => {
+    const program = buildProgram(makeCli(() => xmlResponse("<iOS><list/></iOS>")).deps);
+    const seen: unknown[] = [];
+    program
+      .command("flags")
+      .option("--is-open [bool]", "optional value", (value: string) => value === "true")
+      .option("--cache", "negatable")
+      .option("--no-cache", "negatable")
+      .option("--archived", "plain flag")
+      .action((opts: Record<string, unknown>) => void seen.push(opts));
+    forbidRepeatedOptions(program);
+    for (const command of program.commands) command.exitOverride().configureOutput({ writeErr: () => {}, outputError: () => {} });
+    program.exitOverride();
+    return { program, seen };
+  };
+  for (const argv of [
+    ["--is-open", "false", "--is-open"],
+    ["--is-open", "--is-open", "false"],
+    ["--is-open", "--is-open"],
+    ["--cache", "--no-cache"],
+    ["--no-cache", "--no-cache"],
+  ]) {
+    const { program, seen } = build();
+    await assert.rejects(program.parseAsync(["flags", ...argv], { from: "user" }), (err: Error) => /may be given only once/.test(err.message), argv.join(" "));
+    assert.deepEqual(seen, [], argv.join(" "));
+  }
+  for (const [argv, expected] of [
+    [["--is-open", "false"], { isOpen: false }],
+    [["--is-open"], { isOpen: true }],
+    [["--no-cache", "--archived", "--archived"], { cache: false, archived: true }],
+  ] as const) {
+    const { program, seen } = build();
+    await program.parseAsync(["flags", ...argv], { from: "user" });
+    assert.deepEqual(seen, [expected], argv.join(" "));
   }
 });
