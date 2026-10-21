@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BundesratClient, FEEDS, asArray, filterMembers, type MemberFilter } from "../src/client.js";
 import { BundesratParseError, BundesratValidationError } from "../src/errors.js";
+import { normalizeText } from "../src/validate.js";
 import type { Member } from "../src/types.js";
 import { makeMockTransport, xmlResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
@@ -330,4 +331,22 @@ test("members(filter) rejects a blank filter before any request (a rejection, no
   const pending = c.members({ state: " " });
   await assert.rejects(pending, BundesratValidationError);
   assert.equal(mt.calls.length, 0);
+});
+
+test("filterMembers puts both sides of the comparison in one canonical form: trimmed, NFC (K6)", () => {
+  // A list a library caller built (or another feed's spelling) may carry padding or NFD in the
+  // field itself; the needle is canonical, so the field must be too.
+  const members: Member[] = [
+    { name: "A", state: " Bayern ", party: " CSU " },
+    { name: "B", state: "Thüringen".normalize("NFD"), party: "BÜNDNIS 90/DIE GRÜNEN".normalize("NFD") },
+    { name: "C", state: "Hessen\n", party: "CDU" },
+  ];
+  const names = (rows: Member[]) => rows.map((m) => m.name);
+  assert.deepEqual(names(filterMembers(members, { state: "Bayern" })), ["A"]);
+  assert.deepEqual(names(filterMembers(members, { state: "Thüringen" })), ["B"]);
+  assert.deepEqual(names(filterMembers(members, { state: "Hessen" })), ["C"]);
+  assert.deepEqual(names(filterMembers(members, { party: " csu" })), ["A"]);
+  assert.deepEqual(names(filterMembers(members, { party: "Grüne".normalize("NFD") })), ["B"]);
+  assert.equal(normalizeText("  Müller\t"), "Müller");
+  assert.equal(normalizeText("a  b"), "a  b", "inner whitespace is kept");
 });

@@ -26,6 +26,7 @@ export {
   foldLand,
   knownKeysProblem,
   nonBlankProblem,
+  normalizeText,
   stateProblem,
 } from "./validate.js";
 export { LAENDER } from "./enums.js";

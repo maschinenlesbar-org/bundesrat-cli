@@ -227,8 +227,9 @@ look like a procedural item. Attributes on a text element are ignored and its te
 `members({ state, party })` filters the full list the feed returns, exactly as the
 CLI's `--state` / `--party` do: `state` names one of the sixteen Länder (`LAENDER`,
 rule `stateProblem`) and matches it exactly, `party` a substring of the party name,
-both trimmed and compared case-insensitively on the NFC form, and a member without the
-field never matches. A key the filter doesn't have (`State`, `states`, a `__proto__` key
+compared case-insensitively after both sides — the filter value and the member's field —
+are put in one canonical form (`normalizeText`, exported: trimmed, NFC; inner whitespace
+kept), and a member without the field never matches. A key the filter doesn't have (`State`, `states`, a `__proto__` key
 from `JSON.parse`), a state that is not a Land (`Thueringen`, `Bay`), and a blank or
 non-string value each reject with `BundesratValidationError` before any request
 (`Invalid filter: Unknown key "State"; expected one of state, party.`) — the misspelled

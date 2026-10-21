@@ -20,7 +20,7 @@
 import { RequestEngine, type EngineOptions } from "./engine.js";
 import type { XmlObject, XmlValue } from "./xml.js";
 import { BundesratParseError, cutForMessage } from "./errors.js";
-import { assertValid, knownKeysProblem, nonBlankProblem, stateProblem } from "./validate.js";
+import { assertValid, knownKeysProblem, nonBlankProblem, normalizeText, stateProblem } from "./validate.js";
 import type { AgendaItem, Appointment, Member, Session } from "./types.js";
 
 /** The feed paths (relative to the base URL). All are GET + `?view=renderXml`. */
@@ -188,9 +188,12 @@ export interface MemberFilter {
   party?: string | undefined;
 }
 
-/** Case- and normalisation-insensitive form of a filter value or a field. */
+/**
+ * Case- and normalisation-insensitive form of a filter value or a field: {@link normalizeText}
+ * (trimmed, NFC), lower case. Both sides of every comparison go through it.
+ */
 function fold(text: string): string {
-  return text.normalize("NFC").toLowerCase();
+  return normalizeText(text).toLowerCase();
 }
 
 /** The keys of a {@link MemberFilter}; any other key is a validation error. */
@@ -213,9 +216,10 @@ function assertMemberFilter(filter: MemberFilter | undefined): MemberFilter {
 /**
  * Filter members by Land and/or party, the way the `members --state / --party`
  * command does. `state` names one of the sixteen Länder and matches it exactly,
- * `party` matches a substring of the party name; both trim the needle and compare case-insensitively on the NFC form,
- * so a decomposed umlaut (macOS file names, some input methods) matches the feed's
- * composed one. A member without the field never matches. An unknown key, a state
+ * `party` matches a substring of the party name; both put the needle and the member's
+ * field in one canonical form ({@link normalizeText}: trimmed, NFC) and compare
+ * case-insensitively, so a decomposed umlaut (macOS file names, some input methods) or
+ * a padded value matches the composed one, on either side. A member without the field never matches. An unknown key, a state
  * that is not a Land, a blank or non-string value, or a `members` that is not an array
  * throws a {@link BundesratValidationError}. Pure: the input is not changed.
  */
@@ -228,11 +232,11 @@ export function filterMembers(members: readonly Member[], filter: MemberFilter):
   const { state, party } = assertMemberFilter(filter);
   let result = [...members];
   if (state !== undefined) {
-    const needle = fold(state.trim());
+    const needle = fold(state);
     result = result.filter((m) => typeof m.state === "string" && fold(m.state) === needle);
   }
   if (party !== undefined) {
-    const needle = fold(party.trim());
+    const needle = fold(party);
     result = result.filter((m) => typeof m.party === "string" && fold(m.party).includes(needle));
   }
   return result;

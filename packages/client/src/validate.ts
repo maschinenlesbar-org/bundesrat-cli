@@ -47,9 +47,20 @@ export function knownKeysProblem(known: readonly string[]): Problem<unknown> {
   };
 }
 
-/** Case- and normalisation-insensitive form of a Land name: trimmed, NFC, lower case. */
+/**
+ * A text filter in the one canonical form the library compares: without surrounding
+ * whitespace (a value pasted with a trailing space matched nothing) and in composed Unicode,
+ * NFC (a decomposed "Thüringen", u plus U+0308 as pasted from a macOS file name, matched
+ * nothing). Inner whitespace is kept. The feeds are filtered client-side, so both sides of
+ * the comparison go through it: the `--state` / `--party` value and the member's field.
+ */
+export function normalizeText(value: string): string {
+  return value.trim().normalize("NFC");
+}
+
+/** Case- and normalisation-insensitive form of a Land name: {@link normalizeText}, lower case. */
 export function foldLand(text: string): string {
-  return text.trim().normalize("NFC").toLowerCase();
+  return normalizeText(text).toLowerCase();
 }
 
 /**
