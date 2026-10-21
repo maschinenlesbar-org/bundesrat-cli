@@ -4,7 +4,7 @@
 // overwriting a file by accident and never leaving half a file behind.
 
 import { constants } from "node:buffer";
-import { BundesratError, BundesratValidationError } from "@maschinenlesbar.org/bundesrat-client/internal/errors";
+import { BundesratError, BundesratValidationError, quoteValue } from "@maschinenlesbar.org/bundesrat-client/internal/errors";
 import { isBidiControl } from "@maschinenlesbar.org/bundesrat-client/internal/engine";
 import { isDirectoryMessage, logOf, nodeFiles, refuseOverwrite, type CliDeps } from "./io.js";
 import { InvalidArgumentError } from "commander";
@@ -22,10 +22,21 @@ export class OutputError extends BundesratError {}
  * is a usage error: `-o ""` used to print to stdout silently and `-o " "` created a
  * file named " ". `-` is kept as is and means stdout (see {@link renderJson}), the
  * usual convention, rather than a file named "-".
+ *
+ * Any other dash-leading value is refused as the next option: commander hands a value option
+ * the next argument whatever it looks like, so `bundesrat members -o --compact` wrote a
+ * pretty-printed file named "--compact" with exit 0. commander hands the parser the same string
+ * for `-o -x` and `--output=-x`, so a file whose name starts with a dash is written as `./-x`.
  */
 export function parseOutputPath(value: string): string {
   const problem = nonBlankProblem(value);
   if (problem !== undefined) throw new InvalidArgumentError(problem);
+  if (value !== "-" && value.startsWith("-")) {
+    throw new InvalidArgumentError(
+      `looks like a missing value — ${quoteValue(value)} is the next option, consumed because ` +
+        "this one was left without a value. For a file whose name starts with a dash, write ./-name.",
+    );
+  }
   return value;
 }
 

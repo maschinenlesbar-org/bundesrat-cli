@@ -358,3 +358,22 @@ test("terminal controls are escaped in chunks: the same text as one pass, across
   assert.equal(out[0], expected);
   assert.deepEqual(JSON.parse(out[0]!), { text });
 });
+
+test("-o refuses a dash-leading value as the next option, before any request; ./-name writes such a file (T13)", async () => {
+  for (const argv of [["-o", "--compact", "members"], ["--output=-v", "members"], ["members", "-o", "--force"]]) {
+    const cli = makeCli();
+    assert.equal(await run(argv, cli.deps), 2, argv.join(" "));
+    assert.equal(cli.mt.calls.length, 0, `${argv.join(" ")}: a request was sent`);
+    assert.match(cli.err.join("\n"), /^ERROR \[bundesrat\.cli\] .*looks like a missing value — "-[-\w]+" is the next option.*write \.\/-name\./, argv.join(" "));
+  }
+  await inTempDir(async (dir) => {
+    const cwd = process.cwd();
+    process.chdir(dir);
+    try {
+      assert.equal(await run(["--compact", "-o", "./-v", "members"], makeCli().deps), 0);
+    } finally {
+      process.chdir(cwd);
+    }
+    assert.deepEqual(readdirSync(dir), ["-v"]);
+  });
+});

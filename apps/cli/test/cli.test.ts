@@ -437,9 +437,11 @@ test("the log format is the one commander parsed, where an option's value looks 
   const back = makeCli(() => xmlResponse(fx.membersXml));
   assert.equal(await run(["--log-format", "jsonl", "--user-agent", "--log-format", "members", "--party", "XYZ"], back.deps), 0);
   assert.ok(back.err.length === 1 && isJsonl(back.err[0] as string), back.err.join("\n"));
+  // -o refuses the dash-leading value (T13), in the format asked for.
   const output = makeCli(() => xmlResponse(fx.membersXml));
-  assert.equal(await run(["--log-format", "jsonl", "-o", "--log-format", "members"], output.deps), 0);
-  assert.ok(output.err.length === 1 && isJsonl(output.err[0] as string), output.err.join("\n"));
+  assert.equal(await run(["--log-format", "jsonl", "-o", "--log-format", "members"], output.deps), 2);
+  assert.ok(output.err.length > 0 && output.err.every(isJsonl), output.err.join("\n"));
+  assert.equal(output.mt.calls.length, 0);
   // A parse error after such a value is logged in the format commander would have used.
   const parse = makeCli(() => xmlResponse(fx.membersXml));
   assert.equal(await run(["--log-format", "jsonl", "--user-agent", "--log-format", "members", "--bogus"], parse.deps), 2);
