@@ -350,3 +350,16 @@ test("filterMembers puts both sides of the comparison in one canonical form: tri
   assert.equal(normalizeText("  Müller\t"), "Müller");
   assert.equal(normalizeText("a  b"), "a  b", "inner whitespace is kept");
 });
+
+test("a refusal quotes the value visibly: format and control characters escaped, never raw (D10)", async () => {
+  const c = new BundesratClient({ transport: makeMockTransport(() => xmlResponse(fx.membersXml)).transport });
+  for (const key of ["St‮ate", "sta​te", "s\u0085tate"]) {
+    await assert.rejects(c.members({ [key]: "Bayern" } as MemberFilter), (err: Error) => {
+      const escape = `\\u${key.match(/[​‮\u0085]/)![0].charCodeAt(0).toString(16).padStart(4, "0")}`;
+      assert.ok(err.message.includes(escape), err.message);
+      assert.ok(!/[​‮\u0085]/.test(err.message), err.message);
+      return true;
+    });
+  }
+  assert.throws(() => new BundesratClient({ timeoutMs: "1‮0" as unknown as number }), (err: Error) => err.message.includes("\\u202e") && !err.message.includes("‮"));
+});

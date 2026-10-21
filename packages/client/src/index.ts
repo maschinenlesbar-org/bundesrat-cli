@@ -44,6 +44,7 @@ export {
   redactUrl,
   credentialsIn,
   cutForMessage,
+  quoteValue,
   MAX_MESSAGE_VALUE_LENGTH,
   redactCredentials,
 } from "./errors.js";

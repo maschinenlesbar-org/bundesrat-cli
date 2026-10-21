@@ -11,7 +11,7 @@
 import type { Command } from "commander";
 import { logOf, type CliDeps } from "../io.js";
 import type { MemberFilter } from "@maschinenlesbar.org/bundesrat-client/internal/client";
-import { cutForMessage } from "@maschinenlesbar.org/bundesrat-client/internal/errors";
+import { quoteValue } from "@maschinenlesbar.org/bundesrat-client/internal/errors";
 import { action, parseNonEmpty, parseState } from "../shared.js";
 import { renderJson } from "../output.js";
 
@@ -59,7 +59,7 @@ export function registerCommands(program: Command, deps: CliDeps): void {
           logOf(deps).info(
             "cli",
             `no member${filter.state !== undefined ? " of that Land" : ""} has a party containing ` +
-              `${JSON.stringify(cutForMessage(filter.party))} (--party matches a substring of the party name).`,
+              `${quoteValue(filter.party)} (--party matches a substring of the party name).`,
           );
         }
       }),

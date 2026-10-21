@@ -10,7 +10,7 @@
 //   made. Methods that return a promise call it inside the async body, so they
 //   reject rather than throw synchronously; constructors throw.
 
-import { BundesratValidationError } from "./errors.js";
+import { BundesratValidationError, quoteValue } from "./errors.js";
 import { LAENDER } from "./enums.js";
 
 /** A validation rule: the reason `value` is invalid, or `undefined` when it is valid. */
@@ -32,7 +32,8 @@ export function assertValid<T>(name: string, value: T, problem: Problem<T>): T {
  * are all in `known`. A misspelled or unknown key (`State`, `timeout`), or a
  * `__proto__` key from `JSON.parse`, used to be ignored without a word, so
  * `members({ State: "Bayern" })` returned all 193 members. Returns a `Problem` naming
- * the first unknown key (cut, JSON-quoted) and the known ones.
+ * the first unknown key (`quoteValue`: cut, JSON-quoted, invisible characters escaped) and
+ * the known ones.
  */
 export function knownKeysProblem(known: readonly string[]): Problem<unknown> {
   return (value) => {
@@ -40,7 +41,7 @@ export function knownKeysProblem(known: readonly string[]): Problem<unknown> {
     if (typeof value !== "object" || value === null || Array.isArray(value)) return "Expected an object.";
     for (const key of Object.keys(value)) {
       if (!known.includes(key)) {
-        return `Unknown key ${JSON.stringify(key.slice(0, 60))}; expected one of ${known.join(", ")}.`;
+        return `Unknown key ${quoteValue(key)}; expected one of ${known.join(", ")}.`;
       }
     }
     return undefined;

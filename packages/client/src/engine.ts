@@ -27,6 +27,7 @@ import {
   cutForMessage,
   cutText,
   echoedCredentialForms,
+  quoteValue,
   redactSecrets,
   redactCredentials,
   redactUrl,
@@ -170,7 +171,7 @@ function intOption(name: string, value: number | undefined, fallback: number, ma
     throw new BundesratValidationError(
       // A string is quoted, so `"1000"` doesn't read like the number 1000.
       `Invalid option ${name}: expected an integer from 0 to ${max}, got ` +
-        `${cutForMessage(typeof value === "string" ? JSON.stringify(value) : String(value))}.`,
+        `${typeof value === "string" ? quoteValue(value) : cutForMessage(String(value))}.`,
     );
   }
   return value;

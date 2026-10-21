@@ -387,7 +387,8 @@ test("the --party note quotes the value at most 500 characters long (L3)", async
   const cli = makeCli(() => xmlResponse(fx.membersXml));
   assert.equal(await run(["members", "--party", "Q".repeat(100_000)], cli.deps), 0);
   const record = cli.err.find((line) => line.includes("no member has a party containing")) ?? "";
-  assert.match(record, /containing "Q{500}…" \(--party/);
+  // quoteValue: the "…" after the closing quote, so it doesn't read as part of the value.
+  assert.match(record, /containing "Q{500}"… \(--party/);
   assert.ok(record.length < 700, `${record.length}`);
 });
 

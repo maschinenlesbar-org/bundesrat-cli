@@ -435,7 +435,11 @@ input, thrown before any request), all extending `BundesratError`. A wrong-typed
 that validation error too, never a raw `TypeError`: a non-object filter or options value
 (`members("Bayern")`, `members(null)`, `new BundesratClient(null)`), a non-array list for
 `filterMembers`, a `transport` or `sleep` that isn't a function. Echoed values and
-server text are cut at 500 characters in messages (`cutForMessage`,
+server text are cut at 500 characters in messages (a user's value is quoted with `quoteValue`,
+exported: JSON-quoted with DEL, C1, every format character such as a bidi override or a
+zero-width space, U+2028/2029 and a lone surrogate escaped as `\uXXXX`, so a refusal shows
+what was typed instead of hiding or reordering it, and the "…" of a cut after the closing
+quote; `cutForMessage`,
 `MAX_MESSAGE_VALUE_LENGTH`: an option value, an unexpected root element's name, the
 `--party` value the CLI's note quotes), a server's error text at 200, never inside a
 surrogate pair (`cutText`), so the message stays well-formed and bounded for a library
