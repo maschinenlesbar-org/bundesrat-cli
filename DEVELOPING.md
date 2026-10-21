@@ -113,6 +113,10 @@ a throw in it is swallowed. The CLI's `action()` sets it to log one `WARN` recor
 `bundesrat.http`, `HTTP 503 from <host>: retry 1 of 3 in 2 s` (`retryMessage`; host only, whole
 seconds, ms under 1 s). Tests: `packages/client/test/retry-hook.test.ts`, `apps/cli/test/retry-log.test.ts`.
 
+`onWarning(message: string)` is told, once per answer, when text that was not valid was
+replaced with U+FFFD (see "The XML parser"); a throw in it is swallowed, and the CLI's
+`action()` logs it as a `WARN` record of `bundesrat.api`.
+
 The engine enforces the transport contract itself, so the limits hold for a custom
 transport (a `fetch` wrapper, a raw `node:http` one) too: every call races a deadline of
 `timeoutMs` and gets an `AbortSignal` (`HttpRequest.signal`, honoured by the default
@@ -262,8 +266,15 @@ UTF-16), then the XML declaration's `encoding` (`encoding="ISO-8859-1"`), then t
 Content-Type's `charset`, else UTF-8. The declaration comes before the header — the
 reverse of RFC 7303 — because the CMS stamps `charset=utf-8` on every feed, so a
 document that declares another encoding is the better witness. An encoding
-`TextDecoder` doesn't know is a `BundesratParseError`; bytes invalid in the declared
-encoding become U+FFFD.
+`TextDecoder` doesn't know is a `BundesratParseError`. Text is never changed silently (D2 of
+the 2026-10-21 fix plan): bytes invalid in the declared encoding (an unpaired surrogate in a
+UTF-16 document too) and a numeric reference to a lone surrogate (`&#xD800;`; a high and a
+low reference in a row, `&#xD83D;&#xDE00;`, are the character they encode) become U+FFFD, so
+the result is well-formed text `jq` reads, and the engine option `onWarning` is told how many,
+naming the request: `GET <url>: 2 characters of the answer were not valid text (invalid bytes
+or a lone surrogate) and replaced with U+FFFD.` The CLI logs it as a `WARN` record of
+`bundesrat.api`. One bad character never sinks a whole answer. A reference past U+10FFFF is
+left as text.
 
 It is deliberately **not** a general-purpose parser (no namespaces, DTDs, or full
 mixed-content reconstruction) — just enough for these shallow feeds, and exercised
@@ -547,7 +558,7 @@ character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellF
 and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages, unexpected errors, the
 note on an empty `--party` result), `api` (the server's answers: an error status, the hint
-after a 3xx, and a malformed answer, a `BundesratParseError`: a feed that does not parse,
+after a 3xx, the WARN about text replaced with U+FFFD, and a malformed answer, a `BundesratParseError`: a feed that does not parse,
 the HTML shell, the wrong shape, an empty body, an unknown charset), `http` (the connection, the size-cap hint, the cleartext warning)
 and `output` (`Wrote N bytes` after `-o`, or any failure to write that file: an
 `OutputError`, and a stdout write error). Code logs through `logOf(deps)` and never writes

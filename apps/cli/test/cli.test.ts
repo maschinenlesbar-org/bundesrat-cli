@@ -592,3 +592,12 @@ test("a boolean that can be switched both ways may be given only once: optional 
     assert.deepEqual(seen, [expected], argv.join(" "));
   }
 });
+
+test("text replaced with U+FFFD is printed well-formed with one WARN record of bundesrat.api (D2)", async () => {
+  const cli = makeCli(() => xmlResponse("<iOS><list><item><title>x&#xD800;y</title></item></list></iOS>"));
+  assert.equal(await run(["--compact", "appointments"], cli.deps), 0);
+  assert.deepEqual(JSON.parse(cli.out.join("\n")), [{ title: "x�y" }]);
+  assert.deepEqual(cli.err.map(untimed), [
+    "WARN  [bundesrat.api] GET https://www.bundesrat.de/iOS/v3/02_Termine/termine_table.xml?view=renderXml: 1 character of the answer was not valid text (invalid bytes or a lone surrogate) and replaced with U+FFFD.",
+  ]);
+});

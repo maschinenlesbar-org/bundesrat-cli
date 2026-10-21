@@ -34,7 +34,7 @@ export type { Land } from "./enums.js";
 export type { Problem } from "./validate.js";
 export type { QueryParams, QueryValue } from "./query.js";
 export { parseXml, parseXmlDocument, decodeEntities } from "./xml.js";
-export type { XmlValue, XmlObject, XmlDocument } from "./xml.js";
+export type { XmlValue, XmlObject, XmlDocument, ReplacementTally } from "./xml.js";
 export {
   BundesratError,
   BundesratApiError,

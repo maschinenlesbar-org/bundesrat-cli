@@ -104,8 +104,9 @@ failure · `1` other (incl. a non-XML/HTML-shell response). See
 (`ERROR`, `WARN`, `INFO`) and a topic `bundesrat.<area>`, as text (log4j style) or with
 `--log-format jsonl` as one JSON object per line. The areas: `cli` (usage errors,
 commander's messages, unexpected errors, the note on an empty `--party` result), `api`
-(the feed server's answers: an error status, and a malformed answer — a feed that does
-not parse, the HTML shell, the wrong shape, an empty body), `http` (the connection, the
+(the feed server's answers: an error status, a WARN when text that was not valid — bytes
+invalid in the encoding, a reference to a lone surrogate — was replaced with U+FFFD, and a
+malformed answer — a feed that does not parse, the HTML shell, the wrong shape, an empty body), `http` (the connection, the
 cleartext warning, and one WARN per retry before it waits) and `output` (the `-o` file, stdout failures). A record is always one
 line; control characters in it are escaped.
 

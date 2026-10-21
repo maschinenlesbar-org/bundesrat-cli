@@ -31,13 +31,37 @@ export interface XmlObject {
  */
 const MAX_DEPTH = 512;
 
-/** Decode the five predefined XML entities plus numeric (`&#NN;` / `&#xNN;`) refs. */
-export function decodeEntities(text: string): string {
+/** How many characters of the text were not valid and became U+FFFD (a lone surrogate reference). */
+export interface ReplacementTally {
+  replaced: number;
+}
+
+/** A numeric character reference at the start of a text: `&#xD83D;`, `&#56832;`. */
+const NUMERIC_REFERENCE = /^&#(?:[xX]([0-9a-fA-F]+)|([0-9]+));/;
+
+/** The code point of a numeric reference's body (`#x1F600`, `#128512`). */
+function codeOf(body: string): number {
+  const hex = body[1] === "x" || body[1] === "X";
+  return hex ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+}
+
+/**
+ * Decode the five predefined XML entities plus numeric (`&#NN;` / `&#xNN;`) refs.
+ *
+ * A reference to a UTF-16 surrogate (U+D800–U+DFFF) is not a character. Two in a row, a high
+ * one then a low one (`&#xD83D;&#xDE00;`, as a writer that escapes UTF-16 units emits an
+ * emoji), are the character they encode; a lone one becomes U+FFFD and is counted in `tally`,
+ * so the text stays well-formed (`jq` rejects a lone surrogate, and with it the whole output)
+ * and the change is never silent. An out-of-range reference is left as it is.
+ */
+export function decodeEntities(text: string, tally: ReplacementTally = { replaced: 0 }): string {
   // Hex (`#x…`) and decimal (`#…`) forms use separate character classes so a
   // malformed decimal ref that contains hex letters (`&#1F;`) does NOT match the
   // decimal branch and is left untouched, rather than being truncated at the first
   // non-digit by `parseInt(…, 10)`.
-  return text.replace(/&(#[xX][0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);/g, (whole, body: string) => {
+  let consumed = -1; // the offset of a low-surrogate reference already joined to its high one
+  return text.replace(/&(#[xX][0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);/g, (whole, body: string, offset: number) => {
+    if (offset === consumed) return "";
     switch (body) {
       case "amp":
         return "&";
@@ -51,12 +75,18 @@ export function decodeEntities(text: string): string {
         return "'";
     }
     if (body[0] === "#") {
-      const hex = body[1] === "x" || body[1] === "X";
-      const code = hex ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
-      // Reject out-of-range and UTF-16 surrogate-range (0xD800–0xDFFF) code points:
-      // decoding a lone surrogate would yield an ill-formed string. Leave the
-      // original reference untouched instead.
-      if (Number.isFinite(code) && code >= 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff)) {
+      const code = codeOf(body);
+      if (code >= 0xd800 && code <= 0xdfff) {
+        const next = code <= 0xdbff ? NUMERIC_REFERENCE.exec(text.slice(offset + whole.length, offset + whole.length + 16)) : null;
+        const low = next === null ? undefined : codeOf(`#${next[1] !== undefined ? `x${next[1]}` : next[2]}`);
+        if (low !== undefined && low >= 0xdc00 && low <= 0xdfff) {
+          consumed = offset + whole.length;
+          return String.fromCharCode(code, low);
+        }
+        tally.replaced += 1;
+        return "\ufffd";
+      }
+      if (Number.isFinite(code) && code >= 0 && code <= 0x10ffff) {
         try {
           return String.fromCodePoint(code);
         } catch {
@@ -64,7 +94,8 @@ export function decodeEntities(text: string): string {
         }
       }
     }
-    // Unknown named entity: leave it untouched rather than dropping information.
+    // Unknown named entity, or a reference past U+10FFFF: leave it untouched rather than
+    // dropping information.
     return whole;
   });
 }
@@ -86,7 +117,7 @@ const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 /** An XML name at a given offset (sticky, so it never scans ahead). */
 const NAME = /[A-Za-z_:][\w.:-]*/y;
 
-function parseAttrs(raw: string): Record<string, string> {
+function parseAttrs(raw: string, tally: ReplacementTally): Record<string, string> {
   // Null-proto so an attribute named `__proto__` becomes an own property rather
   // than invoking the Object.prototype setter and reparenting the object.
   const attrs: Record<string, string> = Object.create(null);
@@ -112,7 +143,7 @@ function parseAttrs(raw: string): Record<string, string> {
     if (quote !== '"' && quote !== "'") continue;
     const end = raw.indexOf(quote, i + 1);
     if (end === -1) break;
-    if (!DANGEROUS_KEYS.has(name)) attrs[name] = decodeEntities(raw.slice(i + 1, end));
+    if (!DANGEROUS_KEYS.has(name)) attrs[name] = decodeEntities(raw.slice(i + 1, end), tally);
     i = end + 1;
   }
   return attrs;
@@ -181,12 +212,15 @@ export function parseXml(xml: string): XmlValue {
 export interface XmlDocument {
   root: string;
   value: XmlValue;
+  /** How many references to a lone surrogate became U+FFFD (see {@link decodeEntities}). */
+  replaced: number;
 }
 
 /** Like {@link parseXml}, but also returns the root element's name. */
 export function parseXmlDocument(xml: string): XmlDocument {
   const stack: Frame[] = [];
   const names: string[] = [];
+  const tally: ReplacementTally = { replaced: 0 };
   let root: XmlValue | undefined;
   let rootName: string | undefined;
 
@@ -208,7 +242,7 @@ export function parseXmlDocument(xml: string): XmlDocument {
       // Text — decode entities; only meaningful inside an element.
       const next = xml.indexOf("<", i);
       const end = next === -1 ? n : next;
-      if (stack.length > 0) stack[stack.length - 1]!.text += decodeEntities(xml.slice(i, end));
+      if (stack.length > 0) stack[stack.length - 1]!.text += decodeEntities(xml.slice(i, end), tally);
       i = end;
     } else if (xml.startsWith("<![CDATA[", i)) {
       // CDATA — verbatim, no entity decoding.
@@ -265,7 +299,7 @@ export function parseXmlDocument(xml: string): XmlDocument {
       let raw = xml.slice(NAME.lastIndex, j);
       const selfClosing = raw.endsWith("/");
       if (selfClosing) raw = raw.slice(0, -1);
-      const attrs = parseAttrs(raw);
+      const attrs = parseAttrs(raw, tally);
       if (selfClosing) {
         attach(name, frameValue({ attrs, children: [], text: "", hasElements: false }));
       } else {
@@ -287,5 +321,5 @@ export function parseXmlDocument(xml: string): XmlDocument {
     }
     throw new Error("No root element found in XML document");
   }
-  return { root: rootName, value: root };
+  return { root: rootName, value: root, replaced: tally.replaced };
 }

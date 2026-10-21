@@ -44,6 +44,7 @@ export const ENGINE_OPTION_KEYS = [
   "maxResponseBytes",
   "sleep",
   "onRetry",
+  "onWarning",
 ] as const;
 
 export const DEFAULT_BASE_URL = "https://www.bundesrat.de";
@@ -117,6 +118,15 @@ export interface EngineOptions {
    * and reset connection; never when there is no retry. A throw is swallowed.
    */
   onRetry?: ((event: RetryEvent) => void) | undefined;
+  /**
+   * Called with a one-line warning about an answer the engine delivered changed: characters
+   * that were not valid text — bytes invalid in the declared (or default UTF-8) encoding, or a
+   * reference to a lone surrogate (`&#xD800;`) — replaced with U+FFFD. The message names the
+   * request and the count (`GET <url>: 2 characters of the answer were not valid text …`).
+   * Without it the replacement is silent. A throw is swallowed. The CLI logs it as a `WARN`
+   * record of `bundesrat.api`.
+   */
+  onWarning?: ((message: string) => void) | undefined;
 }
 
 /** What `EngineOptions.onRetry` is told about one retry. */
@@ -423,7 +433,7 @@ function looksLikeHtml(text: string): boolean {
  * than mojibake. (Bytes invalid in the declared encoding become U+FFFD, as everywhere in
  * the WHATWG decoders.)
  */
-function decodeXml(body: Buffer, contentType: string, path: string): string {
+function decodeXml(body: Buffer, contentType: string, path: string): { text: string; replaced: number } {
   let charset: string | undefined;
   if (body[0] === 0xef && body[1] === 0xbb && body[2] === 0xbf) charset = "utf-8";
   else if (body[0] === 0xff && body[1] === 0xfe) charset = "utf-16le";
@@ -433,13 +443,37 @@ function decodeXml(body: Buffer, contentType: string, path: string): string {
   charset ??= "utf-8";
   let decoder: TextDecoder;
   try {
-    decoder = new TextDecoder(charset);
+    decoder = new TextDecoder(charset, { fatal: true });
   } catch {
     throw new BundesratParseError(
       `Unsupported response charset "${cutText(sanitizeServerText(charset), 100)}" from ${path}.`,
     );
   }
-  return decoder.decode(body);
+  try {
+    return { text: decoder.decode(body), replaced: 0 };
+  } catch {
+    // Not valid in the encoding: decode with replacement, and count what was replaced.
+    const text = new TextDecoder(decoder.encoding).decode(body);
+    const sent = decoder.encoding === "utf-8" ? countBytes(body, REPLACEMENT_UTF8) : 0;
+    return { text, replaced: countChar(text, 0xfffd) - sent };
+  }
+}
+
+/** U+FFFD in UTF-8. */
+const REPLACEMENT_UTF8 = Buffer.from([0xef, 0xbf, 0xbd]);
+
+/** How often `needle` occurs in `body`. */
+function countBytes(body: Buffer, needle: Buffer): number {
+  let n = 0;
+  for (let at = body.indexOf(needle); at !== -1; at = body.indexOf(needle, at + needle.length)) n++;
+  return n;
+}
+
+/** How often the UTF-16 unit `code` occurs in `text`. */
+function countChar(text: string, code: number): number {
+  let n = 0;
+  for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === code) n++;
+  return n;
 }
 
 function htmlPageError(path: string): BundesratParseError {
@@ -479,6 +513,7 @@ export class RequestEngine {
   private readonly maxResponseBytes: number;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly onRetry: ((event: RetryEvent) => void) | undefined;
+  private readonly onWarning: ((message: string) => void) | undefined;
 
   constructor(options: EngineOptions = {}) {
     // A misspelled option (`timeout`, `maxRetry`) was ignored and its default used.
@@ -514,6 +549,17 @@ export class RequestEngine {
     this.sleep = functionOption("sleep", options.sleep, realSleep);
     this.onRetry =
       options.onRetry === undefined ? undefined : functionOption("onRetry", options.onRetry, () => {});
+    this.onWarning =
+      options.onWarning === undefined ? undefined : functionOption("onWarning", options.onWarning, () => {});
+  }
+
+  /** Tell `onWarning` about an answer delivered changed. A throwing callback never breaks the request. */
+  private warn(message: string): void {
+    try {
+      this.onWarning?.(message);
+    } catch {
+      // a logging hook is no reason to fail the request
+    }
   }
 
   /** Tell `onRetry` about a retry, then wait. A throwing callback never breaks the request. */
@@ -709,7 +755,7 @@ export class RequestEngine {
   /** Like {@link getXml}, but also returns the root element's name. */
   async getXmlDocument(path: string, query?: QueryParams): Promise<XmlDocument> {
     const res = await this.request(path, query);
-    const text = decodeXml(res.data, res.contentType, path);
+    const { text, replaced: badBytes } = decodeXml(res.data, res.contentType, path);
     if (looksLikeHtml(text)) throw htmlPageError(path);
     // An empty body is not malformed XML — surface it as "empty" rather than the
     // generic parse-failure message so the cause is obvious.
@@ -731,6 +777,16 @@ export class RequestEngine {
     }
     // An XHTML page parses as XML; it is still the website, not a feed.
     if (doc.root.toLowerCase() === "html") throw htmlPageError(path);
+    // The text is never changed silently: bytes invalid in the encoding and references to a
+    // lone surrogate became U+FFFD, so the result is well-formed; one bad character never
+    // sinks a whole answer.
+    const replaced = badBytes + doc.replaced;
+    if (replaced > 0) {
+      this.warn(
+        `GET ${cutForMessage(redactUrl(this.buildUrl(path, query)))}: ${replaced} ${replaced === 1 ? "character" : "characters"} ` +
+          `of the answer ${replaced === 1 ? "was" : "were"} not valid text (invalid bytes or a lone surrogate) and replaced with U+FFFD.`,
+      );
+    }
     return doc;
   }
 

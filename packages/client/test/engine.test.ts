@@ -419,3 +419,42 @@ test("a header named __proto__ is an ordinary header, never the prototype of the
   const f = new RequestEngine({ transport: async () => ({ status: 200, headers: fetchLike as unknown as Record<string, string>, body: Buffer.from([0x3c, 0x61, 0x3e, 0xfc, 0x3c, 0x2f, 0x61, 0x3e]) }) });
   assert.equal(await f.getXml("/x"), "ü");
 });
+
+test("text that is not valid is replaced with U+FFFD and reported through onWarning, never silently (D2)", async () => {
+  const utf16 = (text: string): Buffer => Buffer.from(text, "utf16le");
+  const cases: Array<[string, Buffer, string, unknown, number]> = [
+    // A reference to a lone surrogate (high alone, low alone); a pair of references, hex or
+    // decimal, is the character; an escaped ampersand stays text.
+    [
+      "lone references",
+      Buffer.from("<r><a>x&#xD800;y</a><b>&#xdc00;</b><c>&#xD83D;&#xDE00;</c><e>&#55357;&#56832;</e><d>&amp;#xD800;</d></r>"),
+      "application/xml",
+      { a: "x�y", b: "�", c: "\u{1f600}", e: "\u{1f600}", d: "&#xD800;" },
+      2,
+    ],
+    // Invalid UTF-8 bytes; a U+FFFD the server sent is not counted.
+    ["invalid bytes", Buffer.concat([Buffer.from("<r><a>"), Buffer.from([0xff, 0xc3]), Buffer.from("</a><b>�</b></r>")]), "application/xml", { a: "��", b: "�" }, 2],
+    // A byte undefined in the declared single-byte charset.
+    ["iso-8859-3", Buffer.concat([Buffer.from('<?xml version="1.0" encoding="iso-8859-3"?><r><a>'), Buffer.from([0xa5]), Buffer.from("</a></r>")]), "application/xml", { a: "�" }, 1],
+    // An unpaired surrogate in a UTF-16 document (byte-order mark).
+    ["utf-16", Buffer.concat([Buffer.from([0xff, 0xfe]), utf16("<r><a>x"), Buffer.from([0x00, 0xd8]), utf16("y</a></r>")]), "application/xml", { a: "x�y" }, 1],
+  ];
+  for (const [label, body, type, expected, count] of cases) {
+    const warnings: string[] = [];
+    const e = new RequestEngine({ onWarning: (m) => warnings.push(m), transport: makeMockTransport(() => rawResponse(body, type)).transport });
+    const value = await e.getXml("/feed.xml", { view: "renderXml" });
+    assert.deepEqual(JSON.parse(JSON.stringify(value)), expected, label);
+    assert.ok(!/[\ud800-\udfff]/u.test(JSON.stringify(value)), `${label}: well-formed`);
+    assert.deepEqual(warnings, [
+      `GET https://www.bundesrat.de/feed.xml?view=renderXml: ${count} ${count === 1 ? "character" : "characters"} of the answer ${count === 1 ? "was" : "were"} not valid text (invalid bytes or a lone surrogate) and replaced with U+FFFD.`,
+    ], label);
+  }
+  // Valid text: no warning; a throwing hook never fails the request.
+  const quiet: string[] = [];
+  const ok = new RequestEngine({ onWarning: (m) => quiet.push(m), transport: makeMockTransport(() => xmlResponse("<a>&#xFC;�</a>")).transport });
+  assert.equal(await ok.getXml("/x"), "ü�");
+  assert.deepEqual(quiet, []);
+  const throwing = new RequestEngine({ onWarning: () => { throw new Error("hook"); }, transport: makeMockTransport(() => xmlResponse("<a>&#xD800;</a>")).transport });
+  assert.equal(await throwing.getXml("/x"), "�");
+  assert.throws(() => new RequestEngine({ onWarning: "log" as unknown as () => void }), BundesratValidationError);
+});

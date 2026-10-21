@@ -109,8 +109,9 @@ urheberrechtlich geschützt. Siehe [DATA_LICENSE.md](DATA_LICENSE.md).
 Zeitstempel, eine Stufe (`ERROR`, `WARN`, `INFO`) und ein Thema `bundesrat.<Bereich>`, als
 Text (im Stil von log4j) oder mit `--log-format jsonl` als ein JSON-Objekt pro Zeile. Die
 Bereiche: `cli` (Bedienfehler, Meldungen von commander, unerwartete Fehler, der Hinweis
-bei leerem `--party`-Ergebnis), `api` (die Antworten des Feed-Servers: ein Fehlerstatus
-und eine fehlerhafte Antwort — ein Feed, der sich nicht parsen lässt, die HTML-Hülle, die
+bei leerem `--party`-Ergebnis), `api` (die Antworten des Feed-Servers: ein Fehlerstatus,
+eine WARN-Zeile, wenn ungültiger Text — im Zeichensatz ungültige Bytes, ein Verweis auf ein
+einzelnes Surrogat — durch U+FFFD ersetzt wurde, und eine fehlerhafte Antwort — ein Feed, der sich nicht parsen lässt, die HTML-Hülle, die
 falsche Form, ein leerer Body), `http` (die Verbindung, die Klartext-Warnung und je Wiederholung eine WARN-Zeile vor dem Warten) und `output`
 (die `-o`-Datei, Schreibfehler auf stdout). Ein Eintrag ist immer eine Zeile; Steuerzeichen
 darin werden maskiert.

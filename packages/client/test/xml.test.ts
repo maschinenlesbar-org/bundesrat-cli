@@ -30,8 +30,15 @@ test("decodeEntities accepts upper-case hex and rejects malformed/surrogate refs
   // A decimal ref that (illegally) contains hex letters must be left untouched,
   // not truncated to code point 1.
   assert.equal(decodeEntities("x&#1F;y"), "x&#1F;y");
-  // A UTF-16 surrogate-range code point must not decode to a lone surrogate.
-  assert.equal(decodeEntities("x&#xD800;y"), "x&#xD800;y");
+  // A UTF-16 surrogate-range code point must not decode to a lone surrogate: it is U+FFFD,
+  // counted (D2); a high and a low reference in a row are the character they encode.
+  const tally = { replaced: 0 };
+  assert.equal(decodeEntities("x&#xD800;y&#xDC00;", tally), "x\ufffdy\ufffd");
+  assert.equal(tally.replaced, 2);
+  assert.equal(decodeEntities("&#xD83D;&#xDE00;&#55357;&#56832;&#xD83D;x", tally), "\u{1f600}\u{1f600}\ufffdx");
+  assert.equal(tally.replaced, 3);
+  // Past U+10FFFF: left as it is.
+  assert.equal(decodeEntities("&#x110000;&#99999999999999999999;"), "&#x110000;&#99999999999999999999;");
 });
 
 test("parses a simple nested document to an object with leaf text", () => {
