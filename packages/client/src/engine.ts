@@ -268,7 +268,7 @@ export function isBidiControl(code: number): boolean {
  *   cannot forge a line of its own.
  *
  * This only covers error text: the CLI's JSON output is escaped separately
- * (escapeControlChars in cli/shared.ts), since JSON.stringify alone leaves DEL, C1
+ * (escapeControlChars in the CLI's output.ts), since JSON.stringify alone leaves DEL, C1
  * and bidi characters raw. Written as a code-point filter so no raw control byte
  * ever appears in this source.
  */

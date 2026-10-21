@@ -365,8 +365,14 @@ compact output survives deep nesting depends on the Node version (iterative only
 and the machine's stack. `--compact` takes V8's fast path unless the answer holds a string or
 key of 64 Mi characters or more (`holdsHugeString`, an iterative walk by index and `for…in`,
 without an allocation per value): on Node 26 the fast path aborts the process on a ~250 MB
-string, while it is also the only path that prints very deep nesting there.
-`apps/cli/test/output.test.ts` pins the path with a mocked `JSON.stringify`.
+string, while it is also the only path that prints very deep nesting there. The escaping is
+measured first and built in chunks of 64 Ki characters (`escapeControlChars`): each escaped
+character becomes six, so an answer whose escaped text would pass V8's longest string is an
+`OutputError` ("The answer is too large to print (N characters once its control characters
+are escaped).") before anything is built, and any other prints within memory (one `+=` per
+character made a rope of 100 M pieces on an answer of DEL characters and crashed the heap).
+`apps/cli/test/output.test.ts` pins the path with a mocked `JSON.stringify`;
+`conformance-p27-big-and-odd-answers` runs the built bin under a small heap.
 
 **`-o` integrity** (`output.ts`, `checkOutputTarget`; the file seam `OutputFiles` in `io.ts`,
 `nodeFiles` for the real file system, `CliDeps.files` for tests). Before any request,
@@ -490,7 +496,11 @@ The client's tests are in `packages/client/test/` (`xml`, `query`, `http`, `engi
   number cases are skipped, the feeds are XML text; the empty answer runs), P26 (`-o` never
   loses a file: a write cut short under `ulimit -f`, also on a redirected stdout, an existing
   file without `--force`, a missing directory, `/dev/null`, a FIFO and `/dev/stdout` written in
-  place, a dangling link with `--force`, a 255-byte name, a signal mid-write).
+  place, a dangling link with `--force`, a 255-byte name, a signal mid-write), P27 (a big or odd
+  answer: 20 MB of DEL printed escaped under a 512 MB heap, 90 MB of DEL an ERROR record of
+  `bundesrat.output` rather than a crash, a lone surrogate reference and invalid UTF-8 replaced
+  with U+FFFD and a WARN of `bundesrat.api`; the large flat answer is skipped, a feed value is
+  an element's text).
 
 ## Continuous integration
 
