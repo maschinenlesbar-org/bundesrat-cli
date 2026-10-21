@@ -110,6 +110,17 @@ test("throws on a document with no root element", () => {
   assert.throws(() => parseXml("   \n  "), /No root element/);
 });
 
+test("a document cut at an element boundary is called unterminated, not root-less (B3)", () => {
+  // A body cut short after a whole <employee>: the root is there, only never closed.
+  assert.throws(
+    () => parseXml("<iOS><list><employee><name>A</name></employee>"),
+    /^Error: Unterminated element <iOS>: the document ends before <\/list>$/,
+  );
+  assert.throws(() => parseXml("<iOS>"), /^Error: Unterminated element <iOS>: the document ends before <\/iOS>$/);
+  // A root that closes is still the document, as before.
+  assert.equal((parseXml("<iOS><list/></iOS>") as XmlObject)["list"], "");
+});
+
 // --- Security: deep-nesting depth cap (BR-01) ---
 
 test("a pathologically deep document is rejected with a typed parse error", () => {

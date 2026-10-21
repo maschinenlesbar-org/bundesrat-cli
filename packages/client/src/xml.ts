@@ -166,8 +166,8 @@ function endOf(xml: string, needle: string, from: number, what: string): number 
 
 /**
  * Parse an XML document and return the root element's value. Throws on an empty or
- * root-less document and on an unterminated comment, CDATA section, processing
- * instruction, declaration or tag. Unbalanced close tags are ignored defensively
+ * root-less document, on a root element that is never closed (a document cut short), and
+ * on an unterminated comment, CDATA section, processing instruction, declaration or tag. Unbalanced close tags are ignored defensively
  * rather than throwing, so a slightly malformed feed still yields its data.
  *
  * The tokenizer is a single forward scan (`indexOf` for every terminator), so
@@ -280,6 +280,11 @@ export function parseXmlDocument(xml: string): XmlDocument {
   }
 
   if (root === undefined || rootName === undefined) {
+    // An element still open at the end is a document cut short (at an element boundary: a
+    // cut inside a tag is an unterminated tag above), not one without a root.
+    if (names.length > 0) {
+      throw new Error(`Unterminated element <${names[0]}>: the document ends before </${names[names.length - 1]}>`);
+    }
     throw new Error("No root element found in XML document");
   }
   return { root: rootName, value: root };
