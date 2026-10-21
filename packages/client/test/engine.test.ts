@@ -407,3 +407,15 @@ test("a timeout, the size cap, a refused connection and a DNS failure name the r
     });
   }
 });
+
+test("a header named __proto__ is an ordinary header, never the prototype of the headers read (T12)", async () => {
+  // A JavaScript transport may return any object; JSON.parse makes "__proto__" an own key.
+  const headers = JSON.parse('{"__proto__":{"content-type":"application/xml;charset=iso-8859-1"}}') as Record<string, string>;
+  const body = Buffer.from("<iOS><list><title>ü</title></list></iOS>", "utf8");
+  const e = new RequestEngine({ transport: async () => ({ status: 200, headers, body }) });
+  // With the prototype set, its Content-Type was read: the UTF-8 body decoded as Latin-1 ("Ã¼").
+  assert.deepEqual(JSON.parse(JSON.stringify(await e.getXml("/x"))), { list: { title: "ü" } });
+  const fetchLike = new Headers([["__proto__", "x"], ["content-type", "application/xml;charset=iso-8859-1"]]);
+  const f = new RequestEngine({ transport: async () => ({ status: 200, headers: fetchLike as unknown as Record<string, string>, body: Buffer.from([0x3c, 0x61, 0x3e, 0xfc, 0x3c, 0x2f, 0x61, 0x3e]) }) });
+  assert.equal(await f.getXml("/x"), "ü");
+});
