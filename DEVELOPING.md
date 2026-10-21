@@ -344,12 +344,17 @@ apps/cli/src/cli/
 ```
 
 **Rendering** (`output.ts`, `renderJson`). JSON is pretty-printed, or compact with
-`--compact`, and DEL, C1 and bidi controls are escaped (`escapeControlChars`). An answer
-nested too deeply to pretty-print (none of the projected feeds is, but the rule is the kit's)
-is an `OutputError` suggesting `--compact`, not "Unexpected error: Maximum call stack size
-exceeded". `--compact` takes V8's fast path unless the answer holds a string or key of 64 Mi
-characters or more (`holdsHugeString`): on Node 26 the fast path aborts the process on a
-~250 MB string, while it is also the only path that prints very deep nesting there.
+`--compact`, and DEL, C1 and bidi controls are escaped (`escapeControlChars`). An answer it
+can't print is an `OutputError` (an ERROR record of `bundesrat.output`, exit 1) naming the
+cause, never "Unexpected error": "nested too deeply" for a stack overflow (none of the
+projected feeds is deep, but the rule is the kit's), "too large (more than 536870888
+characters of JSON)" for a text past V8's longest string. "try --compact" is added only when
+the compact form of that very answer prints (`compactPrints`): it is probed, because whether
+compact output survives deep nesting depends on the Node version (iterative only from Node 26)
+and the machine's stack. `--compact` takes V8's fast path unless the answer holds a string or
+key of 64 Mi characters or more (`holdsHugeString`, an iterative walk by index and `for…in`,
+without an allocation per value): on Node 26 the fast path aborts the process on a ~250 MB
+string, while it is also the only path that prints very deep nesting there.
 `apps/cli/test/output.test.ts` pins the path with a mocked `JSON.stringify`.
 
 **`-o` integrity** (`output.ts`, `checkOutputTarget`; the file seam `OutputFiles` in `io.ts`,

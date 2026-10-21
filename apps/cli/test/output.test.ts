@@ -38,14 +38,61 @@ function nested(depth: number): unknown {
   return value;
 }
 
-test("pretty-printing an answer nested too deeply is a clean error that suggests --compact", () => {
-  // The projected feeds are flat, so no feed answer gets there; the rule is the kit's, for every value.
+test("an answer nested too deeply is a clean error; it suggests --compact only where --compact prints it (D7)", () => {
+  // The projected feeds are flat, so no feed answer gets there; the rule is the kit's, for every
+  // value. Whether the compact printer manages depends on the Node version (iterative from Node
+  // 26) and the stack: probed here, never assumed.
+  const value = { x: nested(200_000) };
+  let compactPrints = true;
+  try {
+    JSON.stringify(value);
+  } catch {
+    compactPrints = false;
+  }
   const { deps, out } = makeCli();
   assert.throws(
-    () => renderJson(deps, {}, { x: nested(200_000) }),
-    (err: unknown) => err instanceof OutputError && err.message === "The answer is nested too deeply to pretty-print; try --compact.",
+    () => renderJson(deps, {}, value),
+    (err: unknown) =>
+      err instanceof OutputError && err.message === `The answer is nested too deeply to pretty-print${compactPrints ? "; try --compact" : ""}.`,
   );
   assert.deepEqual(out, []);
+  if (compactPrints) renderJson(deps, { compact: true }, value);
+  else {
+    assert.throws(
+      () => renderJson(deps, { compact: true }, value),
+      (err: unknown) => err instanceof OutputError && err.message === "The answer is nested too deeply to print.",
+    );
+  }
+  assert.equal(out.length, compactPrints ? 1 : 0);
+});
+
+test("an answer too large to print is called too large, not too deep; the hint only where --compact prints (D7)", (t) => {
+  const { deps } = makeCli();
+  const real = JSON.stringify;
+  // V8's own error for a text past its longest string, stood in for: a real one needs 512 MB.
+  const tooLarge = (gap: unknown): boolean => gap === 2 || gap === "big";
+  t.mock.method(JSON, "stringify", (value: unknown, replacer: never, gap: unknown) => {
+    if (tooLarge(gap) || (gap === undefined && (value as { all?: boolean }).all === true)) throw new RangeError("Invalid string length");
+    return real(value, replacer, gap as number);
+  });
+  assert.throws(() => renderJson(deps, {}, { id: "a1" }), (err: Error) =>
+    /^The answer is too large \(more than \d+ characters of JSON\) to pretty-print; try --compact\.$/.test(err.message));
+  assert.throws(() => renderJson(deps, {}, { all: true }), (err: Error) =>
+    /^The answer is too large \(more than \d+ characters of JSON\) to pretty-print\.$/.test(err.message));
+  assert.throws(() => renderJson(deps, { compact: true }, { all: true }), (err: Error) =>
+    /^The answer is too large \(more than \d+ characters of JSON\) to print\.$/.test(err.message));
+});
+
+test("--compact checks a large flat answer for huge strings without an allocation per value (D7)", (t) => {
+  // Object.entries made a [key, value] pair per element: on 48M numbers that took 7 GB and
+  // crashed. The walk goes by index and for…in instead; with Object.entries out of reach it
+  // still prints.
+  const { deps, out } = makeCli();
+  t.mock.method(Object, "entries", () => {
+    throw new Error("Object.entries called");
+  });
+  renderJson(deps, { compact: true }, { list: Array.from({ length: 1000 }, (_, i) => ({ name: `a${i}` })), n: [1, 2, [3]] });
+  assert.equal(out.length, 1);
 });
 
 test("--compact takes the gap path only for an answer holding a huge string, the fast path otherwise", (t) => {
