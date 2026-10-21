@@ -4,7 +4,8 @@
 
 import { CommanderError, type Command } from "commander";
 import { buildProgram, defaultDeps } from "./program.js";
-import { OutputError, logOf, type CliDeps } from "./io.js";
+import { logOf, type CliDeps } from "./io.js";
+import { OutputError } from "./output.js";
 import { DEFAULT_LOG_FORMAT, createLogger, logFormatFromArgv, type LogFormat, type Logger } from "./log.js";
 import {
   BundesratApiError,

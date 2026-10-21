@@ -10,7 +10,8 @@ import { defaultIO } from "./io.js";
 import { BundesratClient } from "@maschinenlesbar.org/bundesrat-client/internal/client";
 import { DEFAULT_BASE_URL, MAX_RETRIES } from "@maschinenlesbar.org/bundesrat-client/internal/engine";
 import { MAX_TIMEOUT_MS } from "@maschinenlesbar.org/bundesrat-client/internal/http";
-import { forbidRepeatedOptions, parseBaseUrl, parseBoundedInt, parseHeaderValue, parseIntArg, parseOutputPath } from "./shared.js";
+import { forbidRepeatedOptions, parseBaseUrl, parseBoundedInt, parseHeaderValue, parseIntArg } from "./shared.js";
+import { parseOutputPath } from "./output.js";
 import { registerCommands } from "./commands/feeds.js";
 import { DEFAULT_LOG_FORMAT, logFormatProblem } from "./log.js";
 

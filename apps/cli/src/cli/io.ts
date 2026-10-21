@@ -4,13 +4,6 @@
 import { writeFileSync } from "node:fs";
 import type { BundesratClient, BundesratClientOptions } from "@maschinenlesbar.org/bundesrat-client/internal/client";
 import { createLogger, type Logger } from "./log.js";
-import { BundesratError } from "@maschinenlesbar.org/bundesrat-client/internal/errors";
-
-/**
- * Writing the output to the `-o` file failed (a missing directory, a directory,
- * EACCES, …). Logged as an ERROR of `bundesrat.output`, exit 1.
- */
-export class OutputError extends BundesratError {}
 
 export interface CliIO {
   out(text: string): void;

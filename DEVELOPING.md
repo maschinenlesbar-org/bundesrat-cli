@@ -332,12 +332,22 @@ packages/client/src/
 apps/cli/src/cli/
     io.ts        # injectable I/O seam (stdout/stderr/file), the logger and the clock
     log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
-    shared.ts    # option parsers, global-option resolver, JSON renderer
+    shared.ts    # option parsers, global-option resolver
+    output.ts    # the output sink: JSON rendering (escapes, deep/huge answers) and -o
     commands/    # feeds.ts — one command per feed (members has --state/--party)
     program.ts   # assembles the commander program from injectable deps
     run.ts       # parses argv -> exit code (no process.exit; testable)
     index.ts     # #! bin shim
 ```
+
+**Rendering** (`output.ts`, `renderJson`). JSON is pretty-printed, or compact with
+`--compact`, and DEL, C1 and bidi controls are escaped (`escapeControlChars`). An answer
+nested too deeply to pretty-print (none of the projected feeds is, but the rule is the kit's)
+is an `OutputError` suggesting `--compact`, not "Unexpected error: Maximum call stack size
+exceeded". `--compact` takes V8's fast path unless the answer holds a string or key of 64 Mi
+characters or more (`holdsHugeString`): on Node 26 the fast path aborts the process on a
+~250 MB string, while it is also the only path that prints very deep nesting there.
+`apps/cli/test/output.test.ts` pins the path with a mocked `JSON.stringify`.
 
 **Closed pipes.** The bin shim installs `handleOutputErrors()` (`io.ts`) before `run()`:
 an EPIPE on stdout (`| head`, a `jq` that exits early) exits 0 quietly; an EPIPE on

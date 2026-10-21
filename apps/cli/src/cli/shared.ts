@@ -3,9 +3,9 @@
 
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
-import { OutputError, logOf, type CliDeps } from "./io.js";
+import { logOf, type CliDeps } from "./io.js";
 import type { BundesratClientOptions } from "@maschinenlesbar.org/bundesrat-client/internal/client";
-import { cleartextProblem, DEFAULT_BASE_URL, isBidiControl, type RetryEvent } from "@maschinenlesbar.org/bundesrat-client/internal/engine";
+import { cleartextProblem, DEFAULT_BASE_URL, type RetryEvent } from "@maschinenlesbar.org/bundesrat-client/internal/engine";
 import { baseUrlProblem, headerValueProblem, nonBlankProblem, stateProblem } from "@maschinenlesbar.org/bundesrat-client/internal/validate";
 
 /**
@@ -55,16 +55,6 @@ export function parseState(value: string): string {
 }
 
 /**
- * commander value-parser for `-o, --output <file>`. A blank or whitespace-only path
- * is a usage error: `-o ""` used to print to stdout silently and `-o " "` created a
- * file named " ". `-` is kept as is and means stdout (see {@link renderJson}), the
- * usual convention, rather than a file named "-".
- */
-export function parseOutputPath(value: string): string {
-  return parseNonEmpty(value);
-}
-
-/**
  * commander value-parser for --base-url. The base URL is trusted input, but it must
  * pass the library's {@link baseUrlProblem} (non-blank, no whitespace, `http:`/`https:`
  * only, no query or fragment), so a bad value fails at parse time (exit 2) with a clear
@@ -107,53 +97,6 @@ export function toEngineOptions(global: GlobalOptions): BundesratClientOptions {
   if (global.maxRetries !== undefined) options.maxRetries = global.maxRetries;
   if (global.maxResponseBytes !== undefined) options.maxResponseBytes = global.maxResponseBytes;
   return options;
-}
-
-/**
- * Escape the control characters JSON.stringify leaves raw. It escapes C0 (including
- * ESC) but not DEL or the C1 range U+0080–U+009F, and terminals may act on those —
- * U+009B is the 8-bit form of CSI. Bidi formatting characters (isBidiControl) are
- * escaped too, so feed text cannot visually reorder the output in a terminal. The output is server data, so escape them; the
- * result is equivalent, valid JSON (these characters only occur inside strings).
- * Checked by char code so the source stays free of control bytes.
- */
-export function escapeControlChars(json: string): string {
-  let result = "";
-  let from = 0;
-  for (let i = 0; i < json.length; i++) {
-    const c = json.charCodeAt(i);
-    if ((c >= 0x7f && c <= 0x9f) || isBidiControl(c)) {
-      result += json.slice(from, i) + "\\u" + c.toString(16).padStart(4, "0");
-      from = i + 1;
-    }
-  }
-  return from === 0 ? json : result + json.slice(from);
-}
-
-/**
- * Render a JSON value, pretty by default and compact with --compact. Writes to the
- * file given by --output (with a short stderr confirmation so stdout stays clean
- * for piping), or to stdout otherwise — also for `--output -`.
- */
-export function renderJson(deps: CliDeps, global: GlobalOptions, value: unknown): void {
-  const text = escapeControlChars(global.compact ? JSON.stringify(value) : JSON.stringify(value, null, 2));
-  if (global.output !== undefined && global.output !== "-") {
-    const data = Buffer.from(text + "\n", "utf8");
-    try {
-      deps.io.writeFile(global.output, data);
-    } catch (err) {
-      // A bad --output path (missing directory, a directory, no permission) is a
-      // user error, not an internal fault — surface it as a clean OutputError (logged
-      // under bundesrat.output) instead of letting the raw fs exception hit the
-      // "Unexpected error" path. Drop the `, open '<path>'` tail since we already name
-      // the path ourselves; the `s` flag lets it span a path with a line break in it.
-      const reason = err instanceof Error ? err.message.replace(/,\s*open\s+'.*'$/s, "") : String(err);
-      throw new OutputError(`Could not write to ${global.output}: ${reason}`, { cause: err });
-    }
-    logOf(deps).info("output", `Wrote ${data.length} bytes to ${global.output}`);
-  } else {
-    deps.io.out(text);
-  }
 }
 
 /**

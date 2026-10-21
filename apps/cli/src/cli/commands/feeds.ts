@@ -12,7 +12,8 @@ import type { Command } from "commander";
 import { logOf, type CliDeps } from "../io.js";
 import type { MemberFilter } from "@maschinenlesbar.org/bundesrat-client/internal/client";
 import { cutForMessage } from "@maschinenlesbar.org/bundesrat-client/internal/errors";
-import { action, parseNonEmpty, parseState, renderJson } from "../shared.js";
+import { action, parseNonEmpty, parseState } from "../shared.js";
+import { renderJson } from "../output.js";
 
 /** Register a trivial "fetch a feed and render it" command. */
 function feedCommand(
