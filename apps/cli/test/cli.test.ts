@@ -490,3 +490,28 @@ test("the npm description names what the CLI shows, not the Stimmverteilung it l
   assert.doesNotMatch(pkg.description, /vote|stimmverteilung/i);
   for (const shown of ["agenda", "members", "committee dates"]) assert.ok(pkg.description.includes(shown), shown);
 });
+
+test("the skills quote the network-error record as the CLI writes it (B4)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const reset = Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" });
+  const err: string[] = [];
+  const code = await run(["--max-retries", "0", "session"], {
+    io: { out: () => {}, err: (s) => err.push(s) },
+    createClient: (opts) =>
+      new BundesratClient({
+        ...opts,
+        transport: () => {
+          throw reset;
+        },
+      }),
+  });
+  assert.equal(code, 6);
+  const record = untimed(err.join("\n"));
+  for (const skill of ["bundesrat-agenda", "bundesrat-members"]) {
+    const text = readFileSync(new URL(`../../../../skills/${skill}/SKILL.md`, import.meta.url), "utf8");
+    const quoted = /`(ERROR \[bundesrat\.http\][^`]*)`/.exec(text)?.[1];
+    assert.ok(quoted !== undefined, `${skill}: no quoted record`);
+    const pattern = new RegExp(`^${quoted.split("…").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*")}$`);
+    assert.match(record, pattern, `${skill} quotes ${quoted}`);
+  }
+});
