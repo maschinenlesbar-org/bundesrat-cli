@@ -10,6 +10,9 @@ bundesrat [global options] <command>
 
 ## Global options
 
+An option that takes a value takes one: giving it twice (`--timeout 1000 --timeout 0`) is a
+usage error (exit 2, `--timeout may be given only once.`), never "the last one wins".
+
 | Option | Description |
 |---|---|
 | `--base-url <url>` | API base URL (only `http:`/`https:`; no query, fragment, whitespace or control characters; a literal `%` in a password is written `%25`) |

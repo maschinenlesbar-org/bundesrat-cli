@@ -335,16 +335,32 @@ test("--state / --party match a decomposed (NFD) umlaut against the feed's compo
   assert.deepEqual(rows.map((r) => r.name), ["Özdemir"]);
 });
 
-test("repeating --state or --party is a usage error, not a silent last-one-wins", async () => {
-  for (const args of [
-    ["members", "--state", "Bayern", "--state", "Hessen"],
-    ["members", "--party", "CDU", "--party", "SPD"],
-  ]) {
+test("a single-value option given twice is a usage error before any request, never last-one-wins (K5)", async () => {
+  const cases: Array<[string[], string]> = [
+    [["members", "--state", "Bayern", "--state", "Hessen"], "--state"],
+    [["members", "--party", "CDU", "--party", "SPD"], "--party"],
+    [["--timeout", "1000", "--timeout", "0", "session"], "--timeout"],
+    [["session", "--timeout", "1000", "--timeout", "0"], "--timeout"],
+    [["--base-url", "https://a.example", "--base-url", "https://b.example", "session"], "--base-url"],
+    [["--log-format", "text", "--log-format", "jsonl", "session"], "--log-format"],
+    [["--user-agent", "a", "--user-agent", "b", "session"], "--user-agent"],
+    [["--max-retries", "1", "--max-retries", "2", "session"], "--max-retries"],
+    [["--max-response-bytes", "1", "--max-response-bytes", "2", "session"], "--max-response-bytes"],
+    [["-o", "-", "--output", "-", "session"], "--output"],
+  ];
+  for (const [args, flag] of cases) {
     const cli = makeCli(() => xmlResponse(fx.membersXml));
     assert.equal(await run(args, cli.deps), 2, args.join(" "));
-    assert.equal(cli.mt.calls.length, 0);
-    assert.match(cli.err.join("\n"), /Given more than once; this option takes a single value\./);
+    assert.equal(cli.mt.calls.length, 0, `${args.join(" ")} sent a request`);
+    // The record is text, or jsonl where the argv scan already read --log-format jsonl.
+    const first = untimed(cli.err[0] ?? "");
+    const record = first.startsWith("{") ? (JSON.parse(first) as { level: string; topic: string; msg: string }) : undefined;
+    const line = record === undefined ? first : `${record.level} [${record.topic}] ${record.msg}`;
+    assert.match(line, new RegExp(`^ERROR \\[bundesrat\\.cli\\] .*${flag} may be given only once\\.$`), args.join(" "));
   }
+  // A flag may repeat.
+  const cli = makeCli(() => xmlResponse(fx.sessionXml));
+  assert.equal(await run(["--compact", "--compact", "session"], cli.deps), 0);
 });
 
 test("a command's --help lists the global options too", async () => {

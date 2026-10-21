@@ -55,21 +55,6 @@ export function parseState(value: string): string {
 }
 
 /**
- * Wrap a commander value-parser for a single-valued option: a second occurrence is
- * a usage error instead of silently replacing the first (`--state Bayern --state
- * Hessen` used to keep only Hessen). Only for options without a default, since
- * commander passes the default as `previous` on the first call.
- */
-export function once<T>(parse: (value: string) => T): (value: string, previous: T | undefined) => T {
-  return (value, previous) => {
-    if (previous !== undefined) {
-      throw new InvalidArgumentError("Given more than once; this option takes a single value.");
-    }
-    return parse(value);
-  };
-}
-
-/**
  * commander value-parser for `-o, --output <file>`. A blank or whitespace-only path
  * is a usage error: `-o ""` used to print to stdout silently and `-o " "` created a
  * file named " ". `-` is kept as is and means stdout (see {@link renderJson}), the
@@ -224,4 +209,28 @@ export function action(
     const client = deps.createClient(options);
     await fn({ client, global, opts: command.opts() }, positionals);
   };
+}
+
+/**
+ * Make giving a single-value option twice a usage error, on `command` and every subcommand:
+ * commander keeps the last value silently, so `--timeout 1000 --timeout 0` switched the timeout
+ * off and `--state Bayern --state Hessen` listed Hessen, with nothing telling the user a value
+ * was dropped. Flags without a value are left alone, and so is a repeatable option, declared
+ * the commander way with an array default (`.option("--tag <t>", …, collect, [])`; this CLI has
+ * none): each value adds to the list. Call it once on a freshly built program: the check counts
+ * per Option object.
+ */
+export function forbidRepeatedOptions(command: Command): void {
+  for (const option of command.options) {
+    if ((!option.required && !option.optional) || option.variadic || Array.isArray(option.defaultValue)) continue;
+    const parse = option.parseArg;
+    let given = false;
+    const guarded = (value: string, previous: unknown): unknown => {
+      if (given) throw new InvalidArgumentError(`${option.long ?? option.short} may be given only once.`);
+      given = true;
+      return parse === undefined ? value : parse(value, previous);
+    };
+    option.parseArg = guarded as typeof option.parseArg;
+  }
+  for (const child of command.commands) forbidRepeatedOptions(child);
 }

@@ -12,7 +12,7 @@ import type { Command } from "commander";
 import { logOf, type CliDeps } from "../io.js";
 import type { MemberFilter } from "@maschinenlesbar.org/bundesrat-client/internal/client";
 import { cutForMessage } from "@maschinenlesbar.org/bundesrat-client/internal/errors";
-import { action, once, parseNonEmpty, parseState, renderJson } from "../shared.js";
+import { action, parseNonEmpty, parseState, renderJson } from "../shared.js";
 
 /** Register a trivial "fetch a feed and render it" command. */
 function feedCommand(
@@ -42,9 +42,9 @@ export function registerCommands(program: Command, deps: CliDeps): void {
     .option(
       "--state <land>",
       "only members of this federal state (Land) — one of the 16 Länder, case-insensitive (contrast --party)",
-      once(parseState),
+      parseState,
     )
-    .option("--party <name>", "only members whose party contains this text, case-insensitive", once(parseNonEmpty))
+    .option("--party <name>", "only members whose party contains this text, case-insensitive", parseNonEmpty)
     .action(
       action(deps, async ({ client, global, opts }) => {
         const filter: MemberFilter = {};

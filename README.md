@@ -154,7 +154,9 @@ Use `--compact` for single-line JSON and `-o <file>` to write to a file — both
 
 ## Global options
 
-Given **before or after** the command, e.g. `bundesrat --compact session`:
+Given **before or after** the command, e.g. `bundesrat --compact session`. An option that
+takes a value takes one: giving it twice (`--timeout 1000 --timeout 0`) is a usage error
+(exit `2`, `--timeout may be given only once.`), never "the last one wins".
 
 | Option | Description |
 | --- | --- |
