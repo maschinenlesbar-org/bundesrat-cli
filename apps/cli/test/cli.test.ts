@@ -604,3 +604,44 @@ test("text replaced with U+FFFD is printed well-formed with one WARN record of b
     "WARN  [bundesrat.api] GET https://www.bundesrat.de/iOS/v3/02_Termine/termine_table.xml?view=renderXml: 1 character of the answer was not valid text (invalid bytes or a lone surrogate) and replaced with U+FFFD.",
   ]);
 });
+
+// T15 of the 2026-10-21 fix round (jobsuche-cli 28be809, ladesaeulenregister-cli 001c48d): a URL
+// with a password anywhere in an argument — padded, after a dash, inside a phrase — must never
+// reach stderr, neither raw in a refusal, a note or commander's echo nor percent-encoded in the
+// request URL of an error record.
+test("a password in a URL inside any argument is redacted on stderr, raw or percent-encoded (T15)", async () => {
+  const url = "https://bob:s3cretpw@host.example/x";
+  const argvs = [
+    ["members", "--party", ` ${url}`],
+    ["members", "--party", `Grüne ${url}`],
+    ["members", "--party", ` -${url}`],
+    ["members", "--party", `-${url}`],
+    ["members", `--party= ${url}`],
+    ["members", "--state", ` ${url}`],
+    ["members", "--state", `Bayern ${url}`],
+    ["-o", ` -${url}`, "session"],
+    ["-o", `-${url}`, "session"],
+    [`--output=-${url}`, "session"],
+    ["--user-agent", ` ${url}`, "session"],
+    ["--user-agent", `agent ${url}\u0001`, "session"],
+    ["--base-url", ` ${url}`, "session"],
+    ["--base-url", url, "session"],
+    [` ${url}`],
+    ["session", ` ${url}`],
+    ["members", `--bogus= ${url}`],
+    ["members", "--party", `x ${url}`, "--bogus"],
+  ];
+  const answers = [
+    () => xmlResponse(fx.membersXml),
+    () => rawResponse(Buffer.from("not found"), "text/plain", 404),
+    () => rawResponse(Buffer.from("busy"), "text/plain", 503),
+  ];
+  for (const argv of argvs) {
+    for (const answer of answers) {
+      const cli = makeCli(answer);
+      await run(["--max-retries", "0", ...argv], cli.deps);
+      const err = cli.err.join("\n");
+      assert.doesNotMatch(err, /s3cretpw|bob%3As3|s3cretpw%40/, `${JSON.stringify(argv)}: ${err}`);
+    }
+  }
+});
