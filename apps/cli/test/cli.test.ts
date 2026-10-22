@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { run } from "../src/cli/run.js";
+import { redactionFor, run } from "../src/cli/run.js";
 import { buildProgram } from "../src/cli/program.js";
 import { forbidRepeatedOptions } from "../src/cli/shared.js";
 import { BundesratClient } from "@maschinenlesbar.org/bundesrat-client/internal/client";
@@ -644,4 +644,18 @@ test("a password in a URL inside any argument is redacted on stderr, raw or perc
       assert.doesNotMatch(err, /s3cretpw|bob%3As3|s3cretpw%40/, `${JSON.stringify(argv)}: ${err}`);
     }
   }
+});
+
+test("the search for URLs inside an argument is linear: a 1 MB argument is read at once (T15)", async () => {
+  // A pattern retried at every position took ~3 s for 40 000 scheme characters without "://".
+  for (const big of ["a".repeat(1 << 20), "a://".repeat(1 << 18), `${"a".repeat(1 << 20)}://bob:s3cretpw@h/`]) {
+    const started = performance.now();
+    const redaction = redactionFor(["members", "--party", big]);
+    redaction.err(`x ${big.slice(-40)}`);
+    assert.ok(performance.now() - started < 1000, `${big.slice(0, 8)}…: ${Math.round(performance.now() - started)} ms`);
+  }
+  // At most 64 URLs inside one argument are read; the first ones are redacted.
+  const many = Array.from({ length: 100 }, (_, i) => ` https://u${i}:pw${i}xyz@h/`).join("");
+  const err = redactionFor(["members", "--party", many]).err(many);
+  assert.ok(!err.includes("pw0xyz") && !err.includes("pw63xyz"), err.slice(0, 200));
 });

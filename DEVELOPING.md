@@ -166,7 +166,8 @@ output. `credentialsIn(value)` finds the exact userinfo of a URL, parseable or n
 back to them for a value that doesn't parse. Only a URL with a scheme counts (a bare
 `a:b@c` is a file name, a party name or a User-Agent as often as a credential), except as
 the `--base-url` value, which is read as if it had one; it is found anywhere in an argument
-(`urlsWithin`), not only at its start: a padded `" https://user:pw@host"`, one after a dash
+(`urlsWithin`: each `://` found with indexOf and its scheme by walking back, so the search is
+linear; at most 64 per argument), not only at its start: a padded `" https://user:pw@host"`, one after a dash
 or inside a phrase reached the `--party` "no member" note, the `--state`, `-o` and
 `--user-agent` refusals and commander's echo. Its percent-encoded form with the `@` (as a
 request URL carries it) is replaced too.
