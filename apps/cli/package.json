@@ -1,6 +1,6 @@
 {
   "name": "@maschinenlesbar.org/bundesrat-cli",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "TypeScript API client and CLI for the Bundesrat's public data feeds — the current plenary sitting's agenda (TOPs and Drucksachen), the members and committee dates",
   "type": "module",
   "bin": {
