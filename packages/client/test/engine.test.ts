@@ -17,6 +17,7 @@ import {
   BundesratValidationError,
   cutForMessage,
   cutText,
+  echoedCredentialForms,
   redactUrl,
   toWellFormed,
 } from "../src/errors.js";
@@ -385,6 +386,38 @@ test("credentials a server echoes are scrubbed from the error: Basic, user:passw
     for (const form of [basic, "alice:pa ss-pw", "pa ss-pw"]) assert.ok(!err.body.includes(form), err.body);
     return true;
   });
+});
+
+test("echoedCredentialForms treats a userinfo without a password as a token (Basic `TOKEN:`)", () => {
+  const basic = (pair: string): string => Buffer.from(pair, "utf8").toString("base64");
+  assert.deepEqual(echoedCredentialForms("alice:s3cret"), [basic("alice:s3cret"), "alice:s3cret", "s3cret"]);
+  assert.deepEqual(echoedCredentialForms("T0ken"), [basic("T0ken:"), "T0ken:", "T0ken"]);
+  assert.deepEqual(echoedCredentialForms("T0ken:"), [basic("T0ken:"), "T0ken:", "T0ken"]);
+  assert.deepEqual(echoedCredentialForms("T%C3%B6k"), [basic("Tök:"), "Tök:"]); // short: not alone
+  assert.deepEqual(echoedCredentialForms(":pw12"), [basic(":pw12"), ":pw12", "pw12"]);
+  assert.deepEqual(echoedCredentialForms(""), []);
+  assert.deepEqual(echoedCredentialForms(":"), []);
+});
+
+test("a token userinfo (no password) a server echoes is scrubbed from the error in every form", async () => {
+  const token = "T0kenS3cret";
+  const basic = Buffer.from(`${token}:`, "utf8").toString("base64");
+  for (const baseUrl of [`https://${token}@mirror.example`, `https://${token}:@mirror.example`]) {
+    for (const echo of [`bad token ${token}`, `Authorization: Basic ${basic}`, `user ${token}: unknown`]) {
+      const engine = new RequestEngine({
+        baseUrl,
+        maxRetries: 0,
+        transport: makeMockTransport(() => rawResponse(echo, "text/plain", 401)).transport,
+      });
+      await assert.rejects(engine.getXml("/x"), (err: BundesratApiError) => {
+        assert.match(err.message, /^HTTP 401 /);
+        for (const text of [err.message, err.body, String(err.detail)]) {
+          assert.ok(!text.includes(token) && !text.includes(basic), `${baseUrl} ${echo}: ${text}`);
+        }
+        return true;
+      });
+    }
+  }
 });
 
 test("a timeout, the size cap, a refused connection and a DNS failure name the request (K3)", async () => {

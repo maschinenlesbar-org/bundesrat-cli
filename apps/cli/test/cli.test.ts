@@ -310,6 +310,26 @@ test("credentials in --base-url are redacted in error messages but still sent", 
   assert.match(cli.mt.last().url, /^http:\/\/user:s3cret@127\.0\.0\.1:18105\//);
 });
 
+test("a token in --base-url (a userinfo without a password) is redacted from what the CLI prints, on stderr and stdout", async () => {
+  const token = "T0kenS3cret";
+  const basic = Buffer.from(`${token}:`, "utf8").toString("base64");
+  for (const base of [`https://${token}@mirror.example`, `https://${token}:@mirror.example`]) {
+    // An error answer that echoes the token and its Basic value: stderr.
+    const failed = makeCli(() => rawResponse(`bad token ${token}, Basic ${basic}`, "text/plain", 401));
+    assert.notEqual(await run(["--base-url", base, "--max-retries", "0", "appointments"], failed.deps), 0);
+    const err = failed.err.join("\n");
+    assert.match(err, /bad token \*\*\*, Basic \*\*\*/);
+    assert.ok(!err.includes(token) && !err.includes(basic), err);
+    // A 2xx answer that echoes the Basic value and `TOKEN:`: stdout.
+    const xml = `<iOS version="1.0"><list><item><type>Event</type><title>Basic ${basic} for ${token}:x</title></item></list></iOS>`;
+    const echoed = makeCli(() => xmlResponse(xml));
+    assert.equal(await run(["--base-url", base, "appointments"], echoed.deps), 0, echoed.err.join("\n"));
+    const out = echoed.out.join("\n");
+    assert.match(out, /Basic \*\*\* for \*\*\*x/);
+    assert.ok(!out.includes(basic) && !out.includes(`${token}:`), out);
+  }
+});
+
 test("bidi controls are stripped from stderr error text and escaped in JSON output", async () => {
   const rlo = String.fromCharCode(0x202e);
   const bad = makeCli(() =>

@@ -177,7 +177,9 @@ every line printed on stdout and every log record on stderr — commander's usag
 echo rejected values (`argument '…' is invalid`, `unknown command '…'`, `too many
 arguments … got 1: …`). The forms a server echoes a userinfo back in are replaced too:
 the `Basic` value and the decoded `user:password` on stdout and stderr, the password
-alone (4 characters or more) on stderr only, since it may well occur in the data. The
+alone (4 characters or more) on stderr only, since it may well occur in the data. A
+userinfo without a password (`https://TOKEN@host`, `https://TOKEN:@host`) is a token: Node
+sends it as Basic `TOKEN:`, so that value, `TOKEN:` and the token itself are the forms. The
 log replaces them in each record's *message*, before the record is cut and escaped, and
 writes it to the raw stderr: the frame (time, level, topic) is never touched, and a
 password with DEL, C1 or bidi characters is matched in its raw form.
@@ -197,7 +199,8 @@ The library keeps them out of what a caller logs, too. The engine holds the base
 a real `#private` field (so `console.log(client)`, `util.inspect` and `JSON.stringify`
 never show it) next to its userinfo, raw and percent-decoded, and the forms a server
 echoes it back in (the `Basic` value, the decoded `user:password`, the password alone
-from 4 characters: `echoedCredentialForms`), and scrubs them from error bodies
+from 4 characters — the user name when there is no password, a token sent as Basic
+`TOKEN:`: `echoedCredentialForms`), and scrubs them from error bodies
 (`BundesratApiError.body`/`detail`), transport error text and the `cause` chain. `BundesratApiError.url` is the request URL with its userinfo redacted. Whatever
 a custom transport throws (a string, fetch's `TypeError` naming the URL) reaches the
 caller as a `BundesratNetworkError` with the original, scrubbed, as its `cause`.
