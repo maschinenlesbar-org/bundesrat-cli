@@ -411,7 +411,16 @@ create (a file that appears during the request is not overwritten either: an `Ou
 exit 1), the data goes to a temporary file beside the target (`.<name>.<pid>-<random>.tmp`,
 the name shortened to stay within NAME_MAX, so a valid name of up to 255 bytes is written) and
 is renamed over it, an existing file's mode is kept, and `--force` writes through a symlink to
-the file it points at, creating it when the link dangles (the link stays). SIGINT, SIGTERM and
+the file it points at, creating it when the link dangles (the link stays). The links are read
+by hand (`linkTarget`), so the kernel's `fs.protected_symlinks` never sees them; the same rule
+is applied at every hop instead: a link is followed only when the caller or the owner of its
+directory made it, or nobody else can write to that directory (neither sticky nor writable by
+others). Another user's link in `/tmp` is refused (`… is a link another user made in a
+directory others can write to; it is not followed`, exit 2 before the request, an output error
+at write time). `nodeFilesFor(owners)` takes the user id and the owner lookup (`LinkOwners`) as
+a seam, so a test can be another user without root. A path `state()` can't inspect (EACCES on
+the way to a link's target) is reported as that (exit 2), not taken for an existing file
+that `--force` may replace. SIGINT, SIGTERM and
 SIGHUP during a file write remove the claim and the temporary file, then exit 130, 143 or 129.
 On failure no temporary file and no claimed name is left (`Could not write to "<path>":
 <reason>`, an ERROR record of `bundesrat.output`; Node's `, open '<path>'` tail, which named
