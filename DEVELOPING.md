@@ -428,7 +428,10 @@ links, and a link loop) are usage errors (exit 2); `-o -` is stdout. A stream
 `/dev/stderr`, `/dev/fd/N`, `/proc/self/fd/N`) is written in place, opened for appending, with
 no claim, no temporary file and no `--force` needed: 0.6.0 refused `/dev/null` as an existing
 file, failed after the request on `/dev/stdout` and `>(…)`, and replaced a FIFO with a regular
-file. A file is written atomically: without `--force` the name is claimed with an exclusive
+file. The open creates nothing (`O_WRONLY | O_APPEND`, no `O_CREAT`) and the descriptor is
+checked (`fstat`): a path that is no FIFO, device or socket by then (a link switched to a
+regular file after the check) is not appended to but takes the way of a file below, so without
+`--force` it is refused (a descriptor path keeps whatever the shell opened). A file is written atomically: without `--force` the name is claimed with an exclusive
 create (a file that appears during the request is not overwritten either: an `OutputError`,
 exit 1), the data goes to a temporary file beside the target (`.<name>.<pid>-<random>.tmp`,
 the name shortened to stay within NAME_MAX, so a valid name of up to 255 bytes is written) and

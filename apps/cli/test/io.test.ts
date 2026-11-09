@@ -4,7 +4,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { handleOutputErrors, stderrAfterStdout } from "../src/cli/io.js";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { handleOutputErrors, nodeFilesFor, stderrAfterStdout } from "../src/cli/io.js";
 import { createLogger } from "../src/cli/log.js";
 
 function writeError(code: string): NodeJS.ErrnoException {
@@ -89,4 +92,29 @@ test("stderr waits for stdout: a record is held while stdout has a backlog, and 
   err("fifth");
   stdout.emit("error", new Error("EPIPE"));
   assert.deepEqual(written, ["first", "second", "third", "fourth", "fifth"]);
+});
+
+// Class G2 of .reviews/2026-10-27-security-audit (portfolio round): a path classified as a stream
+// (a FIFO, a device) and switched to a regular file (through a link) before it is opened was
+// appended to without --force, or created.
+test("a stream target is written only when the descriptor opened is a stream (G2)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "g2-"));
+  try {
+    const victim = join(dir, "victim.txt");
+    writeFileSync(victim, "keep me\n");
+    const link = join(dir, "out.json");
+    symlinkSync(victim, link);
+    const real = nodeFilesFor();
+    const switched = { ...real, state: () => "stream" as const };
+    assert.throws(() => switched.write(link, Buffer.from("appended\n"), false), /Refusing to overwrite/);
+    assert.equal(readFileSync(victim, "utf8"), "keep me\n");
+    // A stream path that is gone by then is not created by the open either.
+    const gone = join(dir, "gone.json");
+    assert.throws(() => switched.write(gone, Buffer.from("x"), false), /Could not write/);
+    assert.throws(() => readFileSync(gone));
+    // A real stream is still written in place.
+    assert.doesNotThrow(() => real.write("/dev/null", Buffer.from("x"), false));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
