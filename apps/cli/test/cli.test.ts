@@ -338,7 +338,8 @@ test("bidi controls are stripped from stderr error text and escaped in JSON outp
   assert.equal(await run(["session"], bad.deps), 4);
   const err = bad.err.join("\n");
   assert.equal([...err].some((c) => c.charCodeAt(0) === 0x202e || c.charCodeAt(0) === 0x1b), false);
-  assert.match(err, /: \]8;;http:\/\/evilclick evil Error: forged$/m);
+  // The whole OSC 8 sequence goes, not only its ESC and BEL.
+  assert.match(err, /: click evil Error: forged$/m);
 
   const xml = `<iOS><list><employee><name>A&#x202E;B&#x2066;C</name></employee></list></iOS>`;
   const ok = makeCli(() => xmlResponse(xml));

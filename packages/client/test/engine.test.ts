@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { execFileSync } from "node:child_process";
 import { TextDecoder } from "node:util";
 import assert from "node:assert/strict";
 import {
@@ -6,6 +7,7 @@ import {
   RequestEngine,
   assertHeaderValue,
   parseRetryAfter,
+  sanitizeServerText,
   validateBaseUrl,
   type EngineOptions,
 } from "../src/engine.js";
@@ -111,10 +113,11 @@ test("error detail is stripped of terminal control characters", async () => {
           return n <= 8 || (n >= 0x0b && n <= 0x1f) || (n >= 0x7f && n <= 0x9f);
         });
       // Control bytes are gone from both the structured detail and the message
-      // that run.ts prints to stderr, while printable characters are preserved.
+      // that run.ts prints to stderr; whole escape sequences go, so none of their
+      // printable rest is left behind, while ordinary text is preserved.
       assert.ok(!hasControl(err.detail ?? ""));
       assert.ok(!hasControl(err.message));
-      assert.equal(err.detail, "boom[31mred2J");
+      assert.equal(err.detail, "boomred");
       return true;
     },
   );
@@ -604,4 +607,78 @@ test("a TextBuilder joins its pieces in order across batches", () => {
   }
   assert.equal(b.toString(), expected.join(""));
   assert.equal(new TextBuilder().toString(), "");
+});
+
+const ESC = String.fromCharCode(0x1b);
+const BEL = String.fromCharCode(0x07);
+
+test("sanitizeServerText drops whole escape sequences, not just their control bytes (C)", () => {
+  const CSI8 = String.fromCharCode(0x9b);
+  const OSC8 = String.fromCharCode(0x9d);
+  const ST8 = String.fromCharCode(0x9c);
+  for (const [input, expected] of [
+    [`line1 ${ESC}]0;title${BEL}rest`, "line1 rest"],
+    [`${ESC}]8;;https://evil.example${ESC}\\click${ESC}]8;;${ESC}\\`, "click"],
+    [`${ESC}[31mred${ESC}[0m plain`, "red plain"],
+    [`${ESC}[1;31;4mbold`, "bold"],
+    [`${CSI8}2Jcleared`, "cleared"],
+    [`${OSC8}0;t${ST8}ok`, "ok"],
+    [`a${ESC}7b${ESC}(Bc`, "abc"],
+    // Unterminated: only ESC and its introducer go, the text stays.
+    [`keep ${ESC}]0;no terminator here`, "keep 0;no terminator here"],
+  ] as const) {
+    assert.equal(sanitizeServerText(input), expected, JSON.stringify(input));
+  }
+});
+
+test("sanitizeServerText drops invisible format characters (zero-width, soft hyphen, BOM) (C)", () => {
+  const text = "real\u200b error\u2028Error: forged\u2066x\u2069 \ufeffend\u00ad\u200d\u2060!";
+  assert.equal(sanitizeServerText(text), "real error Error: forgedx end!");
+  assert.equal(sanitizeServerText("  Cannot GET  /items/details/  Größe  "), "Cannot GET /items/details/ Größe");
+});
+
+test("sanitizeServerText reads a bounded prefix and drops what the per-character filter dropped (C)", () => {
+  // The filter it replaces, one character at a time: C0 but TAB to CR, DEL, C1 and Cf go.
+  const perCharacter = (text: string): string =>
+    [...text]
+      .filter((ch) => {
+        const n = ch.codePointAt(0) ?? 0;
+        return (n >= 0x09 && n <= 0x0d) || !(n <= 0x1f || (n >= 0x7f && n <= 0x9f) || /\p{Cf}/u.test(ch));
+      })
+      .join("")
+      .replace(/\s+/g, " ")
+      .trim();
+  const every = Array.from({ length: 0x3000 }, (_, i) => String.fromCharCode(i)).join("") + "\u{1f600}\u{e0001}\ud800x";
+  for (let at = 0; at < every.length; at += 512) {
+    const piece = every.slice(at, at + 512).replace(/[\u001b\u0090\u0098\u009b-\u009f]/g, "");
+    assert.equal(sanitizeServerText(piece), perCharacter(piece), `from U+${at.toString(16)}`);
+  }
+  // At most 16 384 units of the text are read, never half a surrogate pair.
+  assert.equal(sanitizeServerText("x".repeat(100_000)).length, 16_384);
+  assert.equal(sanitizeServerText(`${"x".repeat(16_383)}\u{1f600}`), "x".repeat(16_383));
+  // A control string ends at another introducer: the first is dropped by the filter, the second
+  // string as a whole. An unterminated run of introducers is linear (100 000 × U+009D took 16 s
+  // with the introducers allowed inside a control string).
+  const OSC8 = String.fromCharCode(0x9d);
+  const ST8 = String.fromCharCode(0x9c);
+  assert.equal(sanitizeServerText(`a${OSC8}0;x${OSC8}0;t${ST8}b`), "a0;xb");
+  assert.equal(sanitizeServerText(`a${ESC}]0;x${ESC}]0;t${BEL}b`), "a0;xb");
+});
+
+// This test starts a process with a small heap: 30 s instead of the suite's 5 s.
+const STARTS_A_PROCESS = { timeout: 30_000 };
+
+test("a malformed answer with a 16 MB tag name ends in a parse error within a small heap (C)", STARTS_A_PROCESS, () => {
+  // The parser names the tag in its reason, and the engine cleaned all of it before the cut, one
+  // `+=` per character: a 16 MB name aborted the process under a 128 MB heap.
+  const engine = new URL("../src/engine.js", import.meta.url).href;
+  const script =
+    `const { RequestEngine } = await import(${JSON.stringify(engine)});` +
+    `const body = Buffer.from("<" + "a".repeat(16 * 1024 * 1024));` +
+    `const e = new RequestEngine({ transport: async () => ({ status: 200, headers: { "content-type": "application/xml" }, body }) });` +
+    `try { await e.getXml("/feed.xml"); } catch (err) { process.stdout.write(err.name + " " + err.message.length); }`;
+  const out = execFileSync(process.execPath, ["--max-old-space-size=128", "--input-type=module", "-e", script], { encoding: "utf8" });
+  const [name, length] = out.split(" ");
+  assert.equal(name, "BundesratParseError", out);
+  assert.ok(Number(length) < 1000, out);
 });
