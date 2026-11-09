@@ -461,10 +461,15 @@ function looksLikeHtml(text: string): boolean {
  * of 2026-09-26: a Latin-1 feed labelled utf-8). The Content-Type charset is used when the
  * document declares nothing; it used to be ignored, so a Latin-1 body declared only there
  * was read as UTF-8. An encoding TextDecoder doesn't know is a BundesratParseError rather
- * than mojibake. (Bytes invalid in the declared encoding become U+FFFD, as everywhere in
+ * than mojibake; its name is quoted with the base URL's credentials scrubbed (`scrub`). (Bytes invalid in the declared encoding become U+FFFD, as everywhere in
  * the WHATWG decoders.)
  */
-function decodeXml(body: Buffer, contentType: string, request: string): { text: string; replaced: number } {
+function decodeXml(
+  body: Buffer,
+  contentType: string,
+  request: string,
+  scrub: (text: string) => string,
+): { text: string; replaced: number } {
   let charset: string | undefined;
   if (body[0] === 0xef && body[1] === 0xbb && body[2] === 0xbf) charset = "utf-8";
   else if (body[0] === 0xff && body[1] === 0xfe) charset = "utf-16le";
@@ -476,7 +481,7 @@ function decodeXml(body: Buffer, contentType: string, request: string): { text: 
   try {
     decoder = new TextDecoder(charset, { fatal: true });
   } catch {
-    throw new BundesratParseError(`${request}: unsupported response charset "${cutText(sanitizeServerText(charset), 100)}".`);
+    throw new BundesratParseError(`${request}: unsupported response charset "${cutText(sanitizeServerText(scrub(charset)), 100)}".`);
   }
   try {
     return { text: decoder.decode(body), replaced: 0 };
@@ -534,6 +539,18 @@ function htmlPageError(request: string): BundesratParseError {
   );
 }
 
+/**
+ * `form` and its spelling in a URL (`encodeURIComponent`): a server that puts a credential into
+ * a URL percent-encodes it. A form that has no such spelling (a lone surrogate) is kept as it is.
+ */
+function urlSpellings(form: string): string[] {
+  try {
+    return [form, encodeURIComponent(form)];
+  } catch {
+    return [form];
+  }
+}
+
 /** `GET <url> failed: `, the start of a network error's message: the request URL, userinfo redacted, cut. */
 function requestFailed(url: string): string {
   return `GET ${cutForMessage(redactUrl(url))} failed: `;
@@ -551,8 +568,9 @@ export class RequestEngine {
   readonly #credentials: string[];
   /**
    * The forms a server echoes that userinfo back in (the Basic value, the decoded
-   * `user:password`, the password alone), longest first, so a password never leaves half
-   * of the `user:password` around it.
+   * `user:password`, the password or token alone; `echoedCredentialForms`), each also
+   * percent-encoded as in a URL, longest first, so a password never leaves half of the
+   * `user:password` around it.
    */
   readonly #echoed: string[];
   private readonly transport: Transport;
@@ -572,16 +590,16 @@ export class RequestEngine {
     // The raw value is checked before the trailing-slash strip, so "https://h/ "
     // cannot slip past it; only an omitted baseUrl selects the default.
     this.#baseUrl = validateBaseUrl(options.baseUrl === undefined ? DEFAULT_BASE_URL : options.baseUrl);
-    this.#credentials = credentialsIn(this.#baseUrl).flatMap((raw) => {
+    // The userinfo as typed and as WHATWG writes it (it percent-encodes some of its characters).
+    const userinfos = [...new Set([...credentialsIn(this.#baseUrl), ...credentialsIn(new URL(this.#baseUrl).href)])];
+    this.#credentials = userinfos.flatMap((raw) => {
       try {
         return [raw, decodeURIComponent(raw)];
       } catch {
         return [raw];
       }
     });
-    this.#echoed = credentialsIn(this.#baseUrl)
-      .flatMap(echoedCredentialForms)
-      .sort((a, b) => b.length - a.length);
+    this.#echoed = [...new Set(userinfos.flatMap(echoedCredentialForms).flatMap(urlSpellings))].sort((a, b) => b.length - a.length);
     this.transport = functionOption("transport", options.transport, nodeHttpTransport);
     // Only an omitted userAgent selects the default: a blank one is an error, not
     // a silent fallback, and a malformed one fails here rather than at request time.
@@ -636,6 +654,41 @@ export class RequestEngine {
    */
   private scrub(text: string): string {
     return this.#credentials.length === 0 ? text : redactSecrets(redactCredentials(text, this.#credentials), this.#echoed);
+  }
+
+  /**
+   * An error body, already scrubbed as sent, as `BundesratApiError.body` keeps it: when it is
+   * JSON with an escape in it, checked decoded too. An escape (`\"`, `\u00e4`) hides an echoed
+   * credential from the scrub of the text as sent, while a caller who parses the body sees it. Such
+   * a body is kept as the decoded JSON written again (`JSON.stringify`, one spelling per character)
+   * with the credential scrubbed in that spelling. A body that doesn't parse is text nobody
+   * decodes, and stays as sent; one too deeply nested to write again is left out.
+   */
+  private scrubBody(scrubbed: string): string {
+    if (this.#echoed.length === 0 || !scrubbed.includes("\\")) return scrubbed;
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(scrubbed);
+    } catch {
+      return scrubbed;
+    }
+    let rewritten: string;
+    try {
+      rewritten = JSON.stringify(decoded);
+    } catch {
+      return "";
+    }
+    const spelled = this.#echoed.map((form) => JSON.stringify(form).slice(1, -1));
+    return spelled.some((form) => rewritten.includes(form)) ? redactSecrets(rewritten, spelled) : scrubbed;
+  }
+
+  /**
+   * A value from an answer quoted for an error message (`quoteValue`), the base URL's credentials
+   * scrubbed first, before the cut: a 2xx answer (a root element the client refuses) can echo them
+   * as well as an error body. API code quotes server values with this.
+   */
+  quoteServerValue(value: string): string {
+    return quoteValue(this.scrub(value));
   }
 
   /**
@@ -817,7 +870,7 @@ export class RequestEngine {
   async getXmlDocument(path: string, query?: QueryParams): Promise<XmlDocument> {
     const res = await this.request(path, query);
     const request = `GET ${this.describeUrl(path, query)}`;
-    const { text, replaced: badBytes } = decodeXml(res.data, res.contentType, request);
+    const { text, replaced: badBytes } = decodeXml(res.data, res.contentType, request, (t) => this.scrub(t));
     if (looksLikeHtml(text)) throw htmlPageError(request);
     // An empty body is not malformed XML — surface it as "empty" rather than the
     // generic parse-failure message so the cause is obvious.
@@ -829,8 +882,9 @@ export class RequestEngine {
       doc = parseXmlDocument(text);
     } catch (cause) {
       // Name the parser's reason (nesting too deep, unterminated tag, no root
-      // element): run.ts prints only the message, never the cause.
-      const reason = cutForMessage(sanitizeServerText(cause instanceof Error ? cause.message : String(cause)));
+      // element): run.ts prints only the message, never the cause. It quotes a tag name of the
+      // answer, so it is scrubbed first, before it is cleaned and cut.
+      const reason = cutForMessage(sanitizeServerText(this.scrub(cause instanceof Error ? cause.message : String(cause))));
       throw new BundesratParseError(`${request}: the answer is not valid XML: ${reason}`, {
         cause: this.scrubCause(cause),
       });
@@ -859,7 +913,9 @@ export class RequestEngine {
     } catch (err) {
       if (!isStringTooLong(err)) throw err;
     }
-    const text = this.scrub(raw);
+    // A JSON body that spells a credential with escapes is written again decoded, scrubbed in
+    // that spelling (scrubBody), and the snippet below is taken from that.
+    const text = this.scrubBody(this.scrub(raw));
     // The Bundesrat serves HTML error pages, not a structured envelope; surface a
     // short, whitespace-collapsed snippet only when it is plain (non-HTML) text.
     const snippet = text.trim().replace(/\s+/g, " ");

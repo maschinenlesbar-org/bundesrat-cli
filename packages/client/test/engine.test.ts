@@ -374,7 +374,7 @@ test("a server detail cut at 200 characters keeps the message well-formed", asyn
 test("own messages quote a server value at most 500 characters long (L3)", async () => {
   const root = `r${"x".repeat(5000)}`;
   const client = new BundesratClient({ transport: async () => xmlResponse(`<${root}><list/></${root}>`) });
-  await assert.rejects(client.appointments(), (err: Error) => err.message.length < 700 && /got <rx+…>/.test(err.message));
+  await assert.rejects(client.appointments(), (err: Error) => err.message.length < 700 && /got "rx+"…/.test(err.message));
 });
 
 test("credentials a server echoes are scrubbed from the error: Basic, user:password, password (L13)", async () => {
@@ -521,7 +521,7 @@ test("an answer error names the request: method and URL, userinfo redacted (D9)"
   // The client's shape errors too.
   const c = new BundesratClient({ transport: makeMockTransport(() => xmlResponse("<error/>")).transport });
   await assert.rejects(c.session(), (err: Error) =>
-    err.message === "GET https://www.bundesrat.de/iOS/SharedDocs/3_Plenum/plenum_aktuelleSitzung_table.xml?view=renderXml: unexpected response shape: expected an <iOS> root element, got <error>.");
+    err.message === 'GET https://www.bundesrat.de/iOS/SharedDocs/3_Plenum/plenum_aktuelleSitzung_table.xml?view=renderXml: unexpected response shape: expected an <iOS> root element, got "error".');
 });
 
 test("an answer longer than V8's longest string is a BundesratParseError naming the request, not a plain Error (B5)", async (t) => {
@@ -681,4 +681,55 @@ test("a malformed answer with a 16 MB tag name ends in a parse error within a sm
   const [name, length] = out.split(" ");
   assert.equal(name, "BundesratParseError", out);
   assert.ok(Number(length) < 1000, out);
+});
+
+// Class D of .reviews/2026-10-27-security-audit (portfolio round): the base URL's credentials
+// are scrubbed from decoded server text too, and from every value the client quotes from an
+// answer, before it is cut.
+test("an error body keeps its spelling unless a credential hides behind an escape (D)", async () => {
+  const base = "https://alice:s3cret-pw@mirror.example";
+  const failed = async (body: string): Promise<BundesratApiError> => {
+    const e = new RequestEngine({ baseUrl: base, maxRetries: 0, transport: async () => rawResponse(body, "application/json", 500) });
+    const err = await e.getXml("/x").catch((caught: unknown) => caught);
+    assert.ok(err instanceof BundesratApiError, String(err));
+    return err;
+  };
+  // No credential, or one spelled as sent: the body as sent (scrubbed), escapes kept.
+  assert.equal((await failed('{"m":"caf\\u00e9 \\"x\\""}')).body, '{"m":"caf\\u00e9 \\"x\\""}');
+  assert.equal((await failed('{"m":"pw s3cret-pw \\u00e9"}')).body, '{"m":"pw *** \\u00e9"}');
+  // Escaped: written again decoded, scrubbed in that spelling; the message's snippet with it.
+  const escaped = await failed('{"m":"pw s3cret\\u002dpw \\u00e9"}');
+  assert.equal(escaped.body, '{"m":"pw *** é"}');
+  assert.equal(escaped.detail, '{"m":"pw *** é"}');
+  assert.ok(!escaped.message.includes("s3cret"), escaped.message);
+  // Not JSON: nobody decodes it, it stays as sent.
+  assert.equal((await failed("pw s3cret\\u002dpw")).body, "pw s3cret\\u002dpw");
+});
+
+test("a value quoted from an answer is scrubbed before it is cut, so no part of a credential stays (D)", () => {
+  const pw = "s3cret-Pw-long";
+  const e = new RequestEngine({ baseUrl: `https://alice:${pw}@mirror.example` });
+  for (const at of [0, 490, 495, 499]) {
+    const quoted = e.quoteServerValue(`${"x".repeat(at)}${pw}${"y".repeat(600)}`);
+    assert.ok(!quoted.includes("s3cret"), `${at}: ${quoted}`);
+  }
+  assert.equal(new RequestEngine().quoteServerValue('a"b'), '"a\\"b"');
+});
+
+test("a token the answer names as its root element, a tag or its charset is scrubbed from the library's error (D)", async () => {
+  // Every value of an answer the client quotes into its own errors: the root element's name, the
+  // parser's reason (which names a tag) and the declared charset. The CLI redacted them on
+  // stderr; a library caller logging err.message saw the token.
+  const token = "dummytoken0123456789";
+  for (const xml of [
+    `<${token}><list/></${token}>`,
+    `<iOS><list><${token} a="1"`,
+    `<?xml version="1.0" encoding="${token}"?><iOS/>`,
+  ]) {
+    const client = new BundesratClient({ baseUrl: `https://${token}@mirror.example`, transport: async () => xmlResponse(xml) });
+    const err = await client.appointments().catch((caught: unknown) => caught);
+    assert.ok(err instanceof BundesratParseError, String(err));
+    assert.ok(!err.message.includes(token), err.message);
+    assert.ok(err.message.includes("***"), err.message);
+  }
 });

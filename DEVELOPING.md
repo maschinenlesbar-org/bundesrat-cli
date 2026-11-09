@@ -205,8 +205,15 @@ a real `#private` field (so `console.log(client)`, `util.inspect` and `JSON.stri
 never show it) next to its userinfo, raw and percent-decoded, and the forms a server
 echoes it back in (the `Basic` value, the decoded `user:password`, the password alone
 from 4 characters — the user name when there is no password, a token sent as Basic
-`TOKEN:`: `echoedCredentialForms`), and scrubs them from error bodies
-(`BundesratApiError.body`/`detail`), transport error text and the `cause` chain. `BundesratApiError.url` is the request URL with its userinfo redacted. Whatever
+`TOKEN:`: `echoedCredentialForms`; each also percent-encoded, and the userinfo also as WHATWG
+writes it), and scrubs them from error bodies (`BundesratApiError.body`/`detail`), transport
+error text and the `cause` chain. An error body that is JSON and spells a credential with
+escapes (`\"`, `\u00e4`), which the scrub of the text as sent misses but a caller who parses
+`.body` sees, is kept as the decoded JSON written again with the credential as `***` (and the
+`detail` snippet is taken from that); one too deeply nested to write again is `""`. Every value
+of a 2xx answer the client quotes into its own errors — the root element's name, a tag name in
+the parser's reason, the declared charset — is scrubbed too, before it is cut
+(`RequestEngine.quoteServerValue(value)` for API code). `BundesratApiError.url` is the request URL with its userinfo redacted. Whatever
 a custom transport throws (a string, fetch's `TypeError` naming the URL) reaches the
 caller as a `BundesratNetworkError` with the original, scrubbed, as its `cause`.
 `apps/cli/test/conformance-p2-library-redaction.test.ts` checks the client, nine failing
@@ -468,7 +475,8 @@ exported: JSON-quoted with DEL, C1, every format character such as a bidi overri
 zero-width space, U+2028/2029 and a lone surrogate escaped as `\uXXXX`, so a refusal shows
 what was typed instead of hiding or reordering it, and the "…" of a cut after the closing
 quote; `cutForMessage`,
-`MAX_MESSAGE_VALUE_LENGTH`: an option value, an unexpected root element's name, the
+`MAX_MESSAGE_VALUE_LENGTH`: an option value, an unexpected root element's name (quoted with
+`RequestEngine.quoteServerValue`, the base URL's credentials scrubbed before the cut), the
 `--party` value the CLI's note quotes), a server's error text at 200, never inside a
 surrogate pair (`cutText`), so the message stays well-formed and bounded for a library
 caller too; the error's properties keep the full value. Server text bound for a message (an

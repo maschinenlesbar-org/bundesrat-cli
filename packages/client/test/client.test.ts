@@ -107,12 +107,12 @@ for (const baseUrl of ["file:///etc/passwd", "ftp://example.org"]) {
 
 test("a document that is not <iOS><list>…</list></iOS> is a BundesratParseError", async () => {
   for (const [body, message] of [
-    ['<?xml version="1.0"?><error><code>500</code><message>CMS error</message></error>', /expected an <iOS> root element, got <error>\./],
-    ["<list><top><toptitle>1</toptitle></top></list>", /expected an <iOS> root element, got <list>\./],
+    ['<?xml version="1.0"?><error><code>500</code><message>CMS error</message></error>', /expected an <iOS> root element, got "error"\./],
+    ["<list><top><toptitle>1</toptitle></top></list>", /expected an <iOS> root element, got "list"\./],
     ["<iOS><foo/></iOS>", /expected exactly one <list> element under <iOS>\./],
     ["<iOS><list><a>1</a></list><list><a>2</a></list></iOS>", /expected exactly one <list> element under <iOS>\./],
     ["<iOS><list>just text</list></iOS>", /expected exactly one <list> element under <iOS>\./],
-    ["<iOS>text</iOS>", /expected an <iOS> root element, got <iOS>\./],
+    ["<iOS>text</iOS>", /expected an <iOS> root element, got "iOS"\./],
   ] as const) {
     const mt = makeMockTransport(() => xmlResponse(body));
     const c = new BundesratClient({ transport: mt.transport });
