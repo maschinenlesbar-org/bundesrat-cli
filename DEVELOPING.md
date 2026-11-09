@@ -120,7 +120,9 @@ replaced with U+FFFD (see "The XML parser"); a throw in it is swallowed, and the
 The engine enforces the transport contract itself, so the limits hold for a custom
 transport (a `fetch` wrapper, a raw `node:http` one) too: every call races a deadline of
 `timeoutMs` and gets an `AbortSignal` (`HttpRequest.signal`, honoured by the default
-transport) that fires then; the body it gets back is checked against `maxResponseBytes`
+transport) that fires then (the default transport joins small chunks of a body as they arrive,
+at most 1024 of them or 64 KiB, so its memory follows the bytes, not the number of chunks a
+server sends); the body it gets back is checked against `maxResponseBytes`
 ("Response exceeded the size limit of N bytes (maxResponseBytes; --max-response-bytes on
 the CLI)"); headers are read from a plain object in any key case, a fetch `Headers` or a
 `Map`; the body may be any ArrayBuffer view (a `Uint8Array` from `fetch`) or an
@@ -569,8 +571,8 @@ The client's tests are in `packages/client/test/` (`xml`, `query`, `http`, `engi
   place, a dangling link with `--force`, a 255-byte name, a signal mid-write), P27 (a big or odd
   answer: 20 MB of DEL printed escaped under a 512 MB heap, 90 MB of DEL an ERROR record of
   `bundesrat.output` rather than a crash, a lone surrogate reference and invalid UTF-8 replaced
-  with U+FFFD and a WARN of `bundesrat.api`; the large flat answer is skipped, a feed value is
-  an element's text).
+  with U+FFFD and a WARN of `bundesrat.api`, an answer in two million one-byte chunks read under
+  a 256 MB heap; the large flat answer is skipped, a feed value is an element's text).
 
 ## Continuous integration
 
