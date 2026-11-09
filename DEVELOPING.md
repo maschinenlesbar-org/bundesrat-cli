@@ -576,7 +576,17 @@ The client's tests are in `packages/client/test/` (`xml`, `query`, `http`, `engi
   answer: 20 MB of DEL printed escaped under a 512 MB heap, 90 MB of DEL an ERROR record of
   `bundesrat.output` rather than a crash, a lone surrogate reference and invalid UTF-8 replaced
   with U+FFFD and a WARN of `bundesrat.api`, an answer in two million one-byte chunks read under
-  a 256 MB heap; the large flat answer is skipped, a feed value is an element's text).
+  a 256 MB heap; the large flat answer is skipped, a feed value is an element's text), P28
+  (hostile error answers: control-string introducers cleaned in linear time, a 16 MB error
+  message and six million lone surrogate references within a 128 MB heap, a credential behind
+  JSON escapes in an error body and one in a redirect's Location scrubbed; the number case is
+  skipped, a feed value is never a number, and so is the quoted-2xx-value case, the client
+  quotes only XML names from an answer), P29 (base-URL credentials: a token userinfo scrubbed,
+  a backslash or a scheme not followed by `//` and the host refused, requests to the parsed
+  host, linear stdout redaction, glued URLs), P30 (`-o --force` follows no other user's link in
+  a shared directory, at every hop; EACCES isn't "exists"; a stream checked on the descriptor),
+  P31 (the release pipeline: the SBOM tool locked in `tools/sbom/`, three jobs, every action
+  pinned).
 
 ## Continuous integration
 
@@ -596,7 +606,8 @@ GitHub Actions workflows under `.github/workflows/`:
   where the tarball is built or where the write token is. Update the tool by changing its
   version in `tools/sbom/package.json` and running `npm install --package-lock-only
   --ignore-scripts` there; don't chain its install into an npm script.
-  `apps/cli/test/release-workflow.test.ts` reads the workflow and the lockfile and checks it.
+  Conformance test P31 (`apps/cli/test/conformance-p31-release-pipeline.test.ts`) reads the
+  workflow and the lockfile and checks it.
 - **publish.yml** — manual dispatch from the release tag (`gh workflow run publish.yml --ref vX.Y.Z`; the version is the tag's): `npm publish --workspace apps/cli` via OIDC **Trusted
   Publishing** (no stored `NPM_TOKEN`) with provenance.
 - **docs.yml** — build the project website (`site/`, English and German) with the TypeDoc API docs
