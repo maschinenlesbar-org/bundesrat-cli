@@ -15,6 +15,8 @@
 // mixed-content reconstruction beyond a `#text` catch-all). It is exercised hard
 // in xml.test.ts against the real feed shapes.
 
+import { TextBuilder } from "./errors.js";
+
 export type XmlValue = string | XmlObject | Array<string | XmlObject>;
 export interface XmlObject {
   [key: string]: XmlValue;
@@ -60,7 +62,7 @@ export function decodeEntities(text: string, tally: ReplacementTally = { replace
   // decimal branch and is left untouched, rather than being truncated at the first
   // non-digit by `parseInt(…, 10)`.
   let consumed = -1; // the offset of a low-surrogate reference already joined to its high one
-  return text.replace(/&(#[xX][0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);/g, (whole, body: string, offset: number) => {
+  const value = (whole: string, body: string, offset: number): string => {
     if (offset === consumed) return "";
     switch (body) {
       case "amp":
@@ -97,7 +99,22 @@ export function decodeEntities(text: string, tally: ReplacementTally = { replace
     // Unknown named entity, or a reference past U+10FFFF: leave it untouched rather than
     // dropping information.
     return whole;
-  });
+  };
+  // One match at a time, the pieces joined in batches (TextBuilder): `replace` with a callback
+  // kept a slot per match until the end, so six million lone-surrogate references (48 MB)
+  // exhausted a 128 MB heap.
+  const references = /&(#[xX][0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);/g;
+  const out = new TextBuilder();
+  let copied = 0;
+  for (let m = references.exec(text); m !== null; m = references.exec(text)) {
+    const replacement = value(m[0], m[1] as string, m.index);
+    if (replacement === m[0]) continue;
+    out.push(text.slice(copied, m.index), replacement);
+    copied = m.index + m[0].length;
+  }
+  if (copied === 0) return text;
+  out.push(text.slice(copied));
+  return out.toString();
 }
 
 interface Frame {

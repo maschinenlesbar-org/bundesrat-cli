@@ -315,7 +315,9 @@ the result is well-formed text `jq` reads, and the engine option `onWarning` is 
 naming the request: `GET <url>: 2 characters of the answer were not valid text (invalid bytes
 or a lone surrogate) and replaced with U+FFFD.` The CLI logs it as a `WARN` record of
 `bundesrat.api`. One bad character never sinks a whole answer. A reference past U+10FFFF is
-left as text. A body too large to become one string (512 MB and more, possible only with
+left as text. `decodeEntities` reads one reference at a time and joins the pieces in batches
+(`TextBuilder`), so millions of references (six million lone ones, 48 MB) are decoded within a
+128 MB heap. A body too large to become one string (512 MB and more, possible only with
 `maxResponseBytes: 0` or `--max-response-bytes 0`) is a `BundesratParseError`, `GET <url>: the
 answer is too large to read as text (N bytes; the longest string is 536870888 characters).`,
 not a plain `Error` ("Unexpected error" in the CLI); an error status with such a body keeps its
@@ -501,6 +503,8 @@ the next introducer), then the remaining C0/C1 controls, DEL and every format ch
 controls, zero-width characters, soft hyphen, BOM), and folds whitespace into single spaces;
 each step is one linear regex replace, so a hostile answer (a 16 MB tag name in the parser's
 reason, a run of unterminated control-string introducers) costs neither seconds nor the heap.
+An error body's snippet is that cleaned text cut at 200 characters (a 16 MB body ends in one
+short message under a small heap).
 `apps/cli/test/conformance-p8-p9-p13-responses-and-errors.test.ts`
 checks the declared charset (P8), the feed's document shape (P9) and twenty-one
 wrong-typed calls (P13).

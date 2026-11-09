@@ -921,18 +921,18 @@ export class RequestEngine {
     // that spelling (scrubBody), and the snippet below is taken from that.
     const text = this.scrubBody(this.scrub(raw));
     // The Bundesrat serves HTML error pages, not a structured envelope; surface a
-    // short, whitespace-collapsed snippet only when it is plain (non-HTML) text.
-    const snippet = text.trim().replace(/\s+/g, " ");
-    let detail =
+    // short, whitespace-collapsed snippet only when it is plain (non-HTML) text. `detail`
+    // lands in an Error.message printed to stderr, so it is cleaned (sanitizeServerText:
+    // escape sequences, control and format characters dropped, whitespace folded) and then
+    // cut. The cleaning reads a bounded prefix: folding the whitespace of a whole 16 MB body
+    // first exhausted a small heap.
+    const snippet = sanitizeServerText(text);
+    const detail =
       snippet.length > 0 && !snippet.startsWith("<")
         ? snippet.length > 200
           ? `${cutText(snippet, 200)}…`
           : snippet
         : undefined;
-    // `detail` came from the response body and lands in an Error.message printed
-    // raw to stderr; strip control and bidi characters so a hostile endpoint cannot
-    // inject terminal escape sequences or reorder the line.
-    if (detail !== undefined) detail = sanitizeServerText(detail);
     return new BundesratApiError({ status, url, method: "GET", body: text, detail, retryAfterMs });
   }
 }

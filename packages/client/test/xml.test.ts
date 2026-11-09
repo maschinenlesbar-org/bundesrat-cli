@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { parseXml, decodeEntities, type XmlObject } from "../src/xml.js";
 import * as fx from "./fixtures.js";
@@ -206,4 +207,21 @@ test("the scanner keeps the old tokenizer's results for declarations, quotes and
     u: { "@k": "v" },
     w: "x  y",
   });
+});
+
+// This test starts a process with a small heap: 30 s instead of the suite's 5 s.
+const STARTS_A_PROCESS = { timeout: 30_000 };
+
+test("millions of lone surrogate references are repaired within a small heap (C)", STARTS_A_PROCESS, () => {
+  // `replace` with a callback kept a slot per match until the end: six million references
+  // (48 MB) exhausted a 128 MB heap. One match at a time, joined in batches, they fit.
+  const xml = new URL("../src/xml.js", import.meta.url).href;
+  const n = 6_000_000;
+  const script =
+    `const { decodeEntities } = await import(${JSON.stringify(xml)});` +
+    `const tally = { replaced: 0 };` +
+    `const text = decodeEntities("a&amp;" + "&#xd800;".repeat(${n}) + "&#xD83D;&#xDE00;z", tally);` +
+    `process.stdout.write(text.length + " " + tally.replaced + " " + JSON.stringify(text.slice(0, 3) + text.slice(-4)));`;
+  const out = execFileSync(process.execPath, ["--max-old-space-size=128", "--input-type=module", "-e", script], { encoding: "utf8" });
+  assert.equal(out, `${n + 5} ${n} ${JSON.stringify("a&\ufffd\ufffd\u{1f600}z")}`);
 });
