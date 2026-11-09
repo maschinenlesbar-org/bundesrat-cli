@@ -15,7 +15,7 @@ usage error (exit 2, `--timeout may be given only once.`), never "the last one w
 
 | Option | Description |
 |---|---|
-| `--base-url <url>` | API base URL (only `http:`/`https:`; no query, fragment, whitespace or control characters; a literal `%` in a password is written `%25`) |
+| `--base-url <url>` | API base URL (only `http:`/`https:`, written `https://` and the host; no query, fragment, backslash, whitespace or control characters; a literal `%` in a password is written `%25`) |
 | `--timeout <ms>` | time limit per request in ms, whole response included (0 = no timeout; at most 2147483647); it bounds each attempt, the waits between retries come on top |
 | `--user-agent <ua>` | User-Agent header value |
 | `--max-retries <n>` | retries for transient 429/503 responses and reset connections (0..10; each waits 200 ms × attempt, or a 429/503's `Retry-After` when that is longer, up to 30 s — a longer one is not retried and the error names the requested wait). Each retry logs one WARN record of `bundesrat.http` before it waits (`HTTP 503 from host: retry 1 of 3 in 2 s`). |

@@ -386,14 +386,17 @@ function hasTransientCode(err: unknown, depth = 0): boolean {
 /**
  * Check a base URL against every rule of {@link baseUrlProblem} — blank,
  * whitespace or control characters, unparseable, a scheme other than
- * `http:`/`https:`, a query or fragment — and return it with trailing slashes
- * stripped. A bad value throws a BundesratValidationError ("Invalid baseUrl:
+ * `http:`/`https:`, a query or fragment, a backslash, a scheme not followed by `//` and
+ * the host — and return it as WHATWG parses it (host lower-cased, a default port dropped,
+ * the path percent-encoded where WHATWG does it), with trailing slashes stripped: the reading
+ * every check of it makes (the host, the cleartext warning, the Authorization header Node
+ * derives), so a transport that reads the request URL as text reaches the same host. A bad value throws a BundesratValidationError ("Invalid baseUrl:
  * <reason>"): it is a configuration error, not a transport failure. The default
  * transport still gates the scheme per hop, but the engine may be handed a custom
  * transport that does no such check, so the configured value is checked here.
  */
 export function validateBaseUrl(raw: string): string {
-  return assertValid("baseUrl", raw, baseUrlProblem).replace(/\/+$/, "");
+  return new URL(assertValid("baseUrl", raw, baseUrlProblem)).href.replace(/\/+$/, "");
 }
 
 /** True for a loopback host: `localhost`, 127.0.0.0/8 or `::1` (as URL#hostname spells it). */
@@ -589,9 +592,10 @@ export class RequestEngine {
     assertValid("options", options, knownKeysProblem(ENGINE_OPTION_KEYS));
     // The raw value is checked before the trailing-slash strip, so "https://h/ "
     // cannot slip past it; only an omitted baseUrl selects the default.
-    this.#baseUrl = validateBaseUrl(options.baseUrl === undefined ? DEFAULT_BASE_URL : options.baseUrl);
+    const typed = options.baseUrl === undefined ? DEFAULT_BASE_URL : options.baseUrl;
+    this.#baseUrl = validateBaseUrl(typed);
     // The userinfo as typed and as WHATWG writes it (it percent-encodes some of its characters).
-    const userinfos = [...new Set([...credentialsIn(this.#baseUrl), ...credentialsIn(new URL(this.#baseUrl).href)])];
+    const userinfos = [...new Set([...credentialsIn(typed), ...credentialsIn(this.#baseUrl)])];
     this.#credentials = userinfos.flatMap((raw) => {
       try {
         return [raw, decodeURIComponent(raw)];

@@ -152,13 +152,22 @@ silently disabling the timeout or retrying for ever.
 `baseUrl` is checked on the raw value, before trailing slashes are stripped, by the
 exported `validateBaseUrl` (rule: `baseUrlProblem`, the same one the CLI's `--base-url`
 uses). A blank value, surrounding or inner whitespace or control characters (`new URL()`
-would hide them while the engine joins the raw string to each feed path, so
-`"https://h/ "` would request `/%20/iOS/...`), an unparseable URL, a scheme other than
-`http:`/`https:`, a query or fragment, and a `%` in the userinfo that isn't an escape
+would hide them, so `"https://h/ "` would request `/%20/iOS/...`), an unparseable URL, a
+scheme other than `http:`/`https:`, a query or fragment, a backslash (WHATWG ends an http(s)
+host at `\`, so `https://u:pw@a.example\@b.example` sends the credentials to `a.example` while
+a text-based reader sees `b.example`), a scheme not followed by exactly `//` and the host
+(`http:host`, `http:/host`, `http:///host`, which WHATWG repairs into `http://host` silently:
+`Expected an absolute http(s) URL ("https://" and the host).`), and a `%` in the userinfo that isn't an escape
 (Node would fail to decode it for the Authorization header; write `%25`) each throw a
 `BundesratValidationError`
 (`Invalid baseUrl: <reason>`) — a configuration error, not a `BundesratNetworkError`.
-Only an omitted `baseUrl` selects the default.
+Only an omitted `baseUrl` selects the default. Requests go to the base URL as WHATWG parses it
+(`validateBaseUrl` returns that spelling: host lower-cased, a default port dropped, the path
+percent-encoded where WHATWG does it), the reading every check of it makes, so a custom
+transport that reads the request URL as text reaches the same host. `credentialsIn` reads a
+userinfo where WHATWG does: after the slashes and backslashes a special scheme skips
+(`http:///u:pw@h`, `https:\\u:pw@h`), up to a backslash too, so a refused value is never
+echoed with its password.
 
 A `user:password@` in the base URL (a mirror behind a login) never reaches the CLI's
 output. `credentialsIn(value)` finds the exact userinfo of a URL, parseable or not, and

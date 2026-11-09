@@ -702,3 +702,27 @@ test("the userinfo redaction of stdout is linear in the answer and catches glued
   assert.ok(out.includes("https://host://***@h and https://***@x://***@w"), out);
   for (const secret of ["u:p1", "u:p2", "v:q3"]) assert.ok(!out.includes(secret), out);
 });
+
+// Classes F, F3, F4 and F5 of .reviews/2026-10-27-security-audit (portfolio round): a base URL
+// with a backslash, or whose scheme isn't followed by exactly `//` and the host, is a usage
+// error, and its userinfo is never echoed (commander quoted `http:///alice:pw@h` in clear).
+test("--base-url with a backslash or a malformed scheme is refused before any request, never echoing the password (F, F3, F4, F5)", async () => {
+  const pw = "s3cret-Pw";
+  for (const base of [
+    `https://alice:${pw}@api.example\\@evil.example`,
+    `https:\\\\alice:${pw}@127.0.0.1:9`,
+    `http:alice:${pw}@127.0.0.1:9`,
+    `http:/alice:${pw}@127.0.0.1:9`,
+    `http:///alice:${pw}@127.0.0.1:9`,
+    `HTTPS:alice:${pw}@mirror.example`,
+    `http:///alice:${pw}@mirror.example/?q=1`,
+    `alice:${pw}@mirror.example`,
+    `T0kenS3cret:@mirror.example`,
+  ]) {
+    const cli = makeCli(() => xmlResponse(fx.appointmentsXml));
+    assert.equal(await run(["--base-url", base, "appointments"], cli.deps), 2, base);
+    assert.equal(cli.mt.calls.length, 0, base);
+    const err = cli.err.join("\n");
+    assert.ok(!err.includes(pw) && !/t0kens3cret/i.test(err), `${base}: ${err}`);
+  }
+});
