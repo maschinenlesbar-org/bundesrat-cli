@@ -55,3 +55,4 @@ export {
 } from "./errors.js";
 
 export * from "./types.js";
+export * from "./operations.js";
