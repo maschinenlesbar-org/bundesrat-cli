@@ -1,0 +1,19 @@
+{
+  "comment": "What tools/interop/interop.mjs needs that is particular to this repo: the mock upstream's answer per path (under --base-url http://127.0.0.1:<port>; the feeds are XML, so raw answers), how many tools the server lists, and the calls to make with what each must answer.",
+  "answers": {
+    "/iOS/SharedDocs/3_Plenum/plenum_aktuelleSitzung_table.xml": {
+      "$raw": "<?xml version=\"1.0\"?><iOS version=\"1.0\"><list><title>1069. Sitzung des Bundesrates</title><top><toptitle>TOP 10</toptitle><topdrucksache>Drucksache 500/26</topdrucksache></top><top><toptitle>TOP 2</toptitle><topdrucksache>Drucksache 343/26; Drucksache 344/26</topdrucksache></top></list></iOS>",
+      "$type": "text/xml; charset=utf-8"
+    },
+    "/iOS/SharedDocs/2_Mitglieder/mitglieder_table.xml": {
+      "$raw": "<?xml version=\"1.0\"?><iOS version=\"1.0\"><list><employee><name>Söder</name><party>CSU</party><state>Bayern</state><brmitglied>true</brmitglied><mitglied>true</mitglied></employee></list></iOS>",
+      "$type": "text/xml; charset=utf-8"
+    }
+  },
+  "tools": 3,
+  "calls": [
+    { "name": "getAgenda", "arguments": {}, "expect": { "status": "ok", "tops.0.top": "TOP 2", "drucksachen": 3 } },
+    { "name": "findMembers", "arguments": { "state": "Bayern" }, "expect": { "total": 1 } },
+    { "name": "findMembers", "arguments": { "state": "Bavaria" }, "error": true }
+  ]
+}
