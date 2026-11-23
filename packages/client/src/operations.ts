@@ -312,10 +312,12 @@ function assertMemberFeed(records: readonly Member[]): void {
 export async function findMembers(
   client: BundesratClient,
   input: { state?: string | undefined; party?: string | undefined; includeDeputies?: boolean | undefined; includePlenipotentiaries?: boolean | undefined } = {},
+  /** Where the feed's records come from (default `client.members()`): a caller that keeps the feed a while passes its own. */
+  feed: () => Promise<Member[]> = () => client.members(),
 ): Promise<Members> {
   const filter = { ...(input.state === undefined ? {} : { state: input.state }), ...(input.party === undefined ? {} : { party: input.party }) };
   filterMembers([], filter); // checks the filter before any request
-  const all = await client.members();
+  const all = await feed();
   assertMemberFeed(all);
   const records = filterMembers(all, filter);
   // The same record twice (the feed has repeated one) is one person.

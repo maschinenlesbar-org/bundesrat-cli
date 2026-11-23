@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { listTools } from "../src/mcp/server.js";
+import { FeedCache } from "../src/mcp/tools.js";
 import { connect } from "./harness.js";
 import { bundesrat } from "./helpers.js";
 
@@ -160,4 +161,31 @@ test("a feed that changed its shape is a tool error, not 'no member matches'; an
   assert.equal(agenda["drucksachen"], 0);
   assert.match(String(agenda["reason"]), /None of the 6 items lists a Drucksache.*the feed may have changed/);
   await renamed.close();
+});
+
+test("findMembers keeps the members feed a while: another filter or page needs no second download", async () => {
+  const feed = bundesrat({ members: [{ firstname: "Markus", name: "Söder", party: "CSU", state: "Bayern", brmitglied: "true", mitglied: "true" }] });
+  const connection = await connect({ transport: feed });
+  await connection.call("findMembers", {});
+  await connection.call("findMembers", { state: "Bayern", offset: 0, limit: 1 });
+  await connection.call("findMembers", { party: "csu", includeDeputies: true });
+  assert.equal(feed.calls.filter((r) => r.url.includes("mitglieder_table.xml")).length, 1);
+  await connection.close();
+});
+
+test("FeedCache: an entry is kept for its time, then fetched again; a failed fetch is not kept", async () => {
+  let now = 0;
+  const cache = new FeedCache<string>(1000, () => now);
+  let fetched = 0;
+  const key = {};
+  const fetch = async (): Promise<string> => `answer ${++fetched}`;
+  assert.equal(await cache.get(key, fetch), "answer 1");
+  now = 999;
+  assert.equal(await cache.get(key, fetch), "answer 1");
+  now = 1000;
+  assert.equal(await cache.get(key, fetch), "answer 2");
+  await assert.rejects(cache.get({}, async () => Promise.reject(new Error("down"))));
+  const other = {};
+  await assert.rejects(cache.get(other, async () => Promise.reject(new Error("down"))));
+  assert.equal(await cache.get(other, fetch), "answer 3");
 });

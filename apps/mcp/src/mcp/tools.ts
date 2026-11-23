@@ -5,7 +5,7 @@
 // every field, one object output schema, and a description of at most 2000 characters: trigger
 // phrases first (German and English), then the traps, then the two rules every tool repeats.
 
-import { FEEDS, findMembers, getAgenda, LAENDER, listAppointments } from "@maschinenlesbar.org/bundesrat-client";
+import { FEEDS, findMembers, getAgenda, LAENDER, listAppointments, type Member } from "@maschinenlesbar.org/bundesrat-client";
 import type { JsonSchema, ToolDefinition } from "./server.js";
 
 /** The service, as results and messages name it. */
@@ -61,6 +61,32 @@ const bool: JsonSchema = { type: "boolean" };
  */
 const feed = (path: string): string => `${path.replace(/^\//, "")}?view=renderXml`;
 
+/**
+ * Answers kept a while per client, so that a question after another (the next page, another Land
+ * or party) needs no second download: the members feed is about 770 KB, changes rarely, and the
+ * Bundesrat's server let quick repeated downloads hang. Only an answer is kept, never a failure or
+ * a pending request (a cancelled call's request must not answer the next one).
+ */
+export class FeedCache<T> {
+  readonly #kept = new WeakMap<object, { at: number; value: T }>();
+  constructor(
+    private readonly ttlMs: number,
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  async get(key: object, fetch: () => Promise<T>): Promise<T> {
+    const hit = this.#kept.get(key);
+    if (hit !== undefined && this.now() - hit.at < this.ttlMs) return hit.value;
+    const value = await fetch();
+    this.#kept.set(key, { at: this.now(), value });
+    return value;
+  }
+}
+
+/** How long findMembers keeps the members feed: 5 minutes. */
+const MEMBERS_KEPT_MS = 5 * 60_000;
+const membersFeed = new FeedCache<Member[]>(MEMBERS_KEPT_MS);
+
 const num = (args: Record<string, unknown>, key: string): number | undefined => (typeof args[key] === "number" ? (args[key] as number) : undefined);
 const str = (args: Record<string, unknown>, key: string): string | undefined => (typeof args[key] === "string" ? (args[key] as string) : undefined);
 
@@ -113,7 +139,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     title: "Members of the Bundesrat",
     description: [
       'Who sits in the Bundesrat: the members by Land and party, with head counts. Use it for "Mitglieder des Bundesrates aus Bayern", "wie viele Grüne sitzen im Bundesrat?", "who represents Saxony in the Bundesrat?".',
-      "Only the 69 full members unless includeDeputies: most records are deputies (stellvertretende Mitglieder), and counting them makes party head counts about three times too high. state is one of the 16 Länder with umlauts (Thüringen, Baden-Württemberg; case doesn't matter); party matches as contains (grüne). A Land's plenipotentiary (Bevollmächtigte:r, often the Land's representative in Berlin) who isn't a member comes only with includePlenipotentiaries. A designated successor (not yet in office) is listed apart in designated and not counted. People come a page at a time (offset, limit); nextOffset says where the next page starts.",
+      "Only the 69 full members unless includeDeputies: most records are deputies (stellvertretende Mitglieder), and counting them makes party head counts about three times too high. state is one of the 16 Länder with umlauts (Thüringen, Baden-Württemberg; case doesn't matter); party matches as contains (grüne). A Land's plenipotentiary (Bevollmächtigte:r, often the Land's representative in Berlin) who isn't a member comes only with includePlenipotentiaries. A designated successor (not yet in office) is listed apart in designated and not counted. People come a page at a time (offset, limit); nextOffset says where the next page starts. The server keeps the members feed for 5 minutes, so the next page or another filter is quick.",
       RULES,
     ].join("\n\n"),
     inputSchema: input({
@@ -131,7 +157,9 @@ export const TOOLS: readonly ToolDefinition[] = [
     source: feed(FEEDS.members),
     paged: (args) => ({ list: "people", offset: num(args, "offset") ?? 0 }),
     async run(args, context) {
-      const answer = await findMembers(context.client, { state: str(args, "state"), party: str(args, "party"), includeDeputies: args["includeDeputies"] === true, includePlenipotentiaries: args["includePlenipotentiaries"] === true });
+      const { client } = context;
+      const input = { state: str(args, "state"), party: str(args, "party"), includeDeputies: args["includeDeputies"] === true, includePlenipotentiaries: args["includePlenipotentiaries"] === true };
+      const answer = await findMembers(client, input, () => membersFeed.get(client, () => client.members()));
       if (answer.total === 0) return { status: "empty", ...answer, reason: "No member matches; try a shorter party text, or includeDeputies." };
       const offset = num(args, "offset") ?? 0;
       const people = answer.people.slice(offset, offset + (num(args, "limit") ?? 100));
