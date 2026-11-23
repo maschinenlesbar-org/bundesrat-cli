@@ -109,3 +109,13 @@ test("findMembers: a Land in another case, Unicode form or padded is taken; an u
   assert.match(wrong.content[0]?.text ?? "", /Baden-Württemberg, Bayern, Berlin/);
   await connection.close();
 });
+
+test("findMembers: a page past the end is empty and says where the matches end", async () => {
+  const connection = await connect({ transport: world });
+  const result = await connection.call("findMembers", { offset: 2 });
+  assert.equal(result.structuredContent?.["status"], "empty");
+  assert.deepEqual(result.structuredContent?.["people"], []);
+  assert.equal(result.structuredContent?.["total"], 2);
+  assert.match(String(result.structuredContent?.["reason"]), /offset 2 is past the 2 matches/);
+  await connection.close();
+});

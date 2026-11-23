@@ -129,6 +129,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       if (answer.total === 0) return { status: "empty", ...answer, reason: "No member matches; try a shorter party text, or includeDeputies." };
       const offset = num(args, "offset") ?? 0;
       const people = answer.people.slice(offset, offset + (num(args, "limit") ?? 100));
+      if (people.length === 0) return { status: "empty", ...answer, people, reason: `offset ${offset} is past the ${answer.total} matches; the people are at offsets 0 to ${answer.total - 1}.` };
       const next = offset + people.length;
       return { status: "ok", ...answer, people, ...(next < answer.total ? { nextOffset: next } : {}) };
     },
