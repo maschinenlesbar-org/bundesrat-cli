@@ -264,9 +264,10 @@ export class BundesratClient {
    * be `<iOS><list>…</list></iOS>`; an empty `<list/>` yields `{}`. Anything else —
    * another root element (an XML error envelope, an XHTML page), no `<list>`, two
    * of them, or text in place of one — throws a BundesratParseError, so a broken
-   * feed is never reported as an empty one.
+   * feed is never reported as an empty one; so does a list whose entries come under
+   * another element name than `entry`.
    */
-  private async list(path: string): Promise<XmlObject> {
+  private async list(path: string, entry: string): Promise<XmlObject> {
     const doc = await this.engine.getXmlDocument(path, RENDER_QUERY);
     const request = `GET ${this.engine.describeUrl(path, RENDER_QUERY)}`;
     if (doc.root !== "iOS" || !isObject(doc.value)) {
@@ -275,6 +276,16 @@ export class BundesratClient {
     const list = doc.value["list"];
     if (list === "") return {};
     if (!isObject(list)) throw shapeError(request, "exactly one <list> element under <iOS>");
+    // Entries under another name (a renamed <employee>, <top> or <item>) used to read as an empty
+    // feed: "no member matches", "the agenda lists no items". An element with children of its own
+    // where the entries should be is one; a plain text field at the list level (a title, an image
+    // path the client doesn't surface) is not.
+    if (list[entry] === undefined) {
+      const other = Object.keys(list).find((key) => !key.startsWith("@") && asArray<XmlValue>(list[key]).some((value) => isObject(value) && Object.keys(value).some((child) => !child.startsWith("@") && child !== "#text")));
+      if (other !== undefined) {
+        throw shapeError(request, `<${entry}> entries in <list>, got ${this.engine.quoteServerValue(`<${other}>`)} instead; the feed may have changed`);
+      }
+    }
     return list;
   }
 
@@ -287,7 +298,7 @@ export class BundesratClient {
    */
   async members(filter: MemberFilter = {}): Promise<Member[]> {
     const checked = assertMemberFilter(filter);
-    const list = await this.list(FEEDS.members);
+    const list = await this.list(FEEDS.members, "employee");
     const all = asArray<XmlValue>(list["employee"]).map((e) => pick<Member>(e, MEMBER_FIELDS));
     return filterMembers(all, checked);
   }
@@ -298,7 +309,7 @@ export class BundesratClient {
    * — *amtliche Werke* under § 5 UrhG — and links).
    */
   async session(): Promise<Session> {
-    const list = await this.list(FEEDS.session);
+    const list = await this.list(FEEDS.session, "top");
     // The same plain-text rule as every TOP field (pick): text with attributes is
     // kept; markup, a repeat or an empty value leaves the key out.
     return {
@@ -309,7 +320,7 @@ export class BundesratClient {
 
   /** Committee appointments and dates (Termine), projected to their factual fields. */
   async appointments(): Promise<Appointment[]> {
-    const list = await this.list(FEEDS.appointments);
+    const list = await this.list(FEEDS.appointments, "item");
     return asArray<XmlValue>(list["item"]).map((i) => pick<Appointment>(i, APPOINTMENT_FIELDS));
   }
 }

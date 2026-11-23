@@ -79,6 +79,11 @@ export const TOOLS: readonly ToolDefinition[] = [
     async run(_args, context) {
       const agenda = await getAgenda(context.client);
       if (agenda.tops.length === 0) return { status: "empty", ...agenda, reason: "The current agenda lists no items (between sittings it can be empty)." };
+      // Nearly every item of a sitting deals with a Drucksache: many items and none at all is the
+      // sign of a renamed <topdrucksache>, not of a sitting of procedural items.
+      if (agenda.tops.length >= 5 && agenda.drucksachen === 0) {
+        return { status: "ok", ...agenda, reason: `None of the ${agenda.tops.length} items lists a Drucksache, which nearly every item of a sitting has: the feed may have changed. Check the agenda on bundesrat.de before saying an item has none.` };
+      }
       return { status: "ok", ...agenda };
     },
   },

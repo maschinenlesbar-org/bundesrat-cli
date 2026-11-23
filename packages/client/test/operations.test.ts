@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BundesratClient, findMembers, getAgenda, isoFromGerman, listAppointments, topKey } from "../src/index.js";
+import { BundesratClient, BundesratParseError, findMembers, getAgenda, isoFromGerman, listAppointments, topKey } from "../src/index.js";
 import { makeMockTransport, xmlResponse } from "./helpers.js";
 
 const feed = (body: string): string => `<?xml version="1.0"?><iOS version="1.0"><list>${body}</list></iOS>`;
@@ -179,4 +179,16 @@ test("findMembers: the Länder's plenipotentiaries (bv only) come with includePl
   assert.deepEqual(all.people.map((p) => [p.name, p.role]), [["A", "member"], ["B", "deputy"], ["P", "plenipotentiary"]]);
   const only = await findMembers(client("mitglieder_table.xml", body), { includePlenipotentiaries: true });
   assert.deepEqual(only.people.map((p) => [p.name, p.role]), [["A", "member"], ["P", "plenipotentiary"]]);
+});
+
+test("findMembers: a feed with nobody, no full member, no party or no Land is an error (the feed changed), never 'no member matches'", async () => {
+  const e = (fields: string) => `<employee><name>A</name>${fields}</employee>`;
+  for (const [body, why] of [
+    ["", /lists nobody/],
+    [e("<party>SPD</party><state>Bayern</state><brmitglied>1</brmitglied><mitglied>1</mitglied>"), /full member/],
+    [e("<partei>SPD</partei><state>Bayern</state><brmitglied>true</brmitglied><mitglied>true</mitglied>"), /party/],
+    [e("<party>SPD</party><land>Bayern</land><brmitglied>true</brmitglied><mitglied>true</mitglied>"), /Land/],
+  ] as const) {
+    await assert.rejects(findMembers(client("mitglieder_table.xml", body)), (err: Error) => err instanceof BundesratParseError && why.test(err.message) && /the feed may have changed/.test(err.message), body);
+  }
 });

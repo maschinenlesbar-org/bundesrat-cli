@@ -388,3 +388,19 @@ test("session surfaces the feed's factual sitzung, stand and each TOP's topurl (
     },
   ]);
 });
+
+test("a feed whose entries come under another element name is a BundesratParseError, not an empty list", async () => {
+  const feeds = [
+    ["members", "<person><name>A</name><party>SPD</party></person>", "employee"],
+    ["session", "<title>1070. Sitzung</title><header>am Freitag</header><item><toptitle>TOP 1</toptitle></item>", "top"],
+    ["appointments", "<termin><title>Plenarsitzung</title></termin>", "item"],
+  ] as const;
+  for (const [feed, body, element] of feeds) {
+    const mt = makeMockTransport(() => xmlResponse(`<iOS><list>${body}</list></iOS>`));
+    const c = new BundesratClient({ transport: mt.transport });
+    await assert.rejects(c[feed](), (err: Error) => err instanceof BundesratParseError && err.message.includes(`<${element}>`) && /the feed may have changed/.test(err.message), feed);
+  }
+  // A list-level text field the client doesn't surface (an image path) is no entry: a title-only agenda stays empty.
+  const mt = makeMockTransport(() => xmlResponse("<iOS><list><title>1070. Sitzung</title><imagePath>/x.jpg</imagePath></list></iOS>"));
+  assert.deepEqual(await new BundesratClient({ transport: mt.transport }).session(), { title: "1070. Sitzung", tops: [] });
+});

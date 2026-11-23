@@ -147,3 +147,17 @@ test("findMembers: a Land's plenipotentiary who isn't a member comes with includ
   assert.deepEqual((answer["people"] as { name: string; role: string }[]).map((p) => [p.name, p.role]), [["Markus Söder", "member"], ["Paula Bevollmächtigte", "plenipotentiary"]]);
   await connection.close();
 });
+
+test("a feed that changed its shape is a tool error, not 'no member matches'; an agenda whose items list no Drucksache says the feed may have changed", async () => {
+  const flags = await connect({ transport: bundesrat({ members: [{ name: "A", party: "SPD", state: "Bayern", brmitglied: "1", mitglied: "1" }] }) });
+  const members = await flags.call("findMembers", {});
+  assert.equal(members.isError, true);
+  assert.match(members.content[0]?.text ?? "", /no record as a full member.*the feed may have changed/);
+  await flags.close();
+  const tops = Array.from({ length: 6 }, (_, i) => ({ toptitle: `TOP ${i + 1}`, topheader: "Gesetz", topdrs: `Drucksache ${i}/26` }));
+  const renamed = await connect({ transport: bundesrat({ session: { fields: { title: "1070. Sitzung" }, tops } }) });
+  const agenda = (await renamed.call("getAgenda", {})).structuredContent ?? {};
+  assert.equal(agenda["drucksachen"], 0);
+  assert.match(String(agenda["reason"]), /None of the 6 items lists a Drucksache.*the feed may have changed/);
+  await renamed.close();
+});

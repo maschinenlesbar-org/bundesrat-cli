@@ -41,7 +41,12 @@ comment, and an XHTML `<html>` root) and throws a `BundesratParseError` with a
 plain-language message rather than a cryptic parse failure. Any other XML that is not
 `<iOS>` with exactly one `<list>` (an XML error envelope, a bare `<list>`, no `<list>`)
 is a `BundesratParseError` too ("GET <url>: unexpected response shape: expected …"),
-so a broken feed never reads as an empty one; a real empty feed is `<iOS><list/></iOS>`. The upstream
+so a broken feed never reads as an empty one; a real empty feed is `<iOS><list/></iOS>`. So is a
+list whose entries come under another name (`<person>` where `<employee>` belongs, `<item>` for
+`<top>`): "expected <employee> entries in <list>, … the feed may have changed". `findMembers` also
+refuses a members feed with nobody, no full member (`mitglied` written `1`), no party or no Land on
+any record: the Bundesrat always has its 69 members. The MCP tool `getAgenda` says in its `reason`
+when five or more items list no Drucksache at all (a renamed `<topdrucksache>`). The upstream
 [bund.dev spec](https://bundesrat.api.bund.dev) documents the paths but the render
 parameter is easy to miss — this was confirmed by probing the live endpoints.
 

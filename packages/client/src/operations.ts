@@ -7,7 +7,8 @@
 // - findMembers: the members by Land and party, full members unless deputies or the Länder's
 //   plenipotentiaries are asked for (bundesrat-members).
 
-import type { BundesratClient } from "./client.js";
+import { filterMembers, type BundesratClient } from "./client.js";
+import { BundesratParseError } from "./errors.js";
 import type { AgendaItem, Member } from "./types.js";
 
 /** One agenda item, with its Drucksachen one by one. */
@@ -280,6 +281,26 @@ function person(m: Member): Person {
 }
 
 /**
+ * The members feed as it always is: someone in it, full members among them (`mitglied` "true"), a
+ * party and a Land on the records. The Bundesrat always has its 69 members, so a feed without them
+ * has changed (an element renamed, the flags written 1/0), and a filter over it would answer "no
+ * member matches", which is false: a BundesratParseError says what is missing instead.
+ */
+function assertMemberFeed(records: readonly Member[]): void {
+  const missing =
+    records.length === 0
+      ? "lists nobody"
+      : !records.some((m) => m.mitglied === "true")
+        ? 'marks no record as a full member (<mitglied>true</mitglied>)'
+        : !records.some((m) => m.party !== undefined)
+          ? "gives no record a party (<party>)"
+          : !records.some((m) => m.state !== undefined)
+            ? "gives no record a Land (<state>)"
+            : undefined;
+  if (missing !== undefined) throw new BundesratParseError(`The Bundesrat's members feed ${missing}; the feed may have changed.`);
+}
+
+/**
  * The members of the Bundesrat, filtered by Land (exact, one of the sixteen) and party (contains).
  * Full members only (`mitglied`), unless `includeDeputies`: the feed's records are mostly deputies,
  * so counting all of them gives party head counts about three times too high. The Länder's
@@ -292,7 +313,11 @@ export async function findMembers(
   client: BundesratClient,
   input: { state?: string | undefined; party?: string | undefined; includeDeputies?: boolean | undefined; includePlenipotentiaries?: boolean | undefined } = {},
 ): Promise<Members> {
-  const records = await client.members({ ...(input.state === undefined ? {} : { state: input.state }), ...(input.party === undefined ? {} : { party: input.party }) });
+  const filter = { ...(input.state === undefined ? {} : { state: input.state }), ...(input.party === undefined ? {} : { party: input.party }) };
+  filterMembers([], filter); // checks the filter before any request
+  const all = await client.members();
+  assertMemberFeed(all);
+  const records = filterMembers(all, filter);
   // The same record twice (the feed has repeated one) is one person.
   const seen = new Set<string>();
   const unique = records.filter((m) => {
