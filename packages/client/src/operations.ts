@@ -110,6 +110,10 @@ export interface Meeting {
   /** ISO local time ("2026-09-25T09:30" or a date "2026-09-22"), German time. */
   start?: string;
   end?: string;
+  /** The feed's start text when it isn't a date this library reads (no `start` then). */
+  startText?: string;
+  /** The feed's end text when it isn't a date this library reads, or is before the start (no `end` then). */
+  endText?: string;
   /** The title says the meeting doesn't take place ("entfällt", "abgesagt", …; see {@link isCancelled}), e.g. replaced by a written poll. */
   cancelled: boolean;
   url?: string;
@@ -117,23 +121,63 @@ export interface Meeting {
 
 /** The answer of {@link listAppointments}. */
 export interface Appointments {
+  /** Every date in the feed. */
   total: number;
+  /** How many of them are cancelled. */
   cancelled: number;
+  /** How many are over (ended, or started without an end, before today in Germany): never listed. */
+  past: number;
+  /** How many have a start or end that isn't a date this library reads (kept as `startText`/`endText`). */
+  unreadable: number;
   /** Sorted by start; those without a readable start last. */
   meetings: Meeting[];
 }
 
+const pad = (n: number): string => String(n).padStart(2, "0");
+
+/** The date and time in Germany at `instant`, as "YYYY-MM-DDTHH:MM". */
+function germanTime(instant: Date): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(instant)
+      .map((part) => [part.type, part.value]),
+  );
+  return `${parts["year"]}-${parts["month"]}-${parts["day"]}T${parts["hour"]}:${parts["minute"]}`;
+}
+
+/** Today's date in Germany ("YYYY-MM-DD"). */
+export function germanToday(now: Date = new Date()): string {
+  return germanTime(now).slice(0, 10);
+}
+
+/** True when the day exists (31.02. doesn't) and the time is one of a day. */
+function possible(y: number, m: number, d: number, hh = 0, mm = 0, ss = 0): boolean {
+  const day = new Date(Date.UTC(y, m - 1, d));
+  return day.getUTCFullYear() === y && day.getUTCMonth() === m - 1 && day.getUTCDate() === d && hh < 24 && mm < 60 && ss < 60;
+}
+
 /**
- * A feed date as ISO local time: "25.09.2026 09:30" or "22.09.2026" (the feed's usual German form)
- * and "2026-09-25 09:30" become "2026-09-25T09:30" or "2026-09-22"; anything else undefined.
+ * A feed date as ISO local German time: "25.09.2026 09:30" or "22.09.2026" (the feed's usual
+ * German form) and "2026-09-25 09:30" become "2026-09-25T09:30" or "2026-09-22"; seconds are kept
+ * when they aren't :00; an ISO time with a zone ("…T09:30:00+02:00", "…Z") is given as the time in
+ * Germany. An impossible date or time (31.02., 25:99) and anything else give undefined.
  */
 export function isoFromGerman(value: string | undefined): string | undefined {
   const text = (value ?? "").trim();
-  const german = text.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
-  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2}))?$/);
+  const time = "(?:[ T](\\d{1,2}):(\\d{2})(?::(\\d{2}))?)?";
+  const german = new RegExp(`^(\\d{2})\\.(\\d{2})\\.(\\d{4})${time}$`).exec(text);
+  const iso = new RegExp(`^(\\d{4})-(\\d{2})-(\\d{2})${time}(Z|[+-]\\d{2}:\\d{2})?$`).exec(text);
   if (german === null && iso === null) return undefined;
-  const [y, m, d, hh, mm] = german !== null ? [german[3], german[2], german[1], german[4], german[5]] : [iso?.[1], iso?.[2], iso?.[3], iso?.[4], iso?.[5]];
-  return hh === undefined ? `${y}-${m}-${d}` : `${y}-${m}-${d}T${hh.padStart(2, "0")}:${mm}`;
+  const [y, m, d, hh, mm, ss] = german !== null ? [german[3], german[2], german[1], german[4], german[5], german[6]] : [iso?.[1], iso?.[2], iso?.[3], iso?.[4], iso?.[5], iso?.[6]];
+  const zone = iso?.[7];
+  if (!possible(Number(y), Number(m), Number(d), Number(hh ?? 0), Number(mm ?? 0), Number(ss ?? 0))) return undefined;
+  if (zone !== undefined) {
+    if (hh === undefined) return undefined;
+    const local = germanTime(new Date(`${y}-${m}-${d}T${pad(Number(hh))}:${mm}:${ss ?? "00"}${zone}`));
+    return ss === undefined || ss === "00" ? local : `${local}:${ss}`;
+  }
+  if (hh === undefined) return `${y}-${m}-${d}`;
+  return `${y}-${m}-${d}T${pad(Number(hh))}:${mm}${ss === undefined || ss === "00" ? "" : `:${ss}`}`;
 }
 
 /**
@@ -146,17 +190,54 @@ export function isCancelled(title: string): boolean {
   return /(?:^|[^\p{L}])(?:entf[äa]llt|entfallen|abgesagt|fällt\s+aus|findet\s+nicht\s+statt)(?![\p{L}])(?!\s+nicht(?![\p{L}]))/u.test(text);
 }
 
-/** The committee dates, sorted by start, cancelled ones marked rather than listed as meetings. */
-export async function listAppointments(client: BundesratClient, input: { includeCancelled?: boolean | undefined } = {}): Promise<Appointments> {
+/** True when ISO time `a` is before `b`: by the minute when both have a time, else by the day. */
+function before(a: string, b: string): boolean {
+  return a.length > 10 && b.length > 10 ? a < b : a.slice(0, 10) < b.slice(0, 10);
+}
+
+/**
+ * The committee dates, sorted by start, cancelled ones marked rather than listed as meetings.
+ * Dates already over (their end, else their start, before today in Germany: `now`, default the
+ * clock) are left out and counted: the feed lists upcoming dates, and an old one left in it is
+ * not one. A start or end that isn't a readable date keeps the feed's text (`startText`,
+ * `endText`) and is counted (`unreadable`): a feed that changes its date form shows, rather than
+ * every meeting silently losing its time. An end before its start is not an end.
+ */
+export async function listAppointments(client: BundesratClient, input: { includeCancelled?: boolean | undefined; now?: Date | undefined } = {}): Promise<Appointments> {
+  const today = germanToday(input.now);
+  let unreadable = 0;
   const all = (await client.appointments()).map((a): Meeting => {
     const start = isoFromGerman(a.startdate);
-    const end = isoFromGerman(a.stopdate);
+    const read = isoFromGerman(a.stopdate);
+    const end = read !== undefined && start !== undefined && before(read, start) ? undefined : read;
+    const startText = start === undefined && a.startdate ? a.startdate.trim() : undefined;
+    const endText = end === undefined && a.stopdate ? a.stopdate.trim() : undefined;
+    if (startText !== undefined || endText !== undefined) unreadable++;
     const title = (a.title ?? "").trim();
-    return { title, ...(start ? { start } : {}), ...(end ? { end } : {}), cancelled: isCancelled(title), ...(a.url ? { url: a.url } : {}) };
+    return {
+      title,
+      ...(start ? { start } : {}),
+      ...(end ? { end } : {}),
+      ...(startText ? { startText } : {}),
+      ...(endText ? { endText } : {}),
+      cancelled: isCancelled(title),
+      ...(a.url ? { url: a.url } : {}),
+    };
   });
-  const sorted = [...all].sort((a, b) => (a.start === undefined ? 1 : b.start === undefined ? -1 : a.start.localeCompare(b.start)));
+  const over = (m: Meeting): boolean => {
+    const last = m.end ?? m.start;
+    return last !== undefined && last.slice(0, 10) < today;
+  };
+  const current = all.filter((m) => !over(m));
+  const sorted = [...current].sort((a, b) => (a.start === undefined ? 1 : b.start === undefined ? -1 : a.start.localeCompare(b.start)));
   const cancelled = all.filter((m) => m.cancelled).length;
-  return { total: all.length, cancelled, meetings: input.includeCancelled === true ? sorted : sorted.filter((m) => !m.cancelled) };
+  return {
+    total: all.length,
+    cancelled,
+    past: all.length - current.length,
+    unreadable,
+    meetings: input.includeCancelled === true ? sorted : sorted.filter((m) => !m.cancelled),
+  };
 }
 
 /** One person of the Bundesrat. */

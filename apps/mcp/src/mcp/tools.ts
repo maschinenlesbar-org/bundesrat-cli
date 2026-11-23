@@ -87,16 +87,20 @@ export const TOOLS: readonly ToolDefinition[] = [
     title: "The Bundesrat's committee dates",
     description: [
       'Upcoming dates of the Bundesrat and its committees, sorted by start. Use it for "wann tagt der Finanzausschuss?", "Termine des Bundesrates", "when does the Bundesrat meet next?".',
-      "Times are ISO local German time. A date whose title says it doesn't take place (entfällt, often replaced by a written poll; abgesagt, fällt aus; not \"entfällt nicht\") is left out unless includeCancelled; the count of those is always given.",
+      "Times are ISO local German time. Dates already over are left out (past counts them). A start or end the server can't read as a date stays as the feed's text (startText, endText; unreadable counts them) and sorts last. A date whose title says it doesn't take place (entfällt, often replaced by a written poll; abgesagt, fällt aus; not \"entfällt nicht\") is left out unless includeCancelled; the count of those is always given.",
       RULES,
     ].join("\n\n"),
     inputSchema: input({ includeCancelled: { type: "boolean", description: "Also list the dates that are cancelled (default false)." } }),
-    outputSchema: output({ total: int, cancelled: int, meetings: arr }),
+    outputSchema: output({ total: int, cancelled: int, past: int, unreadable: int, meetings: arr }),
     source: feed(FEEDS.appointments),
     async run(args, context) {
       const answer = await listAppointments(context.client, { includeCancelled: args["includeCancelled"] === true });
-      if (answer.meetings.length === 0) return { status: "empty", ...answer, reason: answer.total === 0 ? "The feed lists no dates." : "Every listed date is cancelled; ask with includeCancelled." };
-      return { status: "ok", ...answer };
+      const unreadable = answer.unreadable === 0 ? "" : ` ${answer.unreadable} date${answer.unreadable === 1 ? " has a start or end" : "s have starts or ends"} in a form this server doesn't read: the feed's text is in startText or endText (the feed may have changed its date form).`;
+      if (answer.meetings.length === 0) {
+        const why = answer.total === 0 ? "The feed lists no dates." : answer.past === answer.total ? "Every listed date is over." : "Every listed date is cancelled or over; ask with includeCancelled for the cancelled ones.";
+        return { status: "empty", ...answer, reason: `${why}${unreadable}` };
+      }
+      return { status: "ok", ...answer, ...(unreadable === "" ? {} : { reason: unreadable.trim() }) };
     },
   },
   {

@@ -6,6 +6,8 @@ import { BundesratClient, findMembers, getAgenda, isoFromGerman, listAppointment
 import { makeMockTransport, xmlResponse } from "./helpers.js";
 
 const feed = (body: string): string => `<?xml version="1.0"?><iOS version="1.0"><list>${body}</list></iOS>`;
+/** "Today" for the date tests: 1 September 2026, noon in Germany. */
+const SEPTEMBER = new Date("2026-09-01T10:00:00Z");
 const client = (path: string, body: string) =>
   new BundesratClient({ transport: makeMockTransport((request) => (new URL(request.url).pathname.endsWith(path) ? xmlResponse(feed(body)) : xmlResponse(feed("")))).transport });
 
@@ -79,11 +81,11 @@ test("listAppointments: German dates sort as dates, cancelled ones (entfällt) a
     "<item><title>Plenarsitzung</title><startdate>25.09.2026 09:30</startdate></item>" +
     "<item><title>Ausschuss</title><startdate>03.10.2026 9:00</startdate><stopdate>03.10.2026 12:00</stopdate></item>" +
     "<item><title>Ohne Datum</title></item>";
-  const answer = await listAppointments(client("termine_table.xml", body));
+  const answer = await listAppointments(client("termine_table.xml", body), { now: SEPTEMBER });
   assert.deepEqual(answer.meetings.map((m) => [m.title, m.start ?? null]), [["Plenarsitzung", "2026-09-25T09:30"], ["Ausschuss", "2026-10-03T09:00"], ["Ohne Datum", null]]);
   assert.equal(answer.cancelled, 1);
   assert.equal(answer.meetings[1]?.end, "2026-10-03T12:00");
-  const all = await listAppointments(client("termine_table.xml", body), { includeCancelled: true });
+  const all = await listAppointments(client("termine_table.xml", body), { includeCancelled: true, now: SEPTEMBER });
   assert.equal(all.meetings[0]?.cancelled, true);
 });
 
@@ -108,6 +110,42 @@ test("isoFromGerman reads both date forms and refuses others", () => {
   assert.equal(isoFromGerman("22.09.2026"), "2026-09-22");
   assert.equal(isoFromGerman("2026-07-15 14:00"), "2026-07-15T14:00");
   assert.equal(isoFromGerman("bald"), undefined);
+});
+
+test("isoFromGerman refuses impossible dates and times, reads seconds and a time zone (as German time)", () => {
+  assert.equal(isoFromGerman("31.02.2026 10:00"), undefined);
+  assert.equal(isoFromGerman("01.10.2026 25:99"), undefined);
+  assert.equal(isoFromGerman("29.02.2028"), "2028-02-29");
+  assert.equal(isoFromGerman("29.02.2026"), undefined);
+  assert.equal(isoFromGerman("02.10.2026 09:30:00"), "2026-10-02T09:30");
+  assert.equal(isoFromGerman("02.10.2026 09:30:15"), "2026-10-02T09:30:15");
+  assert.equal(isoFromGerman("2026-10-03T09:30:00+02:00"), "2026-10-03T09:30");
+  assert.equal(isoFromGerman("2026-10-03T07:30:00Z"), "2026-10-03T09:30");
+  assert.equal(isoFromGerman("2026-12-03T09:30:00+01:00"), "2026-12-03T09:30");
+});
+
+test("listAppointments: a date it can't read keeps its text and is counted; an end before its start is no end; dates already over are left out and counted", async () => {
+  const body =
+    "<item><title>Zukunft</title><startdate>03.10.2026 9:00</startdate></item>" +
+    "<item><title>Unmöglich</title><startdate>31.02.2026 10:00</startdate></item>" +
+    "<item><title>Rückwärts</title><startdate>25.09.2026 09:30</startdate><stopdate>24.09.2026 12:00</stopdate></item>" +
+    "<item><title>Vorbei</title><startdate>01.01.2020</startdate></item>" +
+    "<item><title>Läuft noch</title><startdate>30.08.2026</startdate><stopdate>02.09.2026</stopdate></item>" +
+    "<item><title>Heute früh</title><startdate>01.09.2026 08:00</startdate></item>";
+  const answer = await listAppointments(client("termine_table.xml", body), { now: SEPTEMBER });
+  assert.deepEqual(
+    answer.meetings.map((m) => [m.title, m.start ?? null, m.end ?? null, m.startText ?? null, m.endText ?? null]),
+    [
+      ["Läuft noch", "2026-08-30", "2026-09-02", null, null],
+      ["Heute früh", "2026-09-01T08:00", null, null, null],
+      ["Rückwärts", "2026-09-25T09:30", null, null, "24.09.2026 12:00"],
+      ["Zukunft", "2026-10-03T09:00", null, null, null],
+      ["Unmöglich", null, null, "31.02.2026 10:00", null],
+    ],
+  );
+  assert.equal(answer.total, 6);
+  assert.equal(answer.past, 1);
+  assert.equal(answer.unreadable, 2);
 });
 
 test("findMembers counts full members only unless deputies are asked for (records are mostly deputies)", async () => {

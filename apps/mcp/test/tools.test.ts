@@ -20,8 +20,8 @@ const world = bundesrat({
     { firstname: "Cem", name: "Özdemir", party: "BÜNDNIS 90/DIE GRÜNEN", state: "Baden-Württemberg", brmitglied: "true", mitglied: "true" },
   ],
   appointments: [
-    { title: "Finanzausschuss entfällt", startdate: "20.11.2026" },
-    { title: "Plenarsitzung", startdate: "27.11.2026 09:30" },
+    { title: "Finanzausschuss entfällt", startdate: "20.11.2099" },
+    { title: "Plenarsitzung", startdate: "27.11.2099 09:30" },
   ],
 });
 
@@ -54,7 +54,7 @@ test("findMembers: full members only by default; a state is one of the 16 Lände
 test("listAppointments: cancelled dates are counted and left out", async () => {
   const connection = await connect({ transport: world });
   const result = await connection.call("listAppointments", {});
-  assert.deepEqual((result.structuredContent?.["meetings"] as { title: string; start: string }[]).map((m) => [m.title, m.start]), [["Plenarsitzung", "2026-11-27T09:30"]]);
+  assert.deepEqual((result.structuredContent?.["meetings"] as { title: string; start: string }[]).map((m) => [m.title, m.start]), [["Plenarsitzung", "2099-11-27T09:30"]]);
   assert.equal(result.structuredContent?.["cancelled"], 1);
   await connection.close();
 });
@@ -70,5 +70,27 @@ test("source is the feed's URL as the request asked for it, with ?view=renderXml
     assert.equal(result.structuredContent?.["source"], `https://www.bundesrat.de/${path}?view=renderXml`, tool);
     assert.ok(world.calls.some((r) => r.url === result.structuredContent?.["source"]), `${tool}: the source is the URL requested`);
   }
+  await connection.close();
+});
+
+test("listAppointments: dates already over are left out and counted; a date it can't read keeps its text, and the reason says so", async () => {
+  const feed = bundesrat({
+    appointments: [
+      { title: "Vorbei", startdate: "01.01.2020" },
+      { title: "Plenarsitzung", startdate: "2099-10-02T09:30:00.000+02:00" },
+      { title: "Ausschuss", startdate: "02.10.2099 09:30" },
+    ],
+  });
+  const connection = await connect({ transport: feed });
+  const answer = (await connection.call("listAppointments", {})).structuredContent ?? {};
+  assert.deepEqual((answer["meetings"] as { title: string; start?: string; startText?: string }[]).map((m) => [m.title, m.start ?? m.startText]), [["Ausschuss", "2099-10-02T09:30"], ["Plenarsitzung", "2099-10-02T09:30:00.000+02:00"]]);
+  assert.equal(answer["past"], 1);
+  assert.equal(answer["unreadable"], 1);
+  assert.match(String(answer["reason"]), /1 date .*startText/);
+  const over = await connect({ transport: bundesrat({ appointments: [{ title: "Vorbei", startdate: "01.01.2020" }] }) });
+  const empty = (await over.call("listAppointments", {})).structuredContent ?? {};
+  assert.equal(empty["status"], "empty");
+  assert.match(String(empty["reason"]), /over/);
+  await over.close();
   await connection.close();
 });

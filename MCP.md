@@ -65,7 +65,7 @@ For scripts and shared configs, pin a release and its digest from the
 | Tool | What it answers |
 |---|---|
 | `getAgenda` | The current plenary sitting's agenda in TOP order, each item with its Drucksachen; whether it is still a draft. |
-| `listAppointments` | The Bundesrat's and its committees' dates, sorted, as ISO times; cancelled dates counted and left out. |
+| `listAppointments` | The Bundesrat's and its committees' upcoming dates, sorted, as ISO times (impossible dates refused, a time zone read as German time); cancelled and past dates counted and left out, a date it can't read kept as the feed's text. |
 | `findMembers` | The members by Land and party with head counts; full members only unless deputies are asked for. |
 
 Every tool only reads. An answer is JSON (`structuredContent` and the same as text), with the
