@@ -254,12 +254,14 @@ export interface Person {
 
 /** The answer of {@link findMembers}. */
 export interface Members {
-  /** How many match (after the role filter). */
+  /** How many match (after the role filter), designated people not among them. */
   total: number;
   /** Head count per party and per Land of the matches. */
   byParty: Record<string, number>;
   byState: Record<string, number>;
   people: Person[];
+  /** Designated people who match (not yet in office: a successor, who would be counted twice), apart. */
+  designated: Person[];
 }
 
 function person(m: Member): Person {
@@ -277,19 +279,28 @@ function person(m: Member): Person {
 /**
  * The members of the Bundesrat, filtered by Land (exact, one of the sixteen) and party (contains).
  * Full members only (`mitglied`), unless `includeDeputies`: the feed's records are mostly deputies,
- * so counting all of them gives party head counts about three times too high.
+ * so counting all of them gives party head counts about three times too high. A designated person
+ * (not yet in office) is listed apart in `designated` and not counted, and a record the feed repeats
+ * counts once, so the full members are never more than the 69 seats.
  */
 export async function findMembers(
   client: BundesratClient,
   input: { state?: string | undefined; party?: string | undefined; includeDeputies?: boolean | undefined } = {},
 ): Promise<Members> {
   const records = await client.members({ ...(input.state === undefined ? {} : { state: input.state }), ...(input.party === undefined ? {} : { party: input.party }) });
-  const people = records.filter((m) => m.brmitglied === "true" || m.mitglied === "true").map(person).filter((p) => input.includeDeputies === true || p.role === "member");
+  // The same record twice (the feed has repeated one) is one person.
+  const seen = new Set<string>();
+  const unique = records.filter((m) => {
+    const key = JSON.stringify(Object.entries(m).sort(([a], [b]) => a.localeCompare(b)));
+    return seen.has(key) ? false : (seen.add(key), true);
+  });
+  const matches = unique.filter((m) => m.brmitglied === "true" || m.mitglied === "true").map(person).filter((p) => input.includeDeputies === true || p.role === "member");
+  const people = matches.filter((p) => !p.designated);
   const count = (key: "party" | "state"): Record<string, number> =>
     people.reduce<Record<string, number>>((acc, p) => {
       const k = p[key] ?? "(none)";
       acc[k] = (acc[k] ?? 0) + 1;
       return acc;
     }, {});
-  return { total: people.length, byParty: count("party"), byState: count("state"), people };
+  return { total: people.length, byParty: count("party"), byState: count("state"), people, designated: matches.filter((p) => p.designated) };
 }

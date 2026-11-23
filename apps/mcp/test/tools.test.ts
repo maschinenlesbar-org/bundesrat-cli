@@ -119,3 +119,17 @@ test("findMembers: a page past the end is empty and says where the matches end",
   assert.match(String(result.structuredContent?.["reason"]), /offset 2 is past the 2 matches/);
   await connection.close();
 });
+
+test("findMembers: a designated successor comes apart and isn't counted", async () => {
+  const feed = bundesrat({
+    members: [
+      { firstname: "Markus", name: "Söder", party: "CSU", state: "Bayern", brmitglied: "true", mitglied: "true" },
+      { firstname: "Neue", name: "Nachfolgerin", party: "CSU", state: "Bayern", brmitglied: "true", mitglied: "true", designiert: "true" },
+    ],
+  });
+  const connection = await connect({ transport: feed });
+  const answer = (await connection.call("findMembers", {})).structuredContent ?? {};
+  assert.equal(answer["total"], 1);
+  assert.deepEqual((answer["designated"] as { name: string }[]).map((p) => p.name), ["Neue Nachfolgerin"]);
+  await connection.close();
+});

@@ -108,7 +108,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     title: "Members of the Bundesrat",
     description: [
       'Who sits in the Bundesrat: the members by Land and party, with head counts. Use it for "Mitglieder des Bundesrates aus Bayern", "wie viele Grüne sitzen im Bundesrat?", "who represents Saxony in the Bundesrat?".',
-      "Only the 69 full members unless includeDeputies: most records are deputies (stellvertretende Mitglieder), and counting them makes party head counts about three times too high. state is one of the 16 Länder with umlauts (Thüringen, Baden-Württemberg; case doesn't matter); party matches as contains (grüne). People come a page at a time (offset, limit); nextOffset says where the next page starts.",
+      "Only the 69 full members unless includeDeputies: most records are deputies (stellvertretende Mitglieder), and counting them makes party head counts about three times too high. state is one of the 16 Länder with umlauts (Thüringen, Baden-Württemberg; case doesn't matter); party matches as contains (grüne). A designated successor (not yet in office) is listed apart in designated and not counted. People come a page at a time (offset, limit); nextOffset says where the next page starts.",
       RULES,
     ].join("\n\n"),
     inputSchema: input({
@@ -121,7 +121,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       offset: { type: "integer", minimum: 0, maximum: 10_000, description: "Where the page of people starts (default 0)." },
       limit: { type: "integer", minimum: 1, maximum: 100, description: "How many people to list (1-100, default 100); the counts always cover all matches." },
     }),
-    outputSchema: output({ total: int, byParty: obj, byState: obj, people: arr, nextOffset: int }),
+    outputSchema: output({ total: int, byParty: obj, byState: obj, people: arr, designated: arr, nextOffset: int }),
     source: feed(FEEDS.members),
     paged: (args) => ({ list: "people", offset: num(args, "offset") ?? 0 }),
     async run(args, context) {

@@ -157,3 +157,13 @@ test("findMembers counts full members only unless deputies are asked for (record
   const all = await findMembers(client("mitglieder_table.xml", body), { includeDeputies: true });
   assert.deepEqual(all.people.map((p) => [p.name, p.role]), [["A", "member"], ["B", "deputy"], ["C", "deputy"]]);
 });
+
+test("findMembers: a designated successor is listed apart, not counted; the same record twice counts once", async () => {
+  const m = (name: string, extra = "") => `<employee><name>${name}</name><party>CSU</party><state>Bayern</state><brmitglied>true</brmitglied><mitglied>true</mitglied>${extra}</employee>`;
+  const body = m("A") + m("B") + m("A") + m("C", "<designiert>true</designiert>");
+  const members = await findMembers(client("mitglieder_table.xml", body));
+  assert.equal(members.total, 2);
+  assert.deepEqual(members.people.map((p) => p.name), ["A", "B"]);
+  assert.deepEqual(members.byParty, { CSU: 2 });
+  assert.deepEqual(members.designated.map((p) => [p.name, p.designated]), [["C", true]]);
+});
