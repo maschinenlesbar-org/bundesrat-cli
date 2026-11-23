@@ -36,9 +36,17 @@ export interface Agenda {
   drucksachen: number;
 }
 
-/** Sort key of a TOP title: [number (-1 without one), letter suffix]. */
+/**
+ * Sort key of a TOP title: [number (-1 without one), letter suffix]. The number is the first one
+ * after "TOP", the letter one standing right after it ("TOP 2b", "TOP 1 a", "TOP 10a-c"), so an
+ * addition after them ("TOP 3 (neu)", "TOP 11 - neu -", "TOP 12/13", "TOP 7 und 8") doesn't move
+ * the item; a title without "TOP" is read the same way from its start.
+ */
 export function topKey(title: string | undefined): [number, string] {
-  const match = (title ?? "").trim().match(/(\d*)\s*([a-z]*)$/i);
+  const text = (title ?? "").trim();
+  const after = /\bTOP\b/i.exec(text);
+  const rest = after === null ? text : text.slice(after.index + after[0].length);
+  const match = /^\s*(\d*)\s*(?:([a-z])(?![\p{L}]))?/iu.exec(rest);
   const number = match?.[1] ? Number(match[1]) : -1;
   return [number, (match?.[2] ?? "").toLowerCase()];
 }

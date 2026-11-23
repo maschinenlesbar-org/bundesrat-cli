@@ -34,6 +34,23 @@ test("topKey reads the number and the letter", () => {
   assert.deepEqual(topKey("TOP a"), [-1, "a"]);
 });
 
+test("topKey reads the TOP's own number when more follows it: (neu), a range of letters, a second TOP", () => {
+  assert.deepEqual(topKey("TOP 3 (neu)"), [3, ""]);
+  assert.deepEqual(topKey("TOP 11 - neu -"), [11, ""]);
+  assert.deepEqual(topKey("TOP 10a-c"), [10, "a"]);
+  assert.deepEqual(topKey("TOP 12/13"), [12, ""]);
+  assert.deepEqual(topKey("TOP 7 und 8"), [7, ""]);
+  assert.deepEqual(topKey("Zu TOP 3"), [3, ""]);
+  assert.deepEqual(topKey("TOP 1 a"), [1, "a"]);
+  assert.deepEqual(topKey("TOP"), [-1, ""]);
+});
+
+test("getAgenda sorts TOP titles with additions by their numbers, not before TOP 1", async () => {
+  const body = ["TOP 11 - neu -", "TOP 3 (neu)", "TOP 1", "TOP 10a-c", "TOP 2", "TOP a"].map((t) => `<top><toptitle>${t}</toptitle></top>`).join("");
+  const agenda = await getAgenda(client("plenum_aktuelleSitzung_table.xml", body));
+  assert.deepEqual(agenda.tops.map((t) => t.top), ["TOP a", "TOP 1", "TOP 2", "TOP 3 (neu)", "TOP 10a-c", "TOP 11 - neu -"]);
+});
+
 test("listAppointments: German dates sort as dates, cancelled ones (entfällt) are counted and left out", async () => {
   const body =
     "<item><title>Sitzung des Finanzausschusses entfällt / Umfrageverfahren</title><startdate>20.09.2026</startdate></item>" +
