@@ -205,3 +205,25 @@ test("a request that times out, a reset or a 5xx ends in a tool error that says 
     await connection.close();
   }
 });
+
+test("getAgenda: a long agenda comes a page at a time; total and drucksachen count the whole sitting", async () => {
+  const tops = Array.from({ length: 154 }, (_, i) => ({ toptitle: `TOP ${i + 1}`, topheader: `Gesetz zur Änderung des ${i + 1}. Gesetzes über einen langen Titel`, topdrucksache: `Drucksache ${i + 1}/26` }));
+  const connection = await connect({ transport: bundesrat({ session: { fields: { title: "1070. Sitzung" }, tops } }), config: { maxResultChars: 8000 } });
+  const seen: string[] = [];
+  let offset: number | undefined = 0;
+  for (let calls = 0; offset !== undefined && calls < 40; calls++) {
+    const answer: Record<string, unknown> = (await connection.call("getAgenda", { offset })).structuredContent ?? {};
+    assert.equal(answer["total"], 154);
+    assert.equal(answer["drucksachen"], 154);
+    seen.push(...(answer["tops"] as { top: string }[]).map((t) => t.top));
+    offset = answer["nextOffset"] as number | undefined;
+  }
+  assert.deepEqual(seen, tops.map((t) => t.toptitle));
+  const page = (await connection.call("getAgenda", { offset: 10, limit: 5 })).structuredContent ?? {};
+  assert.deepEqual((page["tops"] as { top: string }[]).map((t) => t.top), ["TOP 11", "TOP 12", "TOP 13", "TOP 14", "TOP 15"]);
+  assert.equal(page["nextOffset"], 15);
+  const past = (await connection.call("getAgenda", { offset: 154 })).structuredContent ?? {};
+  assert.equal(past["status"], "empty");
+  assert.match(String(past["reason"]), /offset 154 is past the 154 items/);
+  await connection.close();
+});

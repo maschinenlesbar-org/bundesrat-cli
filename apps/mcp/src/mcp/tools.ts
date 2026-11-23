@@ -123,19 +123,29 @@ export const TOOLS: readonly ToolDefinition[] = [
     title: "The agenda of the current Bundesrat sitting",
     description: [
       'What the Bundesrat deals with in its current or next plenary sitting: the agenda items (TOPs) in order, each with its Drucksachen. Use it for "Tagesordnung des Bundesrates", "was berät der Bundesrat am Freitag?", "which bills are on the Bundesrat agenda?", "Drucksachen der nächsten Sitzung".',
-      "The items come sorted by TOP number and letter (the feed lists them out of order); an item without a number (TOP a) comes first. An item can cover several Drucksachen; a procedural one has none. draft: true means the agenda is still a draft (Tagesordnung Entwurf). Between sittings the agenda can be sparse.",
+      "The items come sorted by TOP number and letter (the feed lists them out of order); an item without a number (TOP a) comes first. An item can cover several Drucksachen; a procedural one has none. draft: true means the agenda is still a draft (Tagesordnung Entwurf). Between sittings the agenda can be sparse. Items come a page at a time (offset, limit); nextOffset says where the next page starts; total (items) and drucksachen always count the whole sitting.",
       RULES,
     ].join("\n\n"),
-    inputSchema: input({}),
-    outputSchema: output({ title: str_, sitting: str_, when: str_, asOf: str_, draft: bool, tops: arr, drucksachen: int }),
+    inputSchema: input({
+      offset: { type: "integer", minimum: 0, maximum: 1000, description: "Where the page of items starts (default 0)." },
+      limit: { type: "integer", minimum: 1, maximum: 200, description: "How many items to list (1-200, default 200); total and drucksachen always count the whole sitting." },
+    }),
+    outputSchema: output({ title: str_, sitting: str_, when: str_, asOf: str_, draft: bool, total: int, drucksachen: int, tops: arr, nextOffset: int }),
     source: feed(FEEDS.session),
-    run: advised(async (_args, context) => {
-      const agenda = await getAgenda(context.client);
-      if (agenda.tops.length === 0) return { status: "empty", ...agenda, reason: "The current agenda lists no items (between sittings it can be empty)." };
+    paged: (args) => ({ list: "tops", offset: num(args, "offset") ?? 0 }),
+    run: advised(async (args, context) => {
+      const whole = await getAgenda(context.client);
+      if (whole.tops.length === 0) return { status: "empty", ...whole, total: 0, reason: "The current agenda lists no items (between sittings it can be empty)." };
+      const offset = num(args, "offset") ?? 0;
+      const tops = whole.tops.slice(offset, offset + (num(args, "limit") ?? 200));
+      const total = whole.tops.length;
+      if (tops.length === 0) return { status: "empty", ...whole, total, tops, reason: `offset ${offset} is past the ${total} items; they are at offsets 0 to ${total - 1}.` };
+      const next = offset + tops.length;
+      const agenda = { ...whole, total, tops, ...(next < total ? { nextOffset: next } : {}) };
       // Nearly every item of a sitting deals with a Drucksache: many items and none at all is the
       // sign of a renamed <topdrucksache>, not of a sitting of procedural items.
-      if (agenda.tops.length >= 5 && agenda.drucksachen === 0) {
-        return { status: "ok", ...agenda, reason: `None of the ${agenda.tops.length} items lists a Drucksache, which nearly every item of a sitting has: the feed may have changed. Check the agenda on bundesrat.de before saying an item has none.` };
+      if (total >= 5 && agenda.drucksachen === 0) {
+        return { status: "ok", ...agenda, reason: `None of the ${total} items lists a Drucksache, which nearly every item of a sitting has: the feed may have changed. Check the agenda on bundesrat.de before saying an item has none.` };
       }
       return { status: "ok", ...agenda };
     }),
