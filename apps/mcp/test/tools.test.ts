@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { listTools } from "../src/mcp/server.js";
-import { FeedCache } from "../src/mcp/tools.js";
+import { FeedCache, SIZE_HINT, TOOLS } from "../src/mcp/tools.js";
 import { connect } from "./harness.js";
 import { bundesrat, jsonResponse, makeMockTransport } from "./helpers.js";
 
@@ -226,4 +226,21 @@ test("getAgenda: a long agenda comes a page at a time; total and drucksachen cou
   assert.equal(past["status"], "empty");
   assert.match(String(past["reason"]), /offset 154 is past the 154 items/);
   await connection.close();
+});
+
+test("the size advice fits every tool: each option it names is named with the tools that take it, and it doesn't promise a smaller download", () => {
+  const schemas = new Map(TOOLS.map((tool) => [tool.name, Object.keys((tool.inputSchema as { properties: Record<string, unknown> }).properties)]));
+  const pairs = [...SIZE_HINT.matchAll(/(\w+(?: or \w+)*) \((\w+(?:, \w+)*)\)/g)];
+  assert.ok(pairs.length >= 2, SIZE_HINT);
+  for (const [, options, tools] of pairs) {
+    for (const tool of (tools as string).split(", ")) {
+      for (const option of (options as string).split(" or ")) assert.ok(schemas.get(tool)?.includes(option), `${tool} takes no ${option}: ${SIZE_HINT}`);
+    }
+  }
+  const named = new Set(pairs.flatMap(([, options]) => (options as string).split(" or ")));
+  for (const option of ["state", "party", "limit", "offset", "includeDeputies", "includeCancelled"]) {
+    assert.ok(!new RegExp(`\\b${option}\\b`).test(SIZE_HINT) || named.has(option), `${option} named without its tools: ${SIZE_HINT}`);
+  }
+  assert.doesNotMatch(SIZE_HINT, /members by state or party\.$/);
+  assert.match(SIZE_HINT, /not the download/);
 });
