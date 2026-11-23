@@ -108,11 +108,14 @@ export const TOOLS: readonly ToolDefinition[] = [
     title: "Members of the Bundesrat",
     description: [
       'Who sits in the Bundesrat: the members by Land and party, with head counts. Use it for "Mitglieder des Bundesrates aus Bayern", "wie viele Grüne sitzen im Bundesrat?", "who represents Saxony in the Bundesrat?".',
-      "Only the 69 full members unless includeDeputies: most records are deputies (stellvertretende Mitglieder), and counting them makes party head counts about three times too high. state is one of the 16 Länder, exactly, with umlauts (Thüringen, Baden-Württemberg); party matches as contains (grüne). People come a page at a time (offset, limit); nextOffset says where the next page starts.",
+      "Only the 69 full members unless includeDeputies: most records are deputies (stellvertretende Mitglieder), and counting them makes party head counts about three times too high. state is one of the 16 Länder with umlauts (Thüringen, Baden-Württemberg; case doesn't matter); party matches as contains (grüne). People come a page at a time (offset, limit); nextOffset says where the next page starts.",
       RULES,
     ].join("\n\n"),
     inputSchema: input({
-      state: { type: "string", enum: [...LAENDER], description: "Only members of this Land." },
+      // Not an enum: the client takes a Land in any case and Unicode form (a decomposed umlaut, as
+      // macOS input gives it), and its error lists the sixteen; an enum refused those with a
+      // message that named none.
+      state: { type: "string", minLength: 1, maxLength: 40, description: `Only members of this Land, one of: ${LAENDER.join(", ")} (case and umlaut form don't matter).` },
       party: { type: "string", minLength: 1, maxLength: 50, description: 'Only members whose party contains this text ("CDU", "grüne").' },
       includeDeputies: { type: "boolean", description: "Also list the deputy members (default false)." },
       offset: { type: "integer", minimum: 0, maximum: 10_000, description: "Where the page of people starts (default 0)." },

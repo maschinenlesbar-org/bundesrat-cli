@@ -94,3 +94,18 @@ test("listAppointments: dates already over are left out and counted; a date it c
   await over.close();
   await connection.close();
 });
+
+test("findMembers: a Land in another case, Unicode form or padded is taken; an unknown one is a tool error that lists the Länder", async () => {
+  const connection = await connect({ transport: world });
+  for (const state of ["bayern", "Bayern ", "BAYERN"]) {
+    const result = await connection.call("findMembers", { state });
+    assert.equal(result.isError, undefined, state);
+    assert.deepEqual((result.structuredContent?.["people"] as { name: string }[]).map((p) => p.name), ["Markus Söder"], state);
+  }
+  const nfd = await connection.call("findMembers", { state: "Baden-Württemberg".normalize("NFD") });
+  assert.equal(nfd.structuredContent?.["total"], 1);
+  const wrong = await connection.call("findMembers", { state: "Bavaria" });
+  assert.equal(wrong.isError, true);
+  assert.match(wrong.content[0]?.text ?? "", /Baden-Württemberg, Bayern, Berlin/);
+  await connection.close();
+});
