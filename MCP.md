@@ -69,7 +69,7 @@ For scripts and shared configs, pin a release and its digest from the
 | `findMembers` | The members by Land and party with head counts; full members only unless deputies are asked for. |
 
 Every tool only reads. An answer is JSON (`structuredContent` and the same as text), with the
-`source` it came from and the data licence. A text over 2000 characters is cut and ends in
+`source` it came from (whole, never cut like the data) and the data licence. A text over 2000 characters is cut and ends in
 `…[cut, N characters in all]`, and the answer says `truncated`. A failure is a tool error that
 says what to change (one over 5000 characters loses its middle, never its end, where the reason
 is).
