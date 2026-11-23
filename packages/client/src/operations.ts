@@ -1,7 +1,8 @@
 // The use cases of the skills as library functions, built on the client: each carries the
 // traps the skills document, so no caller (the CLI, the MCP server's tools, a library user) has
 // to know them.
-// - getAgenda: the current plenary agenda in TOP order, the Drucksachen split (bundesrat-agenda);
+// - getAgenda: the current plenary agenda in TOP order, the Drucksachen split, each named in full
+//   (bundesrat-agenda);
 // - listAppointments: the committee dates as ISO times, sorted, cancelled ones marked (bundesrat-agenda);
 // - findMembers: the members by Land and party, full members unless deputies are asked for
 //   (bundesrat-members).
@@ -51,11 +52,31 @@ export function topKey(title: string | undefined): [number, string] {
   return [number, (match?.[2] ?? "").toLowerCase()];
 }
 
-function top(item: AgendaItem): Top {
-  const drucksachen = (item.topdrucksache ?? "")
+/** A Drucksache number ("343/26", "108/26 (neu)"), after its "Drucksache(n)" word. */
+const DRUCKSACHE_NUMBER = /^\d+\/\d+\b/;
+
+/**
+ * The Drucksachen of an element, each named in full. The client joins repeated elements with
+ * "; "; one element may list several itself ("Drucksache 102/26, 103/26", "Drucksachen 104/26
+ * und 105/26", "Drucksache 106/26; 107/26"): when every piece is a number, each becomes
+ * "Drucksache <number>", so no bare number stands without its word. Any other text stays whole.
+ */
+export function splitDrucksachen(text: string | undefined): string[] {
+  return (text ?? "")
     .split(";")
     .map((part) => part.trim())
-    .filter((part) => part !== "");
+    .filter((part) => part !== "")
+    .flatMap((part) => {
+      const pieces = part
+        .replace(/^Drucksachen?\s+/i, "")
+        .split(/\s*(?:,|\bund\b)\s*/)
+        .filter((piece) => piece !== "");
+      return pieces.length > 0 && pieces.every((piece) => DRUCKSACHE_NUMBER.test(piece)) ? pieces.map((piece) => `Drucksache ${piece}`) : [part];
+    });
+}
+
+function top(item: AgendaItem): Top {
+  const drucksachen = splitDrucksachen(item.topdrucksache);
   return {
     top: (item.toptitle ?? "").trim(),
     ...(item.topheader ? { header: item.topheader.trim() } : {}),

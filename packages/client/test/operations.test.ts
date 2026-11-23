@@ -28,6 +28,28 @@ test("getAgenda splits an item's Drucksachen on '; ' and counts them; a procedur
   assert.equal(agenda.drucksachen, 2);
 });
 
+test("getAgenda names every Drucksache of an element in full: a list with commas, und or ';', a suffix kept, other text left whole", async () => {
+  const tops = [
+    "Drucksache 102/26, 103/26",
+    "Drucksache 104/26 und 105/26",
+    "Drucksache 106/26; 107/26",
+    "Drucksache 108/26 (neu)",
+    "Drucksachen 109/26, 110/26 (neu)",
+    "Unterrichtung, siehe Drucksache 111/26",
+  ];
+  const body = tops.map((d, i) => `<top><toptitle>TOP ${i + 1}</toptitle><topdrucksache>${d}</topdrucksache></top>`).join("");
+  const agenda = await getAgenda(client("plenum_aktuelleSitzung_table.xml", body));
+  assert.deepEqual(agenda.tops.map((t) => t.drucksachen), [
+    ["Drucksache 102/26", "Drucksache 103/26"],
+    ["Drucksache 104/26", "Drucksache 105/26"],
+    ["Drucksache 106/26", "Drucksache 107/26"],
+    ["Drucksache 108/26 (neu)"],
+    ["Drucksache 109/26", "Drucksache 110/26 (neu)"],
+    ["Unterrichtung, siehe Drucksache 111/26"],
+  ]);
+  assert.equal(agenda.drucksachen, 10);
+});
+
 test("topKey reads the number and the letter", () => {
   assert.deepEqual(topKey("TOP 67"), [67, ""]);
   assert.deepEqual(topKey("TOP 2b"), [2, "b"]);
