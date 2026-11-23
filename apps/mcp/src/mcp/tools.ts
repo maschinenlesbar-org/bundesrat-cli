@@ -5,7 +5,7 @@
 // every field, one object output schema, and a description of at most 2000 characters: trigger
 // phrases first (German and English), then the traps, then the two rules every tool repeats.
 
-import { findMembers, getAgenda, LAENDER, listAppointments } from "@maschinenlesbar.org/bundesrat-client";
+import { FEEDS, findMembers, getAgenda, LAENDER, listAppointments } from "@maschinenlesbar.org/bundesrat-client";
 import type { JsonSchema, ToolDefinition } from "./server.js";
 
 /** The service, as results and messages name it. */
@@ -54,6 +54,13 @@ const int: JsonSchema = { type: "integer" };
 const str_: JsonSchema = { type: "string" };
 const bool: JsonSchema = { type: "boolean" };
 
+/**
+ * A feed's URL as the client requests it: every feed path needs `?view=renderXml`, without which
+ * bundesrat.de answers with its HTML start page, so a source without it would cite a page without
+ * the data.
+ */
+const feed = (path: string): string => `${path.replace(/^\//, "")}?view=renderXml`;
+
 const num = (args: Record<string, unknown>, key: string): number | undefined => (typeof args[key] === "number" ? (args[key] as number) : undefined);
 const str = (args: Record<string, unknown>, key: string): string | undefined => (typeof args[key] === "string" ? (args[key] as string) : undefined);
 
@@ -68,7 +75,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     ].join("\n\n"),
     inputSchema: input({}),
     outputSchema: output({ title: str_, sitting: str_, when: str_, asOf: str_, draft: bool, tops: arr, drucksachen: int }),
-    source: "iOS/SharedDocs/3_Plenum/plenum_aktuelleSitzung_table.xml",
+    source: feed(FEEDS.session),
     async run(_args, context) {
       const agenda = await getAgenda(context.client);
       if (agenda.tops.length === 0) return { status: "empty", ...agenda, reason: "The current agenda lists no items (between sittings it can be empty)." };
@@ -85,7 +92,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     ].join("\n\n"),
     inputSchema: input({ includeCancelled: { type: "boolean", description: "Also list the dates that are cancelled (default false)." } }),
     outputSchema: output({ total: int, cancelled: int, meetings: arr }),
-    source: "iOS/v3/02_Termine/termine_table.xml",
+    source: feed(FEEDS.appointments),
     async run(args, context) {
       const answer = await listAppointments(context.client, { includeCancelled: args["includeCancelled"] === true });
       if (answer.meetings.length === 0) return { status: "empty", ...answer, reason: answer.total === 0 ? "The feed lists no dates." : "Every listed date is cancelled; ask with includeCancelled." };
@@ -108,7 +115,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       limit: { type: "integer", minimum: 1, maximum: 100, description: "How many people to list (1-100, default 100); the counts always cover all matches." },
     }),
     outputSchema: output({ total: int, byParty: obj, byState: obj, people: arr, nextOffset: int }),
-    source: "iOS/SharedDocs/2_Mitglieder/mitglieder_table.xml",
+    source: feed(FEEDS.members),
     paged: (args) => ({ list: "people", offset: num(args, "offset") ?? 0 }),
     async run(args, context) {
       const answer = await findMembers(context.client, { state: str(args, "state"), party: str(args, "party"), includeDeputies: args["includeDeputies"] === true });

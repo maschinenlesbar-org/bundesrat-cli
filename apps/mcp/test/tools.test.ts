@@ -58,3 +58,17 @@ test("listAppointments: cancelled dates are counted and left out", async () => {
   assert.equal(result.structuredContent?.["cancelled"], 1);
   await connection.close();
 });
+
+test("source is the feed's URL as the request asked for it, with ?view=renderXml (without it bundesrat.de answers its start page)", async () => {
+  const connection = await connect({ transport: world });
+  for (const [tool, path] of [
+    ["getAgenda", "iOS/SharedDocs/3_Plenum/plenum_aktuelleSitzung_table.xml"],
+    ["listAppointments", "iOS/v3/02_Termine/termine_table.xml"],
+    ["findMembers", "iOS/SharedDocs/2_Mitglieder/mitglieder_table.xml"],
+  ] as const) {
+    const result = await connection.call(tool, {});
+    assert.equal(result.structuredContent?.["source"], `https://www.bundesrat.de/${path}?view=renderXml`, tool);
+    assert.ok(world.calls.some((r) => r.url === result.structuredContent?.["source"]), `${tool}: the source is the URL requested`);
+  }
+  await connection.close();
+});
