@@ -110,7 +110,7 @@ export interface Meeting {
   /** ISO local time ("2026-09-25T09:30" or a date "2026-09-22"), German time. */
   start?: string;
   end?: string;
-  /** The title says the meeting doesn't take place ("entfällt"), e.g. replaced by a written poll. */
+  /** The title says the meeting doesn't take place ("entfällt", "abgesagt", …; see {@link isCancelled}), e.g. replaced by a written poll. */
   cancelled: boolean;
   url?: string;
 }
@@ -136,13 +136,23 @@ export function isoFromGerman(value: string | undefined): string | undefined {
   return hh === undefined ? `${y}-${m}-${d}` : `${y}-${m}-${d}T${hh.padStart(2, "0")}:${mm}`;
 }
 
+/**
+ * True when a date's title says it doesn't take place: "entfällt" (the feed's usual word, often
+ * with "/ Umfrageverfahren"), "entfallen", "abgesagt", "fällt aus", "findet nicht statt", in any
+ * case and Unicode form (a decomposed "ä" too). A negated one ("entfällt nicht") is not.
+ */
+export function isCancelled(title: string): boolean {
+  const text = title.normalize("NFC").toLowerCase();
+  return /(?:^|[^\p{L}])(?:entf[äa]llt|entfallen|abgesagt|fällt\s+aus|findet\s+nicht\s+statt)(?![\p{L}])(?!\s+nicht(?![\p{L}]))/u.test(text);
+}
+
 /** The committee dates, sorted by start, cancelled ones marked rather than listed as meetings. */
 export async function listAppointments(client: BundesratClient, input: { includeCancelled?: boolean | undefined } = {}): Promise<Appointments> {
   const all = (await client.appointments()).map((a): Meeting => {
     const start = isoFromGerman(a.startdate);
     const end = isoFromGerman(a.stopdate);
     const title = (a.title ?? "").trim();
-    return { title, ...(start ? { start } : {}), ...(end ? { end } : {}), cancelled: /entf[äa]llt/i.test(title), ...(a.url ? { url: a.url } : {}) };
+    return { title, ...(start ? { start } : {}), ...(end ? { end } : {}), cancelled: isCancelled(title), ...(a.url ? { url: a.url } : {}) };
   });
   const sorted = [...all].sort((a, b) => (a.start === undefined ? 1 : b.start === undefined ? -1 : a.start.localeCompare(b.start)));
   const cancelled = all.filter((m) => m.cancelled).length;

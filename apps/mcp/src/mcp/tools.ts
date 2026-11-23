@@ -87,7 +87,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     title: "The Bundesrat's committee dates",
     description: [
       'Upcoming dates of the Bundesrat and its committees, sorted by start. Use it for "wann tagt der Finanzausschuss?", "Termine des Bundesrates", "when does the Bundesrat meet next?".',
-      "Times are ISO local German time. A date whose title says it doesn't take place (entfällt, often replaced by a written poll) is left out unless includeCancelled; the count of those is always given.",
+      "Times are ISO local German time. A date whose title says it doesn't take place (entfällt, often replaced by a written poll; abgesagt, fällt aus; not \"entfällt nicht\") is left out unless includeCancelled; the count of those is always given.",
       RULES,
     ].join("\n\n"),
     inputSchema: input({ includeCancelled: { type: "boolean", description: "Also list the dates that are cancelled (default false)." } }),

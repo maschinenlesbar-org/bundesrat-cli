@@ -87,6 +87,23 @@ test("listAppointments: German dates sort as dates, cancelled ones (entfällt) a
   assert.equal(all.meetings[0]?.cancelled, true);
 });
 
+test("listAppointments: a date is cancelled by any usual wording, in any Unicode form; a negated one is not", async () => {
+  const titles = [
+    ["Sitzung entf\u0061\u0308llt", true],
+    ["Sitzung ENTFÄLLT", true],
+    ["Sitzung abgesagt", true],
+    ["Sitzung fällt aus", true],
+    ["Die Sitzung findet nicht statt", true],
+    ["Sitzung entfallen", true],
+    ["Die Sitzung entfällt nicht, sie findet statt", false],
+    ["Plenarsitzung", false],
+    ["Sitzung verschoben", false],
+  ] as const;
+  const body = titles.map(([t], i) => `<item><title>${t}</title><startdate>${String(i + 1).padStart(2, "0")}.10.2099</startdate></item>`).join("");
+  const answer = await listAppointments(client("termine_table.xml", body), { includeCancelled: true });
+  assert.deepEqual(answer.meetings.map((m) => [m.title.normalize("NFC"), m.cancelled]), titles.map(([t, c]) => [t.normalize("NFC"), c]));
+});
+
 test("isoFromGerman reads both date forms and refuses others", () => {
   assert.equal(isoFromGerman("22.09.2026"), "2026-09-22");
   assert.equal(isoFromGerman("2026-07-15 14:00"), "2026-07-15T14:00");
