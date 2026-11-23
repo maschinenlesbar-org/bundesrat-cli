@@ -244,3 +244,17 @@ test("the size advice fits every tool: each option it names is named with the to
   assert.doesNotMatch(SIZE_HINT, /members by state or party\.$/);
   assert.match(SIZE_HINT, /not the download/);
 });
+
+test("getAgenda: a sitting that is over says so, and where the next one is found", async () => {
+  const session = (header: string) => bundesrat({ session: { fields: { title: "1070. Sitzung des Bundesrates", header }, tops: [{ toptitle: "TOP 1", topdrucksache: "Drucksache 1/20" }] } });
+  const over = await connect({ transport: session("am Freitag, dem 20. November 2020, 9:30 Uhr") });
+  const past = (await over.call("getAgenda", {})).structuredContent ?? {};
+  assert.equal(past["date"], "2020-11-20");
+  assert.equal(past["past"], true);
+  assert.match(String(past["reason"]), /sitting of 2020-11-20 is over.*listAppointments/);
+  await over.close();
+  const next = await connect({ transport: session("am Freitag, dem 19. November 2099, 9:30 Uhr") });
+  const coming = (await next.call("getAgenda", {})).structuredContent ?? {};
+  assert.deepEqual([coming["date"], coming["past"], coming["reason"]], ["2099-11-19", false, undefined]);
+  await next.close();
+});

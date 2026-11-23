@@ -192,3 +192,20 @@ test("findMembers: a feed with nobody, no full member, no party or no Land is an
     await assert.rejects(findMembers(client("mitglieder_table.xml", body)), (err: Error) => err instanceof BundesratParseError && why.test(err.message) && /the feed may have changed/.test(err.message), body);
   }
 });
+
+test("getAgenda reads the sitting's day from its date line and says when it is over (the feed keeps the last sitting)", async () => {
+  const body = (header: string) => `<title>1070. Sitzung des Bundesrates</title><header>${header}</header><top><toptitle>TOP 1</toptitle></top>`;
+  const on = (header: string, now: Date) => getAgenda(client("plenum_aktuelleSitzung_table.xml", body(header)), { now });
+  const sunday = new Date("2026-11-22T14:27:00Z");
+  const friday = await on("am Freitag, dem 20. November 2026, 9:30 Uhr", sunday);
+  assert.equal(friday.date, "2026-11-20");
+  assert.equal(friday.past, true);
+  const today = await on("am Freitag, dem 20. November 2026, 9:30 Uhr", new Date("2026-11-20T15:00:00Z"));
+  assert.equal(today.past, false, "the day of the sitting is not over");
+  const march = await on("am Freitag, dem 6. März 2026, 9:30 Uhr", new Date("2026-03-01T00:00:00Z"));
+  assert.deepEqual([march.date, march.past], ["2026-03-06", false]);
+  assert.equal((await on("am 18.12.2026", sunday)).date, "2026-12-18");
+  const unknown = await on("demnächst", sunday);
+  assert.deepEqual([unknown.date, unknown.past], [undefined, undefined]);
+  assert.equal((await on("am 31. Februar 2026", sunday)).date, undefined);
+});

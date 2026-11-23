@@ -30,6 +30,13 @@ export interface Agenda {
   when?: string;
   /** The date the agenda is as of (DD.MM.YYYY). */
   asOf?: string;
+  /** The sitting's day, ISO ("2026-11-20"), read from `when`; absent when it can't be read. */
+  date?: string;
+  /**
+   * True when the sitting's day is before today in Germany: the feed keeps the last sitting until
+   * the next agenda is published, so between sittings this is not the next one. Absent without a date.
+   */
+  past?: boolean;
   /** True when the title says the agenda is a draft ("Tagesordnung Entwurf"). */
   draft: boolean;
   /** The items in TOP order (number, then letter; items without a number first). */
@@ -86,9 +93,29 @@ function top(item: AgendaItem): Top {
   };
 }
 
-/** The current plenary sitting's agenda, in TOP order (the feed lists the items out of order). */
-export async function getAgenda(client: BundesratClient): Promise<Agenda> {
+const MONTHS = ["januar", "februar", "märz", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "dezember"];
+
+/**
+ * The day a sitting's date line names, ISO: "am Freitag, dem 20. November 2026, 9:30 Uhr" and
+ * "am 20.11.2026" give "2026-11-20"; a day that doesn't exist or no date gives undefined.
+ */
+export function sittingDate(when: string | undefined): string | undefined {
+  const text = (when ?? "").normalize("NFC").toLowerCase();
+  const named = /(\d{1,2})\.\s*(januar|februar|märz|april|mai|juni|juli|august|september|oktober|november|dezember)\s+(\d{4})/.exec(text);
+  const dotted = /(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(text);
+  const [d, m, y] = named !== null ? [Number(named[1]), MONTHS.indexOf(named[2] ?? "") + 1, Number(named[3])] : dotted !== null ? [Number(dotted[1]), Number(dotted[2]), Number(dotted[3])] : [];
+  if (d === undefined || m === undefined || y === undefined || !possible(y, m, d)) return undefined;
+  return `${y}-${pad(m)}-${pad(d)}`;
+}
+
+/**
+ * The current plenary sitting's agenda, in TOP order (the feed lists the items out of order), with
+ * the sitting's day and whether it is over (`now`, default the clock): between sittings the feed
+ * still holds the last one.
+ */
+export async function getAgenda(client: BundesratClient, input: { now?: Date | undefined } = {}): Promise<Agenda> {
   const session = await client.session();
+  const date = sittingDate(session.header);
   const tops = session.tops.map(top).sort((a, b) => {
     const [na, sa] = topKey(a.top);
     const [nb, sb] = topKey(b.top);
@@ -99,6 +126,7 @@ export async function getAgenda(client: BundesratClient): Promise<Agenda> {
     ...(session.sitzung ? { sitting: session.sitzung } : {}),
     ...(session.header ? { when: session.header } : {}),
     ...(session.stand ? { asOf: session.stand } : {}),
+    ...(date === undefined ? {} : { date, past: date < germanToday(input.now) }),
     draft: /entwurf/i.test(session.title ?? ""),
     tops,
     drucksachen: tops.reduce((n, t) => n + t.drucksachen.length, 0),
