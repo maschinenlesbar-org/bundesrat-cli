@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { listTools } from "../src/mcp/server.js";
 import { FeedCache } from "../src/mcp/tools.js";
 import { connect } from "./harness.js";
-import { bundesrat } from "./helpers.js";
+import { bundesrat, jsonResponse, makeMockTransport } from "./helpers.js";
 
 const world = bundesrat({
   session: {
@@ -188,4 +188,20 @@ test("FeedCache: an entry is kept for its time, then fetched again; a failed fet
   const other = {};
   await assert.rejects(cache.get(other, async () => Promise.reject(new Error("down"))));
   assert.equal(await cache.get(other, fetch), "answer 3");
+});
+
+test("a request that times out, a reset or a 5xx ends in a tool error that says to try again shortly", async () => {
+  const failing = [
+    makeMockTransport(() => Promise.reject(Object.assign(new Error("Request exceeded the 2000ms deadline"), { code: "ETIMEDOUT" }))),
+    makeMockTransport(() => jsonResponse({ error: "boom" }, 500)),
+  ];
+  for (const mock of failing) {
+    const connection = await connect({ transport: mock });
+    for (const tool of ["getAgenda", "listAppointments", "findMembers"]) {
+      const result = await connection.call(tool, {});
+      assert.equal(result.isError, true, tool);
+      assert.match(result.content[0]?.text ?? "", /\. The Bundesrat's feed is slow or unavailable; try again shortly\.$/, tool);
+    }
+    await connection.close();
+  }
 });

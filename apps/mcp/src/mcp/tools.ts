@@ -5,7 +5,7 @@
 // every field, one object output schema, and a description of at most 2000 characters: trigger
 // phrases first (German and English), then the traps, then the two rules every tool repeats.
 
-import { FEEDS, findMembers, getAgenda, LAENDER, listAppointments, type Member } from "@maschinenlesbar.org/bundesrat-client";
+import { BundesratApiError, BundesratNetworkError, FEEDS, findMembers, getAgenda, LAENDER, listAppointments, type Member } from "@maschinenlesbar.org/bundesrat-client";
 import type { JsonSchema, ToolDefinition } from "./server.js";
 
 /** The service, as results and messages name it. */
@@ -25,6 +25,33 @@ export const INSTRUCTIONS = [
 
 /** The deadline's error says what to ask instead. */
 export const DEADLINE_HINT = "The Bundesrat's feed is slow or unavailable; try again shortly.";
+
+/**
+ * `run` with the deadline's advice added to a failed request's error, in the same error class (the
+ * server logs and words it by class): a timeout, a reset or another network failure, and a 5xx or
+ * 429 after the client's retries. The client's messages name only what failed, and with the
+ * defaults (request 30 s, call 45 s) a hang ends at the request's timeout, never at the call's
+ * deadline, whose error is the only one that had advice. A 429 whose Retry-After was too long says
+ * to try again later already.
+ */
+function advised(run: ToolDefinition["run"]): ToolDefinition["run"] {
+  return async (args, context) => {
+    try {
+      return await run(args, context);
+    } catch (err) {
+      throw withAdvice(err);
+    }
+  };
+}
+
+function withAdvice(err: unknown): unknown {
+  const add = (message: string): string => `${message}${/[.!?]$/.test(message) ? "" : "."} ${DEADLINE_HINT}`;
+  if (err instanceof BundesratNetworkError) return new BundesratNetworkError(add(err.message), { cause: err });
+  if (err instanceof BundesratApiError && (err.status >= 500 || err.status === 429) && err.retryAfterMs === undefined) {
+    return new BundesratApiError({ status: err.status, url: err.url, method: err.method, body: err.body, detail: err.detail === undefined ? DEADLINE_HINT : add(err.detail) });
+  }
+  return err;
+}
 
 /** An answer over the size cap says what to ask instead. */
 export const SIZE_HINT = "Narrow the members by state or party.";
@@ -102,7 +129,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     inputSchema: input({}),
     outputSchema: output({ title: str_, sitting: str_, when: str_, asOf: str_, draft: bool, tops: arr, drucksachen: int }),
     source: feed(FEEDS.session),
-    async run(_args, context) {
+    run: advised(async (_args, context) => {
       const agenda = await getAgenda(context.client);
       if (agenda.tops.length === 0) return { status: "empty", ...agenda, reason: "The current agenda lists no items (between sittings it can be empty)." };
       // Nearly every item of a sitting deals with a Drucksache: many items and none at all is the
@@ -111,7 +138,7 @@ export const TOOLS: readonly ToolDefinition[] = [
         return { status: "ok", ...agenda, reason: `None of the ${agenda.tops.length} items lists a Drucksache, which nearly every item of a sitting has: the feed may have changed. Check the agenda on bundesrat.de before saying an item has none.` };
       }
       return { status: "ok", ...agenda };
-    },
+    }),
   },
   {
     name: "listAppointments",
@@ -124,7 +151,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     inputSchema: input({ includeCancelled: { type: "boolean", description: "Also list the dates that are cancelled (default false)." } }),
     outputSchema: output({ total: int, cancelled: int, past: int, unreadable: int, meetings: arr }),
     source: feed(FEEDS.appointments),
-    async run(args, context) {
+    run: advised(async (args, context) => {
       const answer = await listAppointments(context.client, { includeCancelled: args["includeCancelled"] === true });
       const unreadable = answer.unreadable === 0 ? "" : ` ${answer.unreadable} date${answer.unreadable === 1 ? " has a start or end" : "s have starts or ends"} in a form this server doesn't read: the feed's text is in startText or endText (the feed may have changed its date form).`;
       if (answer.meetings.length === 0) {
@@ -132,7 +159,7 @@ export const TOOLS: readonly ToolDefinition[] = [
         return { status: "empty", ...answer, reason: `${why}${unreadable}` };
       }
       return { status: "ok", ...answer, ...(unreadable === "" ? {} : { reason: unreadable.trim() }) };
-    },
+    }),
   },
   {
     name: "findMembers",
@@ -156,7 +183,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     outputSchema: output({ total: int, byParty: obj, byState: obj, people: arr, designated: arr, nextOffset: int }),
     source: feed(FEEDS.members),
     paged: (args) => ({ list: "people", offset: num(args, "offset") ?? 0 }),
-    async run(args, context) {
+    run: advised(async (args, context) => {
       const { client } = context;
       const input = { state: str(args, "state"), party: str(args, "party"), includeDeputies: args["includeDeputies"] === true, includePlenipotentiaries: args["includePlenipotentiaries"] === true };
       const answer = await findMembers(client, input, () => membersFeed.get(client, () => client.members()));
@@ -166,6 +193,6 @@ export const TOOLS: readonly ToolDefinition[] = [
       if (people.length === 0) return { status: "empty", ...answer, people, reason: `offset ${offset} is past the ${answer.total} matches; the people are at offsets 0 to ${answer.total - 1}.` };
       const next = offset + people.length;
       return { status: "ok", ...answer, people, ...(next < answer.total ? { nextOffset: next } : {}) };
-    },
+    }),
   },
 ];
