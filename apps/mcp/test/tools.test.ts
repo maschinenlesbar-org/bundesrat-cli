@@ -133,3 +133,17 @@ test("findMembers: a designated successor comes apart and isn't counted", async 
   assert.deepEqual((answer["designated"] as { name: string }[]).map((p) => p.name), ["Neue Nachfolgerin"]);
   await connection.close();
 });
+
+test("findMembers: a Land's plenipotentiary who isn't a member comes with includePlenipotentiaries", async () => {
+  const feed = bundesrat({
+    members: [
+      { firstname: "Markus", name: "Söder", party: "CSU", state: "Bayern", brmitglied: "true", mitglied: "true" },
+      { firstname: "Paula", name: "Bevollmächtigte", state: "Bayern", brmitglied: "false", mitglied: "false", bv: "true" },
+    ],
+  });
+  const connection = await connect({ transport: feed });
+  assert.equal((await connection.call("findMembers", { includeDeputies: true })).structuredContent?.["total"], 1);
+  const answer = (await connection.call("findMembers", { state: "Bayern", includePlenipotentiaries: true })).structuredContent ?? {};
+  assert.deepEqual((answer["people"] as { name: string; role: string }[]).map((p) => [p.name, p.role]), [["Markus Söder", "member"], ["Paula Bevollmächtigte", "plenipotentiary"]]);
+  await connection.close();
+});

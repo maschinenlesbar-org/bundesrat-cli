@@ -4,8 +4,8 @@
 // - getAgenda: the current plenary agenda in TOP order, the Drucksachen split, each named in full
 //   (bundesrat-agenda);
 // - listAppointments: the committee dates as ISO times, sorted, cancelled ones marked (bundesrat-agenda);
-// - findMembers: the members by Land and party, full members unless deputies are asked for
-//   (bundesrat-members).
+// - findMembers: the members by Land and party, full members unless deputies or the Länder's
+//   plenipotentiaries are asked for (bundesrat-members).
 
 import type { BundesratClient } from "./client.js";
 import type { AgendaItem, Member } from "./types.js";
@@ -245,8 +245,11 @@ export interface Person {
   name: string;
   party?: string;
   state?: string;
-  /** member: one of the 69 full members; deputy: a deputy member (stellvertretendes Mitglied). */
-  role: "member" | "deputy";
+  /**
+   * member: one of the 69 full members; deputy: a deputy member (stellvertretendes Mitglied);
+   * plenipotentiary: a Land's plenipotentiary (Bevollmächtigte:r) who is neither.
+   */
+  role: "member" | "deputy" | "plenipotentiary";
   /** Designated, not yet in office. */
   designated: boolean;
   url?: string;
@@ -270,7 +273,7 @@ function person(m: Member): Person {
     name,
     ...(m.party ? { party: m.party.trim() } : {}),
     ...(m.state ? { state: m.state.trim() } : {}),
-    role: m.mitglied === "true" ? "member" : "deputy",
+    role: m.mitglied === "true" ? "member" : m.brmitglied === "true" ? "deputy" : "plenipotentiary",
     designated: m.designiert === "true",
     ...(m.url ? { url: m.url } : {}),
   };
@@ -279,13 +282,15 @@ function person(m: Member): Person {
 /**
  * The members of the Bundesrat, filtered by Land (exact, one of the sixteen) and party (contains).
  * Full members only (`mitglied`), unless `includeDeputies`: the feed's records are mostly deputies,
- * so counting all of them gives party head counts about three times too high. A designated person
+ * so counting all of them gives party head counts about three times too high. The Länder's
+ * plenipotentiaries who are not members (Bevollmächtigte, `bv` only) come with
+ * `includePlenipotentiaries`, as role "plenipotentiary". A designated person
  * (not yet in office) is listed apart in `designated` and not counted, and a record the feed repeats
  * counts once, so the full members are never more than the 69 seats.
  */
 export async function findMembers(
   client: BundesratClient,
-  input: { state?: string | undefined; party?: string | undefined; includeDeputies?: boolean | undefined } = {},
+  input: { state?: string | undefined; party?: string | undefined; includeDeputies?: boolean | undefined; includePlenipotentiaries?: boolean | undefined } = {},
 ): Promise<Members> {
   const records = await client.members({ ...(input.state === undefined ? {} : { state: input.state }), ...(input.party === undefined ? {} : { party: input.party }) });
   // The same record twice (the feed has repeated one) is one person.
@@ -294,7 +299,8 @@ export async function findMembers(
     const key = JSON.stringify(Object.entries(m).sort(([a], [b]) => a.localeCompare(b)));
     return seen.has(key) ? false : (seen.add(key), true);
   });
-  const matches = unique.filter((m) => m.brmitglied === "true" || m.mitglied === "true").map(person).filter((p) => input.includeDeputies === true || p.role === "member");
+  const asked = (p: Person): boolean => p.role === "member" || (p.role === "deputy" ? input.includeDeputies === true : input.includePlenipotentiaries === true);
+  const matches = unique.filter((m) => m.brmitglied === "true" || m.mitglied === "true" || m.bv === "true").map(person).filter(asked);
   const people = matches.filter((p) => !p.designated);
   const count = (key: "party" | "state"): Record<string, number> =>
     people.reduce<Record<string, number>>((acc, p) => {

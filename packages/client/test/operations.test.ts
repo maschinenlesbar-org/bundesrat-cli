@@ -167,3 +167,16 @@ test("findMembers: a designated successor is listed apart, not counted; the same
   assert.deepEqual(members.byParty, { CSU: 2 });
   assert.deepEqual(members.designated.map((p) => [p.name, p.designated]), [["C", true]]);
 });
+
+test("findMembers: the Länder's plenipotentiaries (bv only) come with includePlenipotentiaries, with a role of their own", async () => {
+  const body =
+    "<employee><name>A</name><party>CSU</party><state>Bayern</state><brmitglied>true</brmitglied><mitglied>true</mitglied><bv>true</bv></employee>" +
+    "<employee><name>B</name><party>CSU</party><state>Bayern</state><brmitglied>true</brmitglied><mitglied>false</mitglied></employee>" +
+    "<employee><name>P</name><state>Bayern</state><brmitglied>false</brmitglied><mitglied>false</mitglied><bv>true</bv></employee>";
+  const plain = await findMembers(client("mitglieder_table.xml", body), { includeDeputies: true });
+  assert.deepEqual(plain.people.map((p) => p.name), ["A", "B"]);
+  const all = await findMembers(client("mitglieder_table.xml", body), { includeDeputies: true, includePlenipotentiaries: true });
+  assert.deepEqual(all.people.map((p) => [p.name, p.role]), [["A", "member"], ["B", "deputy"], ["P", "plenipotentiary"]]);
+  const only = await findMembers(client("mitglieder_table.xml", body), { includePlenipotentiaries: true });
+  assert.deepEqual(only.people.map((p) => [p.name, p.role]), [["A", "member"], ["P", "plenipotentiary"]]);
+});

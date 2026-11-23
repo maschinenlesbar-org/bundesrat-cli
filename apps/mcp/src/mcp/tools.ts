@@ -108,7 +108,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     title: "Members of the Bundesrat",
     description: [
       'Who sits in the Bundesrat: the members by Land and party, with head counts. Use it for "Mitglieder des Bundesrates aus Bayern", "wie viele Grüne sitzen im Bundesrat?", "who represents Saxony in the Bundesrat?".',
-      "Only the 69 full members unless includeDeputies: most records are deputies (stellvertretende Mitglieder), and counting them makes party head counts about three times too high. state is one of the 16 Länder with umlauts (Thüringen, Baden-Württemberg; case doesn't matter); party matches as contains (grüne). A designated successor (not yet in office) is listed apart in designated and not counted. People come a page at a time (offset, limit); nextOffset says where the next page starts.",
+      "Only the 69 full members unless includeDeputies: most records are deputies (stellvertretende Mitglieder), and counting them makes party head counts about three times too high. state is one of the 16 Länder with umlauts (Thüringen, Baden-Württemberg; case doesn't matter); party matches as contains (grüne). A Land's plenipotentiary (Bevollmächtigte:r, often the Land's representative in Berlin) who isn't a member comes only with includePlenipotentiaries. A designated successor (not yet in office) is listed apart in designated and not counted. People come a page at a time (offset, limit); nextOffset says where the next page starts.",
       RULES,
     ].join("\n\n"),
     inputSchema: input({
@@ -118,6 +118,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       state: { type: "string", minLength: 1, maxLength: 40, description: `Only members of this Land, one of: ${LAENDER.join(", ")} (case and umlaut form don't matter).` },
       party: { type: "string", minLength: 1, maxLength: 50, description: 'Only members whose party contains this text ("CDU", "grüne").' },
       includeDeputies: { type: "boolean", description: "Also list the deputy members (default false)." },
+      includePlenipotentiaries: { type: "boolean", description: "Also list the Länder's plenipotentiaries who aren't members (Bevollmächtigte, role plenipotentiary; default false)." },
       offset: { type: "integer", minimum: 0, maximum: 10_000, description: "Where the page of people starts (default 0)." },
       limit: { type: "integer", minimum: 1, maximum: 100, description: "How many people to list (1-100, default 100); the counts always cover all matches." },
     }),
@@ -125,7 +126,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     source: feed(FEEDS.members),
     paged: (args) => ({ list: "people", offset: num(args, "offset") ?? 0 }),
     async run(args, context) {
-      const answer = await findMembers(context.client, { state: str(args, "state"), party: str(args, "party"), includeDeputies: args["includeDeputies"] === true });
+      const answer = await findMembers(context.client, { state: str(args, "state"), party: str(args, "party"), includeDeputies: args["includeDeputies"] === true, includePlenipotentiaries: args["includePlenipotentiaries"] === true });
       if (answer.total === 0) return { status: "empty", ...answer, reason: "No member matches; try a shorter party text, or includeDeputies." };
       const offset = num(args, "offset") ?? 0;
       const people = answer.people.slice(offset, offset + (num(args, "limit") ?? 100));
