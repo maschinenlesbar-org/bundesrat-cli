@@ -125,7 +125,10 @@ replaced with U+FFFD (see "The XML parser"); a throw in it is swallowed, and the
 The engine enforces the transport contract itself, so the limits hold for a custom
 transport (a `fetch` wrapper, a raw `node:http` one) too: every call races a deadline of
 `timeoutMs` and gets an `AbortSignal` (`HttpRequest.signal`, honoured by the default
-transport) that fires then (the default transport joins small chunks of a body as they arrive,
+transport) that fires then, with the engine's timeout error as its reason (the default transport
+stops with that reason, and for a signal some other caller aborted, the MCP server's tool call:
+its deadline, a cancellation, it says "Request aborted by its caller before it finished", never a
+timeout it didn't have; the default transport joins small chunks of a body as they arrive,
 at most 1024 of them or 64 KiB, so its memory follows the bytes, not the number of chunks a
 server sends); the body it gets back is checked against `maxResponseBytes`
 ("Response exceeded the size limit of N bytes (maxResponseBytes; --max-response-bytes on
